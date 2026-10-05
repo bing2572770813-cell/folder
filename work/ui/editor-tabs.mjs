@@ -29,8 +29,12 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const selectionModeLabel=document.createElement('span');selectionModeLabel.className='selection-mode-label';selectionModeLabel.textContent='选区 · 单选';selectTool.append(selectionModeLabel);
   selection.querySelector('summary').textContent='区域标签';
   selectionTools.append(selection);
-  block.querySelector('h2').textContent='防止参数';
-  block.classList.add('block-entity-parameters');
+  block.querySelector('h2').remove();
+  const contour = document.createElement('section');
+  contour.className='block-entity-parameters';
+  const contourTitle=document.createElement('h3');contourTitle.className='section-label';contourTitle.textContent='轮廓参数';
+  contour.append(contourTitle,find('blockHeight').closest('.studio-fields'));
+  entitySelector.querySelector('#prefabSummary').parentElement.append(contour);
   selectorSection.append(block);
   panels.get('map').append(tools, selectorSection, selectionTools, fold);
   panels.get('inspect').append(facing);

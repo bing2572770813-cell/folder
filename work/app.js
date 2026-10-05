@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import demoMap from '../outputs/fold-field-demo.json';
-import { contains, rectangle, region, pasteRegion, changeRegion, moveRegion, transformRegion, fillRegion, symmetricCells } from './editor-model.mjs';
-import { Copy, ClipboardPaste, Move, PaintBucket, FlipHorizontal, FlipVertical, Redo2 } from 'lucide';
+import { contains, rectangle, region, pasteRegion } from './editor-model.mjs';
+import { Copy, ClipboardPaste, Redo2 } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
 
-const icons = { Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Move, PaintBucket, FlipHorizontal, FlipVertical, Redo2 };
+const icons = { Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Redo2 };
 for (const node of document.querySelectorAll('[data-lucide]')) {
   const name=node.dataset.lucide.replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
@@ -25,7 +25,7 @@ const blankTile = () => ({ color: 'white', fold: null });
 let map = defaultMap(), player = { ...map.spawn }, mode = GAME_ONLY ? 'play' : 'edit', tool = 'paint', color = 'white', foldType = 'h';
 let steps = 0, teleports = 0, moving = false, levelWon = false, stepLimitHit = false, legalMoves = [], chosenFold = null, hovered = null, showGrid = true;
 let editHistory = [], playHistory = [], animation = null, saveTimer = null, tooltipTimer = null;
-let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, testPosition=null, previewAxis=null, previewEnabled=false, gestureBefore=null, editSession=null, runStart=null;
+let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, gestureBefore=null;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); player = { ...map.spawn }; } } catch { /* An invalid saved map falls back to the sample map. */ }
 
 function defaultMap() {
@@ -69,7 +69,7 @@ function foldTargetFor(axis,position=player) {
 function finishRun(kind) {
   if(kind==='win'){
     levelWon=true;stepLimitHit=false;
-    if(!editSession&&(map.bestSteps===null||steps<map.bestSteps)){map.bestSteps=steps;persist();}
+    if(map.bestSteps===null||steps<map.bestSteps){map.bestSteps=steps;persist();}
     $('resultTitle').textContent='通关！';
     $('resultDetail').textContent=`${map.name} · ${steps} 步${map.bestSteps===steps?' · 新纪录':''}`;
     toast(`通关！到达出口 ${coord(player.r,player.c)}`);
@@ -107,8 +107,8 @@ viewport.appendChild(renderer.domElement);
 const camera=new THREE.OrthographicCamera(-10,10,8,-8,.1,150);
 const controls=new OrbitControls(camera,renderer.domElement);
 controls.enableRotate=false; controls.enableDamping=true; controls.dampingFactor=.12; controls.screenSpacePanning=true;
-controls.minZoom=.3; controls.maxZoom=4; controls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.PAN,RIGHT:THREE.MOUSE.PAN};
-controls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_PAN};
+controls.minZoom=.3; controls.maxZoom=4; controls.mouseButtons={LEFT:null,MIDDLE:null,RIGHT:THREE.MOUSE.PAN};
+controls.touches={ONE:null,TWO:THREE.TOUCH.DOLLY_PAN};
 let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
 const paper=new THREE.Group(); scene.add(paper);
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
@@ -270,7 +270,7 @@ $('exportGame').onclick=exportGameHtml;
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=null,lastClickTile=null,lastEditKey=null,dragEdited=false,multiTouch=false;const activePointers=new Set();
 function hitAt(clientX,clientY){const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);return raycaster.intersectObjects(hitCells,false)[0]?.object.userData??null;}
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
-renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);if(activePointers.size>1)multiTouch=true;pointerDown={x:e.clientX,y:e.clientY,button:e.button,pointerType:e.pointerType};lastEditKey=null;dragEdited=false;manualPan=e.button===2||e.button===1||e.button===0&&e.shiftKey;renderer.domElement.setPointerCapture(e.pointerId);});
+renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);if(activePointers.size>1)multiTouch=true;pointerDown={x:e.clientX,y:e.clientY,button:e.button,pointerType:e.pointerType};lastEditKey=null;dragEdited=false;manualPan=e.button===2;renderer.domElement.setPointerCapture(e.pointerId);});
 renderer.domElement.addEventListener('pointermove',e=>{
   if(manualPan){hoverOutline.visible=false;return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
   if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));$('hoverCoord').textContent=coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?COLOR_NAMES[map.tiles[hit.r][hit.c].color]:'空格');}else{hoverOutline.visible=false;$('hoverCoord').textContent='—';}

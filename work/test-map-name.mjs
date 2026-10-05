@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {normalizeMapName,mapFilename} from './map-name.mjs';
+assert.equal(normalizeMapName('  回折 · 孤岛  '),'回折 · 孤岛');
+assert.equal(normalizeMapName('   '),'未命名关卡');
+assert.equal(normalizeMapName(null),'未命名关卡');
+assert.equal(normalizeMapName('图'.repeat(60)).length,48);
+assert.equal(mapFilename('第一关'),'第一关.json');
+assert.equal(mapFilename('A/B:C*?'),'A_B_C__.json');
+assert.equal(mapFilename('CON'),'_CON.json');
+assert.equal(mapFilename('...'),'未命名关卡.json');
+console.log('PASS: map name normalization, Unicode filenames, invalid filename characters and reserved names.');

@@ -1,9 +1,6 @@
 import * as THREE from 'three';
 import demoMap from '../outputs/fold-field-demo.json';
 import { contains, rectangle, region, pasteRegion, changeRegion, moveRegion, transformRegion, fillRegion, symmetricCells } from './editor-model.mjs';
-import { createLevel, normalizeProject, duplicateLevel as duplicateProjectLevel, removeLevel as removeProjectLevel, moveLevel as moveProjectLevel, snapshotLevel as snapshotProjectLevel } from './level-group.mjs';
-import { analyzeLevel, validateLevel } from './level-analysis.mjs';
-import { createMechanics, movementMechanic, createMechanicContext } from './mechanics.mjs';
 import { Copy, ClipboardPaste, Move, PaintBucket, FlipHorizontal, FlipVertical, Redo2 } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
@@ -14,10 +11,6 @@ for (const node of document.querySelectorAll('[data-lucide]')) {
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
 const $ = id => document.getElementById(id);
-const editorWorkspaceGroups={map:[1,2,6,7,9,10],fold:[3,4,5,8],level:[11,12]};
-let editorWorkspace='map';
-function setEditorWorkspace(next){if(!editorWorkspaceGroups[next])return;editorWorkspace=next;const children=[...$('editPanel').children];for(const [group,indices] of Object.entries(editorWorkspaceGroups))for(const index of indices){const node=children[index-1];if(node)node.hidden=group!==next;}document.querySelectorAll('[data-editor-workspace]').forEach(button=>{const active=button.dataset.editorWorkspace===next;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});}
-document.querySelectorAll('[data-editor-workspace]').forEach(button=>button.addEventListener('click',()=>setEditorWorkspace(button.dataset.editorWorkspace)));
 const GAME_ONLY = Boolean(window.__FOLD_FIELD_GAME_ONLY__);
 if (GAME_ONLY) document.body.classList.add('game-only');
 const COLORS = { white: '#f4f5ed', red: '#e97c73', yellow: '#e9cf72', blue: '#7ebed3', green: '#91bd83', purple: '#b6a0d0', black: '#303a38' };
@@ -25,24 +18,15 @@ const COLOR_NAMES = { white: '纸白', red: '珊瑚红', yellow: '麦穗黄', bl
 const FOLDS = ['h','v','d1','d2'];
 const FOLD_NAMES = { h: '横向折线', v: '纵向折线', d1: '对角折线 ↘', d2: '对角折线 ↗' };
 const FACE_NAMES = ['北','东北','东','东南','南','西南','西','西北'];
-const STORAGE_KEY = 'fold-field-map-v1', PROJECT_KEY = 'fold-field-project-v1';
+const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
-const EMBEDDED_PROJECT = window.__FOLD_FIELD_EXPORT_PROJECT__;
 const clone = data => JSON.parse(JSON.stringify(data));
 const blankTile = () => ({ color: 'white', fold: null });
 let map = defaultMap(), player = { ...map.spawn }, mode = GAME_ONLY ? 'play' : 'edit', tool = 'paint', color = 'white', foldType = 'h';
 let steps = 0, teleports = 0, moving = false, levelWon = false, stepLimitHit = false, legalMoves = [], chosenFold = null, hovered = null, showGrid = true;
 let editHistory = [], playHistory = [], animation = null, saveTimer = null, tooltipTimer = null;
 let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, testPosition=null, previewAxis=null, previewEnabled=false, gestureBefore=null, editSession=null, runStart=null;
-let runLog=[];
-let analysisPath=null, replayTimer=null;
-const runtimeMechanics=createMechanics().register(movementMechanic);
-let project={version:1,name:'折纸关卡组',activeId:'level-demo',levels:[]}, activeLevel=null;
-function saveProject(){if(!activeLevel)return;activeLevel.map=clone(map);activeLevel.name=map.name;project.activeId=activeLevel.id;try{localStorage.setItem(PROJECT_KEY,JSON.stringify(project));}catch{}}
-function loadProject(){try{const raw=localStorage.getItem(PROJECT_KEY);if(raw)project=normalizeProject(JSON.parse(raw));}catch{}if(!project.levels.length)project=normalizeProject({version:1,name:'折纸关卡组',activeId:'level-demo',levels:[createLevel(map,'level-demo')]});activeLevel=project.levels.find(level=>level.id===project.activeId)||project.levels[0];map=validateMap(activeLevel.map,true);}
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); player = { ...map.spawn }; } } catch { /* An invalid saved map falls back to the sample map. */ }
-if (EMBEDDED_PROJECT) { try { project=normalizeProject(EMBEDDED_PROJECT); activeLevel=project.levels.find(level=>level.id===project.activeId)||project.levels[0]; map=validateMap(activeLevel.map,true); player={...map.spawn}; } catch {} }
-else if (!GAME_ONLY) loadProject();
 
 function defaultMap() {
   return clone(demoMap);
@@ -62,8 +46,7 @@ function validateMap(data,allowDraft=false) {
   if(!Number.isInteger(maxSteps)||maxSteps<0||maxSteps>999)throw new Error('最大步数须为 0–999 的整数');
   const bestSteps=data.bestSteps==null?null:Number(data.bestSteps);
   if(bestSteps!==null&&(!Number.isInteger(bestSteps)||bestSteps<0||bestSteps>9999))throw new Error('最佳步数无效');
-  const mechanics=Array.isArray(data.mechanics)?data.mechanics.filter(item=>item&&typeof item.id==='string').map(item=>({id:item.id,config:item.config??{}})).slice(0,64):[];
-  return {version:1,width:data.width,height:data.height,tiles,spawn:{r:s.r,c:s.c,dir:s.dir},exit:exit?{r:exit.r,c:exit.c}:null,name:typeof data.name==='string'&&data.name.trim()?data.name.trim().slice(0,48):'未命名关卡',description:typeof data.description==='string'?data.description.slice(0,240):'',maxSteps,bestSteps,mechanics};
+  return {version:1,width:data.width,height:data.height,tiles,spawn:{r:s.r,c:s.c,dir:s.dir},exit:exit?{r:exit.r,c:exit.c}:null,name:typeof data.name==='string'&&data.name.trim()?data.name.trim().slice(0,48):'未命名关卡',description:typeof data.description==='string'?data.description.slice(0,240):'',maxSteps,bestSteps};
 }
 function validateForPlay() {
   const errors=[];
@@ -90,11 +73,8 @@ function finishRun(kind) {
     $('resultTitle').textContent='通关！';
     $('resultDetail').textContent=`${map.name} · ${steps} 步${map.bestSteps===steps?' · 新纪录':''}`;
     toast(`通关！到达出口 ${coord(player.r,player.c)}`);
-    const nextIndex=activeLevel?project.levels.findIndex(level=>level.id===activeLevel.id)+1:-1;
-    $('resultNext').hidden=nextIndex<0||nextIndex>=project.levels.length;
   } else {
     levelWon=false;stepLimitHit=true;
-    $('resultNext').hidden=true;
     $('resultTitle').textContent='步数超限';
     $('resultDetail').textContent=`本关最多 ${map.maxSteps} 步，当前已用 ${steps} 步。`;
     toast('步数超限，请重试',true);
@@ -106,7 +86,7 @@ function checkRunEnd() {
   if(map.maxSteps>0&&steps>map.maxSteps){finishRun('limit');return;}
   if(isAtExit()){finishRun('win');return;}
 }
-function persist() { clearTimeout(saveTimer); $('saveState').textContent='保存中'; saveTimer=setTimeout(() => { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(map)); if(!GAME_ONLY)saveProject(); $('saveState').textContent='本地已保存'; } catch { $('saveState').textContent='仅当前会话'; } },120); }
+function persist() { clearTimeout(saveTimer); $('saveState').textContent='保存中'; saveTimer=setTimeout(() => { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(map)); $('saveState').textContent='本地已保存'; } catch { $('saveState').textContent='仅当前会话'; } },120); }
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return mode==='edit'?editHistory:playHistory; }
 function editSnapshot(){return {map:clone(map),rect:editRect?{...editRect}:null};}
@@ -213,7 +193,7 @@ $('zoomIn').onclick=()=>{camera.zoom=Math.min(4,camera.zoom*1.16);camera.updateP
 function clearSelection(){disposableClear(effectLayer);legalMoves=[];chosenFold=null;selectionRing.visible=false;if($('foldTitle')){$('foldTitle').textContent='未选择折纸线';$('foldDetail').textContent='—';$('teleportBtn').disabled=true;}}
 function overlay(r,c,hex,opacity=.35){const m=new THREE.Mesh(new THREE.PlaneGeometry(.89,.89),new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(wx(c),tileTop(r,c)+.016,wz(r));effectLayer.add(m);return m;}
 function tileOutline(r,c,hex){const line=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.9,.9)),new THREE.LineBasicMaterial({color:hex,depthTest:false}));line.rotation.x=-Math.PI/2;line.position.set(wx(c),tileTop(r,c)+.024,wz(r));effectLayer.add(line);}
-function selectPlayer(){clearSelection();selectionRing.visible=true;for(const action of runtimeMechanics.actions(createMechanicContext(map,player))){const {r,c}=action.to;legalMoves.push({r,c});overlay(r,c,'#bce772',.44);tileOutline(r,c,'#7a9b52');}$('toolStatus').textContent='玩家 '+coord(player.r,player.c);}
+function selectPlayer(){clearSelection();selectionRing.visible=true;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const r=player.r+dr,c=player.c+dc;if(walkable(r,c)){legalMoves.push({r,c});overlay(r,c,'#bce772',.44);tileOutline(r,c,'#7a9b52');}}$('toolStatus').textContent='玩家 '+coord(player.r,player.c);}
 function reflectPoint(r,c,axis){const dr=r-axis.r,dc=c-axis.c;if(axis.type==='h')return {r:axis.r-dr,c};if(axis.type==='v')return {r,c:axis.c-dc};if(axis.type==='d1')return {r:axis.r+dc,c:axis.c+dr};return {r:axis.r-dc,c:axis.c-dr};}
 function foldTarget(axis){return foldTargetFor(axis,player);}
 function selectFold(r,c){clearSelection();chosenFold={r,c,type:map.tiles[r][c].fold};const t=foldTarget(chosenFold);overlay(r,c,'#e7ce67',.35);tileOutline(r,c,'#ac9456');
@@ -223,8 +203,8 @@ function selectFold(r,c){clearSelection();chosenFold={r,c,type:map.tiles[r][c].f
   $('foldTitle').textContent=coord(r,c)+' · '+FOLD_NAMES[a.type];$('foldDetail').textContent=t.valid?coord(player.r,player.c)+' → '+coord(t.r,t.c):t.reason;$('teleportBtn').disabled=!t.valid;$('toolStatus').textContent=t.valid?'再次点击 '+coord(t.r,t.c)+' 传送':t.reason;
 }
 function animatePlayer(from,to,type){moving=true;animation={start:performance.now(),duration:type==='teleport'?480:220,from:new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,checkEnd:true};updateUI();}
-function movePlayer(r,c){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!legalMoves.some(t=>t.r===r&&t.c===c)||!walkable(r,c)){toast(walkable(r,c)?'请先点击玩家查看可移动范围':'黑色或空格方块不可移动',true);return;}record();const prev={...player},dr=r-player.r,dc=c-player.c;player.r=r;player.c=c;player.dir=(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8;steps++;runLog.push({kind:'move',from:{...prev},to:{...player},step:steps});clearSelection();animatePlayer(prev,player,'move');updateUI();}
-function teleport(){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!chosenFold){toast('请先选择折纸线',true);return;}const t=foldTarget(chosenFold);if(!t.valid){toast(t.reason+'，无法传送',true);return;}record();const prev={...player},a={...chosenFold};const forward=reflectPoint(player.r-Math.cos(player.dir*Math.PI/4),player.c+Math.sin(player.dir*Math.PI/4),a);const dr=forward.r-t.r,dc=forward.c-t.c;player={r:t.r,c:t.c,dir:(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8};steps++;teleports++;runLog.push({kind:'fold',axis:{...a},from:{...prev},to:{...player},step:steps});clearSelection();animatePlayer(prev,player,'teleport');updateUI();toast('折纸传送 · '+coord(prev.r,prev.c)+' → '+coord(t.r,t.c));}
+function movePlayer(r,c){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!legalMoves.some(t=>t.r===r&&t.c===c)||!walkable(r,c)){toast(walkable(r,c)?'请先点击玩家查看可移动范围':'黑色或空格方块不可移动',true);return;}record();const prev={...player},dr=r-player.r,dc=c-player.c;player.r=r;player.c=c;player.dir=(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8;steps++;clearSelection();animatePlayer(prev,player,'move');updateUI();}
+function teleport(){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!chosenFold){toast('请先选择折纸线',true);return;}const t=foldTarget(chosenFold);if(!t.valid){toast(t.reason+'，无法传送',true);return;}record();const prev={...player},a={...chosenFold};const forward=reflectPoint(player.r-Math.cos(player.dir*Math.PI/4),player.c+Math.sin(player.dir*Math.PI/4),a);const dr=forward.r-t.r,dc=forward.c-t.c;player={r:t.r,c:t.c,dir:(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8};steps++;teleports++;clearSelection();animatePlayer(prev,player,'teleport');updateUI();toast('折纸传送 · '+coord(prev.r,prev.c)+' → '+coord(t.r,t.c));}
 $('teleportBtn').onclick=teleport;
 
 function setTool(next){tool=next;document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
@@ -249,23 +229,20 @@ function editAt(r,c){const t=map.tiles[r][c];const isSpawn=r===map.spawn.r&&c===
 }
 function turn(delta){if(moving)return;record();player.dir=(player.dir+delta+8)%8;if(mode==='edit'){map.spawn.dir=player.dir;persist();}renderPlayer();updateUI();}
 document.querySelectorAll('.rotate-left').forEach(b=>b.onclick=()=>turn(-1));document.querySelectorAll('.rotate-right').forEach(b=>b.onclick=()=>turn(1));
-function setMode(next){if(mode===next)return;clearTimeout(replayTimer);replayTimer=null;if(next==='play'){const check=validateForPlay();if(!check.valid){toast(check.errors.join('；'),true);return;}}animation=null;moving=false;levelWon=false;stepLimitHit=false;playerGroup.scale.setScalar(1);mode=next;steps=0;teleports=0;playHistory=[];runLog=[];player={...map.spawn};clearSelection();renderPlayer();updateUI();if(mode==='play')checkRunEnd();}
+function setMode(next){if(mode===next)return;if(next==='play'){const check=validateForPlay();if(!check.valid){toast(check.errors.join('；'),true);return;}}animation=null;moving=false;levelWon=false;stepLimitHit=false;playerGroup.scale.setScalar(1);mode=next;steps=0;teleports=0;playHistory=[];player={...map.spawn};clearSelection();renderPlayer();updateUI();if(mode==='play')checkRunEnd();}
 $('editMode').onclick=()=>setMode('edit');$('playMode').onclick=()=>setMode('play');$('startBtn').onclick=()=>setMode(mode==='edit'?'play':'edit');
-$('restartBtn').onclick=()=>{if(moving)return;animation=null;moving=false;levelWon=false;stepLimitHit=false;player={...map.spawn};steps=teleports=0;playHistory=[];runLog=[];clearSelection();renderPlayer();updateUI();toast('已回到玩家起点');};
+$('restartBtn').onclick=()=>{if(moving)return;animation=null;moving=false;levelWon=false;stepLimitHit=false;player={...map.spawn};steps=teleports=0;playHistory=[];clearSelection();renderPlayer();updateUI();toast('已回到玩家起点');};
 $('resultRetry').onclick=()=>{$('restartBtn').click();$('resultOverlay').hidden=true;};$('resultEdit').onclick=()=>{$('resultOverlay').hidden=true;setMode('edit');};
-$('resultNext').onclick=()=>{if(!activeLevel)return;const index=project.levels.findIndex(level=>level.id===activeLevel.id);const next=project.levels[index+1];if(!next)return;activeLevel=next;project.activeId=next.id;map=validateMap(next.map,true);player={...map.spawn};steps=teleports=0;levelWon=stepLimitHit=false;clearSelection();buildPaper();fitCamera();$('resultOverlay').hidden=true;renderLevelGroup();persist();};
 function undo(){if(moving)return;const previous=currentHistory().pop();if(!previous)return;clearSelection();if(mode==='edit'){map=previous;player={...map.spawn};buildPaper();fitCamera(false);persist();}else{player=previous.player;steps=previous.steps;teleports=previous.teleports;renderPlayer();}updateUI();}
 $('undoBtn').onclick=undo;
 function updateUI(){
-  const playing=mode==='play';$('editPanel').hidden=playing;document.querySelector('.editor-workspaces').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
+  const playing=mode==='play';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
   const names={paint:'改颜色 · '+COLOR_NAMES[color],place:'放置方块 · '+COLOR_NAMES[color],erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',exit:'设置出口'};if(!chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(player.r,player.c):names[tool];
   $('steps').textContent=$('canvasSteps').textContent=String(steps).padStart(2,'0');$('teleports').textContent=String(teleports).padStart(2,'0');$('playerCoord').textContent=coord(player.r,player.c)+' · 朝'+FACE_NAMES[player.dir];$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[player.dir];
-  renderRunLog();
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
   $('levelName').value=map.name;$('levelDescription').value=map.description;$('maxSteps').value=map.maxSteps;
-  renderMechanicsConfig();
   $('bestStepsLabel').textContent='最佳步数：'+(map.bestSteps===null?'—':map.bestSteps);
   $('exitStatus').textContent=map.exit&&inside(map.exit.r,map.exit.c)?'出口：'+coord(map.exit.r,map.exit.c):'出口：未设置';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
@@ -281,24 +258,6 @@ $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Numbe
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='fold-field-map.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>2000000)throw new Error('地图文件过大');const next=validateMap(JSON.parse(await file.text()));setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
 
-function renderLevelGroup(){if(GAME_ONLY||!activeLevel)return;const select=$('levelSelect');select.replaceChildren();for(const level of project.levels){const option=document.createElement('option');option.value=level.id;option.textContent=level.name;select.append(option);}select.value=activeLevel.id;$('levelNotes').value=activeLevel.notes||'';const snapshots=$('snapshotSelect');snapshots.replaceChildren();if(!activeLevel.snapshots.length){const empty=document.createElement('option');empty.value='';empty.textContent='暂无快照';snapshots.append(empty);}else activeLevel.snapshots.slice().reverse().forEach((snapshot,index)=>{const option=document.createElement('option');option.value=String(activeLevel.snapshots.length-1-index);option.textContent=`${snapshot.label} · ${new Date(snapshot.createdAt).toLocaleString()}`;snapshots.append(option);});$('levelGroupStatus').textContent=`关卡组：${project.levels.length} 关 · 当前 ${project.levels.findIndex(level=>level.id===activeLevel.id)+1} · 快照 ${activeLevel.snapshots.length}`;}
-function activateLevel(id){const next=project.levels.find(level=>level.id===id);if(!next)return;saveProject();activeLevel=next;project.activeId=next.id;map=validateMap(next.map,true);player={...map.spawn};editHistory=[];redoHistory=[];buildPaper();fitCamera();renderLevelGroup();persist();toast('已切换到 '+map.name);}
-function blankLevel(){return {version:1,width:map.width,height:map.height,tiles:Array.from({length:map.height},()=>Array.from({length:map.width},blankTile)),spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null};}
-if($('levelSelect'))$('levelSelect').onchange=e=>activateLevel(e.target.value);
-if($('newLevel'))$('newLevel').onclick=()=>{const level=createLevel(blankLevel());project.levels.push(level);project.activeId=level.id;activateLevel(level.id);};
-if($('duplicateLevel'))$('duplicateLevel').onclick=()=>{try{saveProject();const copy=duplicateProjectLevel(project,activeLevel.id);activateLevel(copy.id);}catch(error){toast(error.message,true);}};
-if($('deleteLevel'))$('deleteLevel').onclick=()=>{try{removeProjectLevel(project,activeLevel.id);activateLevel(project.activeId);}catch(error){toast(error.message,true);}};
-if($('levelUp'))$('levelUp').onclick=()=>{moveProjectLevel(project,activeLevel.id,-1);saveProject();renderLevelGroup();persist();};
-if($('levelDown'))$('levelDown').onclick=()=>{moveProjectLevel(project,activeLevel.id,1);saveProject();renderLevelGroup();persist();};
-if($('levelNotes'))$('levelNotes').onchange=event=>{activeLevel.notes=event.target.value.slice(0,2000);saveProject();persist();};
-if($('saveSnapshot'))$('saveSnapshot').onclick=()=>{saveProject();snapshotProjectLevel(activeLevel,$('snapshotLabel').value||'手动快照');$('snapshotLabel').value='';persist();renderLevelGroup();toast('已保存版本快照');};
-if($('restoreSnapshot'))$('restoreSnapshot').onclick=()=>{const index=Number($('snapshotSelect').value);const snapshot=activeLevel?.snapshots[index];if(!snapshot){toast('请选择要恢复的快照',true);return;}record();map=validateMap(snapshot.map,true);activeLevel.map=clone(map);buildPaper();fitCamera();persist();toast('已恢复快照：'+snapshot.label);};
-if($('exportGroup'))$('exportGroup').onclick=()=>{saveProject();const url=URL.createObjectURL(new Blob([JSON.stringify(project,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='fold-field-project.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('关卡组已导出');};
-if($('importGroup'))$('importGroup').onclick=()=>$('groupFile').click();
-if($('groupFile'))$('groupFile').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>5000000)throw new Error('关卡组文件过大');const imported=normalizeProject(JSON.parse(await file.text()));project=imported;activeLevel=project.levels.find(level=>level.id===project.activeId)||project.levels[0];map=validateMap(activeLevel.map,true);player={...map.spawn};editHistory=[];redoHistory=[];buildPaper();fitCamera();renderLevelGroup();persist();toast('关卡组导入完成');}catch(error){toast('导入失败：'+error.message,true);}event.target.value='';};
-if($('analyzeLevel'))$('analyzeLevel').onclick=async()=>{const status=$('analysisStatus'),stepsList=$('analysisSteps');status.textContent='正在分析…';stepsList.replaceChildren();analysisPath=null;$('replayAnalysis').disabled=true;const errors=validateLevel(map);if(errors.length){status.textContent='校验失败：'+errors.join('；');return;}const report=analyzeLevel(clone(map));if(report.shortest===null){status.textContent=`无法到达出口 · 已探索 ${report.reachable} 格`;toast('关卡无法到达出口',true);return;}analysisPath=report.path; $('replayAnalysis').disabled=false;const budget=map.maxSteps>0?(report.shortest<=map.maxSteps?' · 在步数预算内':' · 超出步数预算'):'';status.textContent=`可通关 · 最短 ${report.shortest} 步 · 已探索 ${report.reachable} 格${budget}`;report.path.forEach((action,index)=>{const item=document.createElement('button');item.textContent=`${index+1}. ${action.kind==='fold'?'折纸 '+coord(action.axis.r,action.axis.c):'移动'}：${coord(action.from.r,action.from.c)} → ${coord(action.to.r,action.to.c)}`;item.onclick=()=>{testPosition={...action.from,dir:map.spawn.dir};setTool('test');toast('已定位到第 '+(index+1)+' 步的测试站位');};stepsList.append(item);});toast('关卡校验通过，已生成最短路线');};
-if($('replayAnalysis'))$('replayAnalysis').onclick=()=>{if(!analysisPath?.length)return;setMode('play');let index=0;const step=()=>{if(index>=analysisPath.length){toast('最短路线回放完成');return;}const action=analysisPath[index++];if(action.kind==='move'){selectPlayer();movePlayer(action.to.r,action.to.c);}else{selectFold(action.axis.r,action.axis.c);teleport();}replayTimer=setTimeout(step,700);};replayTimer=setTimeout(step,450);};
-
 function updateLevelField(field,value){
   const next=clone(map);
   if(field==='name')next.name=String(value).slice(0,48);
@@ -310,14 +269,6 @@ function updateLevelField(field,value){
   }
   map=validateMap(next);persist();updateUI();
 }
-function renderMechanicsConfig(){if($('mechanicsConfig'))$('mechanicsConfig').value=JSON.stringify(map.mechanics||[],null,2);}
-function applyMechanicsConfig(){try{const parsed=JSON.parse($('mechanicsConfig').value||'[]');if(!Array.isArray(parsed))throw new Error('机制配置必须是数组');const next=validateMap({...map,mechanics:parsed},true);record();map=next;persist();updateUI();toast('机制配置已应用');}catch(error){toast('机制配置无效：'+error.message,true);}}
-$('applyMechanics').onclick=applyMechanicsConfig;
-$('clearMechanics').onclick=()=>{$('mechanicsConfig').value='[]';applyMechanicsConfig();};
-function renderRunLog(){const list=$('runLogList');if(!list)return;$('runLogCount').textContent=runLog.length+' 步';list.textContent=runLog.length?runLog.map((action,index)=>`${index+1}. ${action.kind==='fold'?'折纸 '+coord(action.axis.r,action.axis.c):'移动'} ${coord(action.from.r,action.from.c)} → ${coord(action.to.r,action.to.c)}`).join(' · '):'尚未行动';}
-$('clearRunLog').onclick=()=>{runLog=[];renderRunLog();toast('试玩记录已清空');};
-$('exportRunLog').onclick=()=>{const payload={level:map.name,start:map.spawn,steps,teleports,completed:levelWon,actions:runLog};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='fold-field-run.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('试玩记录已导出');};
-document.querySelectorAll('.hint-tab').forEach(button=>button.onclick=()=>{const hints={area:'点击玩家显示八方向可移动方块。',mechanism:'点击折纸线高亮镜像目标，再次点击目标方块传送；也可按 F。',next:'优先选择绿色目标；红色目标表示越界、空格或阻挡。'};document.querySelectorAll('.hint-tab').forEach(tab=>tab.classList.toggle('active',tab===button));$('hintText').textContent=hints[button.dataset.hint];});
 $('levelName').addEventListener('change',e=>updateLevelField('name',e.target.value));
 $('levelDescription').addEventListener('change',e=>updateLevelField('description',e.target.value));
 $('maxSteps').addEventListener('change',e=>updateLevelField('maxSteps',e.target.value));
@@ -325,10 +276,8 @@ $('maxSteps').addEventListener('change',e=>updateLevelField('maxSteps',e.target.
 function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
-  if(!GAME_ONLY)saveProject();
   const current=document.documentElement.outerHTML;
-  const embeddedProject=!GAME_ONLY&&project.levels.length>1?JSON.stringify(project):'null';
-  const boot='<script>window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(map).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_PROJECT__='+embeddedProject.replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
+  const boot='<script>window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(map).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
   const html='<!doctype html>\n'+current.replace(/<script>/i,boot+'<script>');
   const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
   const a=document.createElement('a');a.href=url;a.download='game.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('独立游戏已导出为 game.html');
@@ -367,6 +316,6 @@ function tick(now){requestAnimationFrame(tick);controls.update();paper.position.
   if(animation){const t=Math.min(1,(now-animation.start)/animation.duration),smooth=t*t*(3-2*t);if(animation.type==='teleport'){if(t<.5){playerGroup.position.copy(animation.from);playerGroup.scale.setScalar(Math.max(.03,1-t*2));}else{playerGroup.position.copy(animation.to);playerGroup.scale.setScalar(Math.max(.03,(t-.5)*2));}}else{playerGroup.position.lerpVectors(animation.from,animation.to,smooth);}playerGroup.rotation.y=-player.dir*Math.PI/4;if(t>=1){animation=null;moving=false;playerGroup.scale.setScalar(1);renderPlayer();updateUI();checkRunEnd();}}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();syncState();}
 }
-setEditorWorkspace('map');renderLevelGroup();buildPaper();fitCamera();if(mode==='play')checkRunEnd();requestAnimationFrame(tick);
+buildPaper();fitCamera();if(mode==='play')checkRunEnd();requestAnimationFrame(tick);
 // Read-only diagnostics support visual and interaction checks without bypassing the UI.
 window.foldField={getState:()=>clone({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,renderedFrames}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),.28+paper.position.y,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};

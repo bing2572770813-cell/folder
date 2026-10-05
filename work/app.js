@@ -277,7 +277,7 @@ function editAt(r,c){
   buildPaper();persist();updateUI();
 }
 
-function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;$('propertyInspector').replaceChildren();$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';}
+function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;$('propertyInspector').replaceChildren();$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';$('mechanismDescriptions').textContent='选择实体以查看机制说明';}
 function scheduleInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
 function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
 function inspectAtCell(r,c){selectedCells=[{r,c}];editRect=cellBounds(selectedCells);drawEditSelection();inspectSelection();}
@@ -289,6 +289,9 @@ function inspectSelection(){
     const schema=entity.properties?entityPropertySchema(entity.properties,tagCatalog):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
+  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。'};
+  const mechanismPanel=$('mechanismDescriptions');mechanismPanel.replaceChildren();
+  for(const type of new Set(cells.map(p=>map.tiles[p.r][p.c]?.terrain??'none'))){const text=document.createElement('p');text.textContent=descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type);mechanismPanel.append(text);}
   inspectedCell=cells[0];
   const {values,schema,mixed}=batchProperties(entries);
   $('inspectedEntity').textContent=cells.length===1?coord(cells[0].r,cells[0].c)+' · '+(map.tiles[cells[0].r][cells[0].c]?(prefabs.find(p=>p.id===entityType(map.tiles[cells[0].r][cells[0].c]))?.name||'实体方块'):'虚空'):'批量检视 · '+selectedCells.length+' 个选中格 / '+cells.length+' 个实体占用格';

@@ -1,3 +1,4 @@
+import {paperSurface} from './paper-surface.mjs';
 import {entityType,entityChoices,entityHidden} from './entity-visibility.mjs';
 import {legalKeyNames,renameKeyCells} from './keys.mjs';
 import {normalizeMapName,mapFilename} from './map-name.mjs';
@@ -147,23 +148,25 @@ function makeToken(color){
 }
 function buildPaper() {
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
-  const buckets=new Map(),edges=[],styleEdges=new Map(),terrains=new Map();
+  const surfaces=new Map(),buckets=new Map(),edges=[],styleEdges=new Map(),terrains=new Map();
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r][c];if(!tile||cellHidden(r,c))continue;
-    const cell={r,c};if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);
+    const cell={r,c},surface=paperSurface(map,r,c,cellHidden);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
     const y=tileTop(r,c),x=wx(c),z=wz(r);
     if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);staticTokenLayer.add(token);}
     if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.04,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
 
     const edgeColor=entityEdgeColor(tile);
-    if(edgeColor){
+    if(edgeColor&&surface){if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);for(let i=0;i<surface.boundary.length;i++)for(const p of [surface.boundary[i],surface.boundary[(i+1)%surface.boundary.length]])lines.push(x+p[0],p[1]+.004,z+p[2]);}
+    if(edgeColor&&!surface){
       if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);
       const corners=[[x-.5,0,z-.5],[x+.5,0,z-.5],[x+.5,0,z+.5],[x-.5,0,z+.5],[x-.5,y+.004,z-.5],[x+.5,y+.004,z-.5],[x+.5,y+.004,z+.5],[x-.5,y+.004,z+.5]];
       for(const [a,b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])lines.push(...corners[a],...corners[b]);
     }
     if(tile.terrain){if(!terrains.has(tile.terrain))terrains.set(tile.terrain,[]);terrains.get(tile.terrain).push(cell);}
-    edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
+    if(surface){for(let i=0;i<surface.boundary.length;i++)for(const p of [surface.boundary[i],surface.boundary[(i+1)%surface.boundary.length]])edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
   }
+  for(const [color,bucket] of surfaces){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(bucket.positions,3));geometry.computeVertexNormals();const mesh=new THREE.Mesh(geometry,materials[color??'white']);mesh.userData.triangleCells=bucket.triangleCells;mesh.userData.surfaceCells=bucket.cells;tileLayer.add(mesh);}
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
   for(const [color,cells] of buckets){
     const mesh=new THREE.InstancedMesh(tileGeo,materials[color??'white'],cells.length);mesh.userData.cells=cells;
@@ -338,6 +341,7 @@ const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=
 function hitAt(clientX,clientY){
   const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);
   const surface=raycaster.intersectObjects(tileLayer.children,false)[0];
+  if(surface?.object.userData.triangleCells)return surface.object.userData.triangleCells[surface.faceIndex];
   if(surface?.instanceId!==undefined)return surface.object.userData.cells[surface.instanceId];
   const point=raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());if(!point)return null;
   const local=paper.worldToLocal(point),c=Math.floor(local.x+map.width/2),r=Math.floor(local.z+map.height/2);return inside(r,c)?{r,c}:null;
@@ -371,7 +375,7 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 let renderedFrames=0;
 function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,selectedCells,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
 function screenPoints(){
-  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeToken.children[0].geometry.type,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??o.userData.surfaceCells?.length??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeToken.children[0].geometry.type,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
 }
 function tick(now){requestAnimationFrame(tick);controls.update();updateFoldAxes();

@@ -36,7 +36,8 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   contour.append(contourTitle,find('blockHeight').closest('.studio-fields'));
   entitySelector.querySelector('#prefabSummary').parentElement.append(contour);
   selectorSection.append(block);
-  panels.get('map').append(tools, selectorSection, selectionTools, fold);
+  tools.querySelector('[data-tool="fold"]').insertAdjacentElement('afterend',fold);
+  panels.get('map').append(tools, selectorSection, selectionTools);
   panels.get('inspect').append(facing);
   panels.get('properties').append(dimensions);
   panels.get('layers').append(layers);

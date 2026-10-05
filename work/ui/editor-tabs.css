@@ -11,3 +11,5 @@
 .block-entity-parameters{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
 
 .tag-picker-row{display:flex;align-items:center;gap:8px;margin-top:16px}.tag-picker-label{flex:none;font-size:11px;white-space:nowrap}.tag-picker-row>.prefab-picker{flex:1;min-width:0}#tagSummary span{min-width:0;overflow-wrap:anywhere}
+
+#foldDirectionPanel{grid-column:1/-1;margin:0;padding:12px 8px;border:1px solid var(--line);border-radius:5px;background:#eef1e9}#foldDirectionPanel[hidden]{display:none}

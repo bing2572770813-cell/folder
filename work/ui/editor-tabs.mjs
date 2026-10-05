@@ -18,6 +18,7 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   selectorSection.className = 'section';
   const title = document.createElement('h2');title.className='section-label';title.textContent='实体类型';
   selectorSection.append(title, entitySelector);
+  entitySelector.querySelector('#prefabSummary').parentElement.append(find('blockColorPanel'));
   const selectionTools = document.createElement('section');selectionTools.className='section';
   const selectionTitle = document.createElement('h2');selectionTitle.className='section-label';selectionTitle.textContent='选区与剪贴板';
   selectionTools.append(selectionTitle, selection.querySelector('.studio-tools'));

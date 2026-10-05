@@ -56,6 +56,7 @@ let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??nul
 function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let map=defaultMap(),tool='place',color='white',foldType='h';
 let hovered=null,showGrid=true;
+let selectedTagTool=null;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectionMode='single';
 let selectedCells=[],selectionBase=[],hiddenRegions=new Set();
@@ -239,7 +240,9 @@ for(const id of ['blockThickness','blockGradualRate'])$(id).onchange=()=>{try{br
 $('blockHeight').oninput=()=>{const n=Number($('blockHeight').value);if(Number.isFinite(n)&&n>=.01&&n<=16){brushHeight=n;syncState();}};
 $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number.isFinite(n)||n<.01||n>16){toast('方块高度须为 0.01–16',true);$('blockHeight').value=brushHeight;return;}brushHeight=n;if(tool!=='place')setTool('place');};
 
-function setTool(next){if(next==='paint')next='place';pendingRegion=null;tool=next;const tagNames={player:"玩家起点",entry:"设置区域入口","region-exit":"设置区域出口","clear-tags":"清除方块标签"};$("tagSummary").textContent=tagNames[tool]||"选择方块标签";$("exitRegionPanel").hidden=tool!=="region-exit";if(tagNames[tool])$("tagSummary").parentElement.open=false;disposableClear(placementLayer);drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
+function setTool(next){if(next==='paint')next='place';pendingRegion=null;tool=next;const tagNames={player:"玩家起点",entry:"设置区域入口","region-exit":"设置区域出口","clear-tags":"清除方块标签"};if(tagNames[tool])selectedTagTool=tool;
+const tagSummary=$('tagSummary'),tagName=document.createElement('span');tagName.textContent=tagNames[selectedTagTool]||'选择方块标签';
+const tagIcon=selectedTagTool?document.querySelector('[data-tool="'+selectedTagTool+'"] svg').cloneNode(true):createElement(Box);tagIcon.setAttribute('aria-hidden','true');tagSummary.replaceChildren(tagIcon,tagName);$("exitRegionPanel").hidden=tool!=="region-exit";disposableClear(placementLayer);drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(b.dataset.tool==='select'){selectionMode=tool==='select'&&selectionMode==='single'?'multi':'single';if(selectionMode==='single'&&selectedCells.length>1){selectedCells=selectedCells.slice(0,1);editRect=cellBounds(selectedCells);}b.setAttribute('aria-label','选区 · '+(selectionMode==='single'?'单选':'多选'));b.dataset.tip='选区 · '+(selectionMode==='single'?'单选':'多选');b.querySelector('.selection-mode-label').textContent=b.dataset.tip;}setTool(b.dataset.tool);scheduleInspection();});
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile))return;color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefabs.find(p=>p.id===selectedPrefabId)?.tile.blocked?'阻挡实体':'可通行实体';if(tool!=='place')setTool('place');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
@@ -441,15 +444,16 @@ function tick(now){requestAnimationFrame(tick);controls.update();updateFoldAxes(
   controller.tick(now);
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}
 }
-resetRegions();setupPrefabs();buildPaper();fitCamera();if(P.mode==='play')checkRunEnd();requestAnimationFrame(tick);
+resetRegions();setupPrefabs();setTool(tool);buildPaper();fitCamera();if(P.mode==='play')checkRunEnd();requestAnimationFrame(tick);
 // Read-only diagnostics support visual and interaction checks without bypassing the UI.
 window.foldField={getState:()=>clone({map,player:P.player,mode:P.mode,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,chosenFold:P.chosenFold,view,renderedFrames,terrainState:P.terrainState}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),tileTop(r,c)+paper.position.y+.01,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
 
 function setupPrefabs(){
+  $('prefabSummary').parentElement.addEventListener('toggle',()=>{$('blockColorPanel').hidden=!$('prefabSummary').parentElement.open||!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile);});
   let fingerprint='',loading=false;
   function applyPrefabBrush(){
     const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
-    $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored;
+    $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored||!$('prefabSummary').parentElement.open;
     const summary=$('prefabSummary'),name=document.createElement('span');name.textContent=prefab?.name||'无可用实体';summary.replaceChildren();
     if(prefab){const img=document.createElement('img');img.src=prefabPreview(prefab);img.alt='';summary.append(img);}
     summary.append(name);
@@ -463,7 +467,7 @@ function setupPrefabs(){
     for(const prefab of prefabs)select.add(new Option(prefab.name,prefab.id));
     if(!prefabs.some(p=>p.id===selectedPrefabId))selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
     if(!prefabs.length)select.add(new Option('无可用实体',''));
-    select.value=selectedPrefabId||'';$('prefabGrid').replaceChildren();for(const prefab of prefabs){const b=document.createElement('button'),img=document.createElement('img');b.className='prefab-preview';b.dataset.prefab=prefab.id;b.dataset.name=prefab.name;b.title=prefab.name;b.setAttribute('aria-label',prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;b.append(img);b.onclick=()=>{selectedPrefabId=prefab.id;select.value=prefab.id;applyPrefabBrush();$('prefabSummary').parentElement.open=false;setTool('place');};$('prefabGrid').append(b);}applyPrefabBrush();renderEntityVisibility();
+    select.value=selectedPrefabId||'';$('prefabGrid').replaceChildren();for(const prefab of prefabs){const b=document.createElement('button'),img=document.createElement('img');b.className='prefab-preview';b.dataset.prefab=prefab.id;b.dataset.name=prefab.name;b.title=prefab.name;b.setAttribute('aria-label',prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;b.append(img);b.onclick=()=>{selectedPrefabId=prefab.id;select.value=prefab.id;applyPrefabBrush();setTool('place');};$('prefabGrid').append(b);}applyPrefabBrush();renderEntityVisibility();
   }
   async function refresh(){
     if(loading||document.hidden||GAME_ONLY||!/^https?:$/.test(location.protocol))return;

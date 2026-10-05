@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, columnLabel, applyFoldLine } from './tile-model.mjs';
+import { axisKey, uniqueFoldAxes, clipInfiniteLine } from './fold-geometry.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion } from './editor-model.mjs';
 import { Copy, ClipboardPaste, Redo2 } from 'lucide';
@@ -122,8 +123,10 @@ const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new TH
 const gridMaterial=new THREE.LineBasicMaterial({color:'#b9bdbb',transparent:true,opacity:.8});
 const sharedGeometries=new Set([tileGeo,markerGeo]);
 const sharedMaterials=new Set([...Object.values(materials),gridMaterial]);
-let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group();
-paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer);
+let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group(), foldAxisLayer=new THREE.Group();
+paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer);
+let foldAxes=[],foldAxisMesh=null,axisViewKey=null;
+const axisRaycaster=new THREE.Raycaster();
 
 const visibility={coords:true,tiles:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
@@ -177,6 +180,7 @@ function buildPaper() {
   }
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;entityEdgeLayer.add(outline);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
+  rebuildFoldAxes();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
 }
 function addAxisLabels(maxHeight){
@@ -189,7 +193,7 @@ function addAxisLabels(maxHeight){
   const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.03;label.userData.ownedTexture=texture;boardLayer.add(label);
 }
 function applyVisibility(){
-  const editing=mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;playerGroup.visible=!editing||visibility.player;
+  const editing=mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing||visibility.player;
 }
 for(const [id,key] of [['coordsVisible','coords'],['tilesVisible','tiles'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();};
 
@@ -206,15 +210,14 @@ function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'
 $('fixedView').onclick=()=>changeView('fixed');$('topView').onclick=()=>changeView('top');$('fitView').onclick=()=>fitCamera();
 $('zoomIn').onclick=()=>{camera.zoom=Math.min(64,camera.zoom*1.16);camera.updateProjectionMatrix();};$('zoomOut').onclick=()=>{camera.zoom=Math.max(.3,camera.zoom/1.16);camera.updateProjectionMatrix();};
 
-function clearSelection(){disposableClear(effectLayer);legalMoves=[];chosenFold=null;selectionRing.visible=false;if($('foldTitle')){$('foldTitle').textContent='未选择折纸线';$('foldDetail').textContent='—';$('teleportBtn').disabled=true;}}
+function clearSelection(){axisViewKey=null;disposableClear(effectLayer);legalMoves=[];chosenFold=null;selectionRing.visible=false;if($('foldTitle')){$('foldTitle').textContent='未选择折纸线';$('foldDetail').textContent='—';$('teleportBtn').disabled=true;}}
 function overlay(r,c,hex,opacity=.35){const m=new THREE.Mesh(new THREE.PlaneGeometry(.89,.89),new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(wx(c),tileTop(r,c)+.016,wz(r));effectLayer.add(m);return m;}
 function tileOutline(r,c,hex){const line=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.9,.9)),new THREE.LineBasicMaterial({color:hex,depthTest:false}));line.rotation.x=-Math.PI/2;line.position.set(wx(c),tileTop(r,c)+.024,wz(r));effectLayer.add(line);}
 function selectPlayer(){clearSelection();selectionRing.visible=true;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const r=player.r+dr,c=player.c+dc;if(walkable(r,c)){legalMoves.push({r,c});overlay(r,c,'#bce772',.44);tileOutline(r,c,'#7a9b52');}}$('toolStatus').textContent='玩家 '+coord(player.r,player.c);}
 function reflectPoint(r,c,axis){const dr=r-axis.r,dc=c-axis.c;if(axis.type==='h')return {r:axis.r-dr,c};if(axis.type==='v')return {r,c:axis.c-dc};if(axis.type==='d1')return {r:axis.r+dc,c:axis.c+dr};return {r:axis.r-dc,c:axis.c-dr};}
 function foldTarget(axis){return foldTargetFor(axis,player);}
 function selectFold(r,c){const directions=foldsOf(map.tiles[r][c]),previous=chosenFold;const index=previous?.r===r&&previous?.c===c?(directions.indexOf(previous.type)+1)%directions.length:0;clearSelection();chosenFold={r,c,type:directions[index]};const t=foldTarget(chosenFold);overlay(r,c,'#e7ce67',.35);tileOutline(r,c,'#ac9456');
-  const a=chosenFold,span=Math.max(map.width,map.height)*1.6;let dx=0,dz=0;if(a.type==='h')dx=span;if(a.type==='v')dz=span;if(a.type==='d1')dx=dz=span;if(a.type==='d2'){dx=span;dz=-span;}
-  const axis=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(wx(c)-dx,.33,wz(r)-dz),new THREE.Vector3(wx(c)+dx,.33,wz(r)+dz)]),new THREE.LineDashedMaterial({color:'#7d9761',dashSize:.18,gapSize:.14,transparent:true,opacity:.55,depthTest:false}));axis.computeLineDistances();effectLayer.add(axis);
+  const a=chosenFold;axisViewKey=null;
   if(inside(t.r,t.c)){overlay(t.r,t.c,t.valid?'#91d6c9':'#de9b91',.4);tileOutline(t.r,t.c,t.valid?'#4b967d':'#b4594e');}
   $('foldTitle').textContent=coord(r,c)+' · '+FOLD_NAMES[a.type];$('foldDetail').textContent=t.valid?coord(player.r,player.c)+' → '+coord(t.r,t.c):t.reason;$('teleportBtn').disabled=!t.valid;$('toolStatus').textContent=t.valid?'再次点击 '+coord(t.r,t.c)+' 传送':t.reason;
 }
@@ -347,10 +350,10 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 let renderedFrames=0;
 function syncState(){viewport.dataset.state=JSON.stringify({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid});}
 function screenPoints(){
-  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible}});
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,entityEdgeStyles:entityEdgeLayer.children.length,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
 }
-function tick(now){requestAnimationFrame(tick);controls.update();
+function tick(now){requestAnimationFrame(tick);controls.update();updateFoldAxes();
   if(animation){const t=Math.min(1,(now-animation.start)/animation.duration),smooth=t*t*(3-2*t);if(animation.type==='teleport'){if(t<.5){playerGroup.position.copy(animation.from);playerGroup.scale.setScalar(Math.max(.03,1-t*2));}else{playerGroup.position.copy(animation.to);playerGroup.scale.setScalar(Math.max(.03,(t-.5)*2));}}else{playerGroup.position.lerpVectors(animation.from,animation.to,smooth);}playerGroup.rotation.y=-player.dir*Math.PI/4;if(t>=1){animation=null;moving=false;playerGroup.scale.setScalar(1);renderPlayer();updateUI();checkRunEnd();}}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}
 }
@@ -389,4 +392,25 @@ function setupPrefabs(){
     selectedPrefabId=$('prefabType').value||null;applyPrefabBrush();if(tool!=='place')setTool('paint');else updateUI();
   };
   refresh();if(!GAME_ONLY)setInterval(refresh,2000);document.addEventListener('visibilitychange',refresh);
+}
+
+function rebuildFoldAxes(){
+  disposableClear(foldAxisLayer);foldAxes=uniqueFoldAxes(map);axisViewKey=null;
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(foldAxes.length*6),3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(foldAxes.length*6),3));
+  foldAxisMesh=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.78,depthWrite:false,toneMapped:false}));foldAxisMesh.frustumCulled=false;foldAxisLayer.add(foldAxisMesh);
+}
+function updateFoldAxes(){
+  if(!foldAxisMesh||!foldAxes.length)return;
+  camera.updateMatrixWorld();
+  const key=camera.matrixWorld.elements.join(',')+'|'+camera.projectionMatrix.elements.join(',')+'|'+(chosenFold?axisKey(chosenFold):'');if(key===axisViewKey)return;axisViewKey=key;
+  const corners=[];for(const x of [-1,1])for(const y of [-1,1]){axisRaycaster.setFromCamera(new THREE.Vector2(x,y),camera);const ray=axisRaycaster.ray;corners.push(ray.origin.clone().addScaledVector(ray.direction,(.016-ray.origin.y)/ray.direction.y));}
+  const rect={minX:Math.min(...corners.map(p=>p.x))-2,maxX:Math.max(...corners.map(p=>p.x))+2,minZ:Math.min(...corners.map(p=>p.z))-2,maxZ:Math.max(...corners.map(p=>p.z))+2};
+  const positions=foldAxisMesh.geometry.attributes.position,colors=foldAxisMesh.geometry.attributes.color;let count=0;
+  for(const axis of foldAxes){
+    const direction=axis.type==='h'?{x:1,z:0}:axis.type==='v'?{x:0,z:1}:axis.type==='d1'?{x:1,z:1}:{x:1,z:-1};
+    const segment=clipInfiniteLine({x:wx(axis.c),z:wz(axis.r)},direction,rect);if(!segment)continue;
+    const tint=new THREE.Color(chosenFold&&axisKey(chosenFold)===axisKey(axis)?'#94723d':'#708b75');
+    for(const point of segment){positions.setXYZ(count,point.x,.016,point.z);colors.setXYZ(count,tint.r,tint.g,tint.b);count++;}
+  }
+  positions.needsUpdate=true;colors.needsUpdate=true;foldAxisMesh.geometry.setDrawRange(0,count);
 }

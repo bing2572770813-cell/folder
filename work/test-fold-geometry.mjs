@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {axisKey,uniqueFoldAxes,clipInfiniteLine} from './fold-geometry.mjs';
+const rect={minX:-50,maxX:60,minZ:-40,maxZ:70};
+assert.deepEqual(clipInfiniteLine({x:0,z:2},{x:1,z:0},rect),[{x:-50,z:2},{x:60,z:2}]);
+assert.deepEqual(clipInfiniteLine({x:3,z:0},{x:0,z:1},rect),[{x:3,z:-40},{x:3,z:70}]);
+assert.deepEqual(clipInfiniteLine({x:0,z:0},{x:1,z:1},rect),[{x:-40,z:-40},{x:60,z:60}]);
+assert.equal(clipInfiniteLine({x:0,z:100},{x:1,z:0},rect),null);
+const panned={minX:1000,maxX:1200,minZ:-10,maxZ:10};
+assert.deepEqual(clipInfiniteLine({x:0,z:0},{x:1,z:0},panned),[{x:1000,z:0},{x:1200,z:0}]);
+assert.equal(axisKey({r:2,c:3,type:'d1'}),axisKey({r:4,c:5,type:'d1'}));
+const map={height:2,width:3,tiles:[[{folds:['h','v']},{fold:'h'},null],[{fold:'v'},null,{folds:['h']}]]};
+assert.equal(uniqueFoldAxes(map).length,3);
+console.log('PASS: infinite axes clip outside map bounds, remote pan, diagonals, invisible axes and marker deduplication.');

@@ -12,6 +12,9 @@ Here is the folder for all assets in game, all modifier should follew schemes be
       1. bgm and sfx, with suffix .wav
    5. prefab
       1. config files for encapsulated entities, with suffix .json
+   6. map
+      1. game maps, with suffix .json
+      2. 
 2. ai modify notes
    1. should give all names of ai-generated assets following with "_ai"
    2. should give all names of web-src assets following with "_web"

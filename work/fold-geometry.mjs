@@ -13,7 +13,7 @@ export function uniqueFoldAxes(map){
  const a={r:start.r-d.r/2,c:start.c-d.c/2},b={r:end.r+d.r/2,c:end.c+d.c/2};
  // Endpoints lie on the containing cell boundary, clamped to map bounds.
  const clamp=v=>({r:Math.max(-.5,Math.min(map.height-.5,v.r)),c:Math.max(-.5,Math.min(map.width-.5,v.c))});
- const from=clamp(a),to=clamp(b),contribution=cells.length*.5,radius=Math.ceil(contribution);
+ const from=clamp(a),to=clamp(b),contribution=cells.length*.5,radius=p.type==='d1'||p.type==='d2'?Math.floor(contribution):Math.ceil(contribution);
  groups.push({...p,cells,center,from,to,contribution,radius,id:key});
  }return groups;
 }

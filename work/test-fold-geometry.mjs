@@ -28,13 +28,13 @@ console.log('PASS: actual game teleport gate accepts in-range sources and reject
 for(const type of ['h','v','d1','d2'])for(const count of [1,2,3,4,5]){
  const m={width:9,height:9,tiles:Array.from({length:9},()=>Array(9).fill(null))};
  for(let i=0;i<count;i++)applyFoldLine(m,type==='h'?2:2+i,type==='v'?6:type==='d2'?6-i:2+i,type);
- const a=uniqueFoldAxes(m)[0];assert.equal(a.cells.length,count);assert.equal(a.contribution,count*.5);assert.equal(a.radius,Math.ceil(count*.5));
+ const a=uniqueFoldAxes(m)[0];assert.equal(a.cells.length,count);assert.equal(a.contribution,count*.5);assert.equal(a.radius,type==='d1'||type==='d2'?Math.floor(count*.5):Math.ceil(count*.5));
  const endpoint=a.cells[0];const player={r:endpoint.r-a.radius,c:endpoint.c};
  assert.equal(foldDistance(a,player),a.radius);assert.equal(inFoldRange(a,player),true);
  assert.equal(inFoldRange(a,{r:player.r-1,c:player.c}),false);
 }
 assert.equal(foldDistance(null,{r:0,c:0}),Infinity);
-console.log('PASS: all four directions contribute 0.5 per cell, odd totals round up, nearest-cell distance includes radius boundary.');
+console.log('PASS: all four directions contribute 0.5 per cell, diagonal totals round down and straight totals round up, nearest-cell distance includes radius boundary.');
 
 const single={cells:[{r:3,c:3}],radius:1};
 assert.equal(foldDistance(single,{r:2,c:2}),1);

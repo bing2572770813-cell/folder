@@ -21,3 +21,5 @@ const blockedEntry=structuredClone(next);blockedEntry.tiles[0][0].blocked=true;a
 assert.throws(()=>tagCell(next,4,4,'exitTo','missing'),/不存在/);
 
 const joined=assignRegion(next,[{r:2,c:0}],'next',true);assert.equal(joined.tiles[2][0].regionTag,'next');assert.equal(next.tiles[2][0].regionTag,'默认区域');assert.throws(()=>assignRegion(next,[{r:2,c:0}],'missing',true));assert.throws(()=>assignRegion(next,[{r:4,c:4}],'next',true),/共存/);
+
+const {legalKeyNames,renameKeyCells}=await import('./keys.mjs');const keyMap=structuredClone(next);keyMap.tiles[1][0].terrain='key';keyMap.tiles[1][0].keyName='旧名';keyMap.tiles[4][4].tags.requiredKeys=['旧名'];const keyRenamed=renameKeyCells(keyMap,[{r:1,c:0}],'新名');assert.deepEqual(legalKeyNames(keyRenamed),['新名']);assert.deepEqual(keyRenamed.tiles[4][4].tags.requiredKeys,['新名']);assert.throws(()=>renameKeyCells(keyMap,[{r:1,c:0}],'新名',(r,c)=>r===4&&c===4),/隐藏出口/);assert.equal(keyMap.tiles[1][0].keyName,'旧名');

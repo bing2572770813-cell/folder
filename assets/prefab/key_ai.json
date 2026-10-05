@@ -8,7 +8,8 @@
     "blocked": false,
     "folds": [],
     "terrain": "key",
-    "terrainConfig": {}
+    "terrainConfig": {},
+    "keyName": "钥匙"
   },
   "size": {
     "width": 1,

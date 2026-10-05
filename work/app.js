@@ -1,4 +1,4 @@
-import {legalKeyNames} from './keys.mjs';
+import {legalKeyNames,renameKeyCells} from './keys.mjs';
 import {normalizeMapName,mapFilename} from './map-name.mjs';
 import playerRuntime from './player.cjs';
 import * as THREE from 'three';
@@ -465,6 +465,6 @@ function drawPlacementPreview(hit){
  $('hoverCoord').textContent=(invalid?'无法放置 · ':'占格预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
 
-$('applyKeyName').onclick=()=>{try{const name=$('keyName').value.trim();if(!name||name.length>80)throw new Error('钥匙名须为 1–80 字');const cells=selectedCells.filter(p=>map.tiles[p.r]?.[p.c]?.terrain==='key');if(!cells.length)throw new Error('先选择钥匙方块');if(cells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');record();for(const p of cells)map.tiles[p.r][p.c].keyName=name;buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$('keyName').value,cellHidden);record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};
 
 $('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};

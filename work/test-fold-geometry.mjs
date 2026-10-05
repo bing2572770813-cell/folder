@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import {axisKey,uniqueFoldAxes,clipInfiniteLine} from './fold-geometry.mjs';
-const rect={minX:-50,maxX:60,minZ:-40,maxZ:70};
-assert.deepEqual(clipInfiniteLine({x:0,z:2},{x:1,z:0},rect),[{x:-50,z:2},{x:60,z:2}]);
-assert.deepEqual(clipInfiniteLine({x:3,z:0},{x:0,z:1},rect),[{x:3,z:-40},{x:3,z:70}]);
-assert.deepEqual(clipInfiniteLine({x:0,z:0},{x:1,z:1},rect),[{x:-40,z:-40},{x:60,z:60}]);
-assert.equal(clipInfiniteLine({x:0,z:100},{x:1,z:0},rect),null);
-const panned={minX:1000,maxX:1200,minZ:-10,maxZ:10};
-assert.deepEqual(clipInfiniteLine({x:0,z:0},{x:1,z:0},panned),[{x:1000,z:0},{x:1200,z:0}]);
-assert.equal(axisKey({r:2,c:3,type:'d1'}),axisKey({r:4,c:5,type:'d1'}));
-const map={height:2,width:3,tiles:[[{folds:['h','v']},{fold:'h'},null],[{fold:'v'},null,{folds:['h']}]]};
-assert.equal(uniqueFoldAxes(map).length,3);
-console.log('PASS: infinite axes clip outside map bounds, remote pan, diagonals, invisible axes and marker deduplication.');
+import {applyFoldLine,normalizeFoldCells} from './tile-model.mjs';
+import {uniqueFoldAxes,foldGroupAt,inFoldRange,foldStrokes} from './fold-geometry.mjs';
+const map={width:7,height:7,tiles:Array.from({length:7},()=>Array(7).fill(null))};
+for(const c of [1,2,4])applyFoldLine(map,3,c,'h');
+let groups=uniqueFoldAxes(map);assert.equal(groups.length,2);
+let g=foldGroupAt(groups,3,1,'h');assert.deepEqual(g.center,{r:3,c:1.5});assert.equal(g.radius,1);
+assert.equal(inFoldRange(g,{r:3,c:.5}),true);assert.equal(inFoldRange(g,{r:2,c:1.5}),true);assert.equal(inFoldRange(g,{r:2,c:1}),false);
+applyFoldLine(map,3,3,'h');groups=uniqueFoldAxes(map);assert.equal(groups.length,1);g=groups[0];assert.equal(g.radius,2);
+applyFoldLine(map,3,3,'v');assert.equal(uniqueFoldAxes(map).length,2);
+applyFoldLine(map,3,2,null);assert.equal(uniqueFoldAxes(map).length,3);
+for(const type of ['d1','d2']){const m={width:7,height:7,tiles:Array.from({length:7},()=>Array(7).fill(null))};applyFoldLine(m,2,2,type);applyFoldLine(m,3,type==='d1'?3:1,type);const a=uniqueFoldAxes(m)[0];assert.equal(a.radius,2);for(const stroke of foldStrokes(a)){const length=Math.hypot(stroke[1].r-stroke[0].r,stroke[1].c-stroke[0].c);assert.ok(length<=1/3+1e-9);for(const p of stroke){assert.ok(p.r>=-.5&&p.c>=-.5&&p.r<=6.5&&p.c<=6.5);}}}
+assert.throws(()=>normalizeFoldCells([{r:7,c:0,type:'h'}],7,7));
+console.log('PASS: void placement, directional adjacency, merge/split, crossing groups, Manhattan boundary, diagonal radius, finite dash-dot strokes.');

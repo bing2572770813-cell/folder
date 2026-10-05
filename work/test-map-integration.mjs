@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import {normalizeTile,blocked,columnLabel} from './tile-model.mjs';
+import {normalizeTile,blocked,columnLabel,normalizeFoldCells} from './tile-model.mjs';
 const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const validation=source.slice(source.indexOf('function validateMap('),source.indexOf('function validateForPlay('));
-const context={normalizeTile,blocked,columnLabel};vm.createContext(context);vm.runInContext(validation,context);
+const context={normalizeTile,blocked,columnLabel,normalizeFoldCells};vm.createContext(context);vm.runInContext(validation,context);
 const map={version:1,width:128,height:128,tiles:Array.from({length:128},()=>Array.from({length:128},()=>({color:'white',fold:null}))),spawn:{r:0,c:0,dir:0},exit:{r:127,c:127},maxSteps:0};
 map.tiles[4][5]={color:'blue',height:3,fold:'h',folds:['h','v'],prefabId:'paper_ai',blocked:false};
 const valid=context.validateMap(map);

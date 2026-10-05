@@ -1,4 +1,6 @@
 import {normalizeBehavior,normalizeBaseEntity} from './entities/behaviors.mjs';
+import {normalizePropertySchema} from './core/property-model.mjs';
+import {copyJson} from './core/json-value.mjs';
 export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black'];
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
@@ -47,14 +49,16 @@ export function normalizeTile(tile) {
   const keyName=terrain==='key'?(tile.keyName??'钥匙'):undefined;
   if(keyName!==undefined&&(typeof keyName!=='string'||!keyName.trim()||keyName.trim().length>80))throw new Error('钥匙名须为 1–80 字');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
+  const propertyExtras={...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
-  return {...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
-  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),tile:normalizeTile({...data.tile,prefabId:data.id})};
+  const propertySchema=normalizePropertySchema(data.propertySchema??data.tile.propertySchema??{});
+  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})};
 }
 export function columnLabel(c) {
   let label='';for(let n=c+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;

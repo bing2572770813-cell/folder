@@ -1,3 +1,4 @@
+import {normalizeBehavior,normalizeBaseEntity} from './entities/behaviors.mjs';
 export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black'];
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
@@ -52,7 +53,8 @@ export function normalizeTile(tile) {
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
-  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],tile:normalizeTile({...data.tile,prefabId:data.id})};
+  const BaseEntity=normalizeBaseEntity(data.BaseEntity);
+  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),tile:normalizeTile({...data.tile,prefabId:data.id})};
 }
 export function columnLabel(c) {
   let label='';for(let n=c+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;

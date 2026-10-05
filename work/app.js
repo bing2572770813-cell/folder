@@ -24,6 +24,9 @@ import {renderPropertyInspector} from './ui/property-inspector.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import {LineSegments2} from 'three/examples/jsm/lines/LineSegments2.js';
+import {LineSegmentsGeometry} from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
+import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
 
 const icons = { Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Redo2 };
@@ -330,12 +333,17 @@ function undo(){if(P.mode==='play'){controller.undo();return;}if(P.moving)return
 $('undoBtn').onclick=undo;
 $('redoBtn').onclick=()=>{if(P.mode!=='edit'||P.moving)return;const next=redoHistory.pop();if(!next)return;editHistory.push(editSnapshot());map=next.map;editRect=next.rect;selectedCells=next.selectedCells??[];controller.resetPosition();buildPaper();persist();};
 const editSelectionLayer=new THREE.Group();paper.add(editSelectionLayer);
+function selectionOutline(width,height,color){
+  const x=width/2,y=height/2;
+  const geometry=new LineSegmentsGeometry().setPositions([-x,-y,0,x,-y,0,x,-y,0,x,y,0,x,y,0,-x,y,0,-x,y,0,-x,-y,0]);
+  return new LineSegments2(geometry,new LineMaterial({color,linewidth:3,depthTest:false,depthWrite:false}));
+}
 function drawEditSelection(){
   disposableClear(editSelectionLayer);const rect=pendingRegion;
-  if(P.mode==='edit')for(const p of selectedCells){if(cellHidden(p.r,p.c))continue;const line=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.96,.96)),new THREE.LineBasicMaterial({color:'#447db0',depthTest:false}));line.rotation.x=-Math.PI/2;line.position.set(wx(p.c),tileTop(p.r,p.c)+.04,wz(p.r));editSelectionLayer.add(line);}
+  if(P.mode==='edit')for(const p of selectedCells){if(cellHidden(p.r,p.c))continue;const line=selectionOutline(.96,.96,'#447db0');line.rotation.x=-Math.PI/2;line.position.set(wx(p.c),tileTop(p.r,p.c)+.04,wz(p.r));editSelectionLayer.add(line);}
   if(rect&&P.mode==='edit'){
-    const geo=new THREE.PlaneGeometry(rect.w,rect.h);const valid=rect.r>=0&&rect.c>=0&&rect.r+rect.h<=map.height&&rect.c+rect.w<=map.width;
-    const line=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:valid?'#447db0':'#ce554c',depthTest:false}));geo.dispose();
+    const valid=rect.r>=0&&rect.c>=0&&rect.r+rect.h<=map.height&&rect.c+rect.w<=map.width;
+    const line=selectionOutline(rect.w,rect.h,valid?'#447db0':'#ce554c');
     line.rotation.x=-Math.PI/2;line.position.set(wx(rect.c+(rect.w-1)/2),.4,wz(rect.r+(rect.h-1)/2));line.renderOrder=10;editSelectionLayer.add(line);
   }
   $('regionStatus').textContent=pendingRegion?'点击粘贴落点 · Esc 取消':editRect?coord(editRect.r,editRect.c)+' · '+editRect.w+' × '+editRect.h:'左键拖拽框选';

@@ -434,11 +434,12 @@ function updateFoldAxes(){}
 
 function renderRegionControls(){
  const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));keyList.replaceChildren();for(const key of legalKeyNames(map)){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=key;input.checked=chosenKeys.has(key);input.setAttribute('aria-label','所需钥匙 '+key);label.append(input,document.createTextNode(key));keyList.append(label);}if(!keyList.children.length)keyList.textContent='地图上没有可收集的钥匙';
+ const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of regionNames(map))regionChoice.add(new Option(name,name));if(regionNames(map).includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;
  const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;container.replaceChildren();$('exitRegion').replaceChildren();
  for(const name of names){$('exitRegion').add(new Option(name,name));const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=!hiddenRegions.has(name);input.setAttribute('aria-label','显示区域 '+name);input.onchange=()=>{if(input.checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();};label.append(input,document.createTextNode(name));container.append(label);}
  if(names.includes(current))$('exitRegion').value=current;
 }
-$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');const next=assignRegion(map,selectedCells,$('regionName').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};
 function prefabPreview(prefab){
  const key=JSON.stringify(prefab);if(previewCache.has(key))return previewCache.get(key);
  previewRenderer??=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});previewRenderer.setSize(100,80);previewRenderer.setClearColor('#e1e8e0',1);
@@ -465,3 +466,5 @@ function drawPlacementPreview(hit){
 }
 
 $('applyKeyName').onclick=()=>{try{const name=$('keyName').value.trim();if(!name||name.length>80)throw new Error('钥匙名须为 1–80 字');const cells=selectedCells.filter(p=>map.tiles[p.r]?.[p.c]?.terrain==='key');if(!cells.length)throw new Error('先选择钥匙方块');if(cells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');record();for(const p of cells)map.tiles[p.r][p.c].keyName=name;buildPaper();persist();}catch(e){toast(e.message,true);}};
+
+$('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};

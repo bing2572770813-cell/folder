@@ -21,8 +21,8 @@ export function validateRegions(map){
  for(const p of taggedCells(map,'exitTo')){const target=p.tile.tags.exitTo;for(const key of p.tile.tags.requiredKeys??[])if(!keys.has(key))errors.push('出口所需钥匙不存在或不可收集：'+key);if(!names.has(target))errors.push('跳转区域不存在：'+target);else if(counts.get(target)!==1)errors.push('跳转区域需要唯一入口：'+target);}
  return [...new Set(errors)];
 }
-export function assignRegion(map,cells,name){
- name=name.trim();if(!name||name.length>80)throw new Error('区域名称须为 1–80 字');if(regionNames(map).includes(name))throw new Error('区域名称已存在');
+export function assignRegion(map,cells,name,existing=false){
+ name=name.trim();if(!name||name.length>80)throw new Error('区域名称须为 1–80 字');if(!existing&&regionNames(map).includes(name))throw new Error('区域名称已存在');if(existing&&!regionNames(map).includes(name))throw new Error('区域不存在');
  const next=JSON.parse(JSON.stringify(map)),oldNames=new Set();let count=0;for(const p of cells)if(next.tiles[p.r]?.[p.c]){oldNames.add(regionOf(next.tiles[p.r][p.c]));next.tiles[p.r][p.c].regionTag=name;count++;}
  if(!count)throw new Error('选区中没有可设置标签的方块');
  const remaining=new Set(regionNames(next));for(const p of taggedCells(next,'exitTo'))if(oldNames.has(p.tile.tags.exitTo)&&!remaining.has(p.tile.tags.exitTo))p.tile.tags.exitTo=name;

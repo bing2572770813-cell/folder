@@ -19,3 +19,5 @@ assert.throws(()=>assignRegion(next,[{r:0,c:0},{r:4,c:4}],'mixed'),/共存/);
 console.log('PASS: folds survive placement, hidden mask holes remain untouched, cleared starts stay cleared and region renames preserve exits.');
 const blockedEntry=structuredClone(next);blockedEntry.tiles[0][0].blocked=true;assert.ok(validateRegions(blockedEntry).some(e=>e.includes('可行走')));
 assert.throws(()=>tagCell(next,4,4,'exitTo','missing'),/不存在/);
+
+const joined=assignRegion(next,[{r:2,c:0}],'next',true);assert.equal(joined.tiles[2][0].regionTag,'next');assert.equal(next.tiles[2][0].regionTag,'默认区域');assert.throws(()=>assignRegion(next,[{r:2,c:0}],'missing',true));assert.throws(()=>assignRegion(next,[{r:4,c:4}],'next',true),/共存/);

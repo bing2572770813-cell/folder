@@ -23,7 +23,7 @@ const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const clone = data => JSON.parse(JSON.stringify(data));
 const blankTile = () => normalizeTile({color:'white',fold:null});
-let brushHeight=.09, selectedPrefabId=null, prefabs=[];
+let brushHeight=.09, selectedPrefabId=null, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
 function brushTile(){const prefab=prefabs.find(p=>p.id===selectedPrefabId);return normalizeTile({...prefab?.tile,color,height:brushHeight,blocked:prefab?prefab.tile.blocked:color==='black',prefabId:prefab?.id??null});}
 let map = defaultMap(), player = { ...map.spawn }, mode = GAME_ONLY ? 'play' : 'edit', tool = 'paint', color = 'white', foldType = 'h';
 let steps = 0, teleports = 0, moving = false, levelWon = false, stepLimitHit = false, legalMoves = [], chosenFold = null, hovered = null, showGrid = true;
@@ -281,7 +281,7 @@ function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
   const current=document.documentElement.outerHTML;
-  const boot='<script>window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(map).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
+  const boot='<script>window.__FOLD_FIELD_PREFABS__='+JSON.stringify(prefabs).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(map).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
   const html='<!doctype html>\n'+current.replace(/<script>/i,boot+'<script>');
   const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
   const a=document.createElement('a');a.href=url;a.download='game.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('独立游戏已导出为 game.html');
@@ -322,6 +322,42 @@ function tick(now){requestAnimationFrame(tick);controls.update();paper.position.
   if(animation){const t=Math.min(1,(now-animation.start)/animation.duration),smooth=t*t*(3-2*t);if(animation.type==='teleport'){if(t<.5){playerGroup.position.copy(animation.from);playerGroup.scale.setScalar(Math.max(.03,1-t*2));}else{playerGroup.position.copy(animation.to);playerGroup.scale.setScalar(Math.max(.03,(t-.5)*2));}}else{playerGroup.position.lerpVectors(animation.from,animation.to,smooth);}playerGroup.rotation.y=-player.dir*Math.PI/4;if(t>=1){animation=null;moving=false;playerGroup.scale.setScalar(1);renderPlayer();updateUI();checkRunEnd();}}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();syncState();}
 }
-buildPaper();fitCamera();if(mode==='play')checkRunEnd();requestAnimationFrame(tick);
+setupPrefabs();buildPaper();fitCamera();if(mode==='play')checkRunEnd();requestAnimationFrame(tick);
 // Read-only diagnostics support visual and interaction checks without bypassing the UI.
 window.foldField={getState:()=>clone({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,renderedFrames}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),.28+paper.position.y,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
+
+function setupPrefabs(){
+  let fingerprint='',loading=false;
+  function renderCatalog(){
+    const select=$('prefabType');select.replaceChildren(new Option('普通方块（自定义）',''));
+    for(const prefab of prefabs)select.add(new Option(prefab.name,prefab.id));
+    if(selectedPrefabId&&!prefabs.some(p=>p.id===selectedPrefabId)){selectedPrefabId=null;toast('当前实体文件已移除，切换为自定义方块');}
+    select.value=selectedPrefabId||'';
+  }
+  async function refresh(){
+    if(loading||document.hidden||GAME_ONLY||!/^https?:$/.test(location.protocol))return;
+    loading=true;
+    try{const response=await fetch('/api/prefabs',{cache:'no-store'});if(!response.ok)throw new Error('服务未提供实体目录');const catalog=await response.json();
+      const next=catalog.prefabs.map(normalizePrefab),key=JSON.stringify(next);
+      if(key!==fingerprint){prefabs=next;fingerprint=key;renderCatalog();}
+      $('prefabStatus').textContent=catalog.errors.length?catalog.errors.map(e=>e.file+'：'+e.message).join('；'):'实时读取 assets/prefab · '+prefabs.length+' 种实体';
+    }catch(error){$('prefabStatus').textContent='使用内置实体目录 · '+error.message;}finally{loading=false;}
+  }
+  renderCatalog();$('prefabStatus').textContent='内置实体目录 · 本地服务支持实时更新';
+  $('prefabType').onchange=()=>{
+    selectedPrefabId=$('prefabType').value||null;const prefab=prefabs.find(p=>p.id===selectedPrefabId);
+    if(prefab){color=prefab.tile.color;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('prefabName').value=prefab.name;
+      document.querySelectorAll('[data-color]').forEach(b=>{const active=b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefab.tile.blocked?'阻挡实体':'可通行实体';}
+    if(tool!=='place')setTool('paint');
+  };
+  $('savePrefab').onclick=async()=>{
+    const name=$('prefabName').value.trim();if(!name){toast('请输入实体名称',true);return;}
+    const data={version:1,id:'entity_'+Date.now()+'_ai',name,tile:brushTile()};data.tile.prefabId=data.id;
+    if(!/^https?:$/.test(location.protocol)){
+      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=data.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('实体已导出，请放入 assets/prefab 后启动本地服务');return;
+    }
+    $('savePrefab').disabled=true;
+    try{const response=await fetch('/api/prefabs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');await refresh();toast('实体已保存至 assets/prefab');}catch(error){toast('实体保存失败：'+error.message,true);}finally{$('savePrefab').disabled=false;}
+  };
+  refresh();if(!GAME_ONLY)setInterval(refresh,2000);document.addEventListener('visibilitychange',refresh);
+}

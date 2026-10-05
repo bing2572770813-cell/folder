@@ -8,3 +8,12 @@ const result=pasteRegion(base,clip,1,1);assert.deepEqual(result.map.tiles[1][1],
 assert.deepEqual(result.map.spawn,base.spawn);assert.deepEqual(result.map.exit,base.exit);result.map.tiles[1][1].height=8;assert.equal(clip[0][0].height,2);
 assert.throws(()=>pasteRegion(base,clip,3,3));assert.deepEqual(base,before);
 console.log('PASS: reverse selection, independent clipboard, tile properties, null cells, atomic bounds and unique markers.');
+
+base.foldCells=[{r:0,c:1,type:'h'},{r:3,c:3,type:'v'}];
+const voidClip=region(base,rect),voidPaste=pasteRegion(base,voidClip,1,1);
+assert.ok(voidPaste.map.foldCells.some(p=>p.r===1&&p.c===2&&p.type==='h'));
+assert.ok(voidPaste.map.foldCells.some(p=>p.r===3&&p.c===3&&p.type==='v'));
+assert.equal(voidPaste.map.tiles[1][2],null);
+assert.equal(voidClip.foldCells.length,1);
+assert.equal(pasteRegion(base,region({...base,foldCells:[]},rect),2,2).map.foldCells.some(p=>p.r===3&&p.c===3),false);
+console.log('PASS: clipboard preserves independent void folds and clears overwritten markers.');

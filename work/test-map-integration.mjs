@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import {normalizeTile,blocked,columnLabel} from './tile-model.mjs';
+import {normalizeTile,blocked,columnLabel,normalizeFoldCells} from './tile-model.mjs';
 const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const validation=source.slice(source.indexOf('function validateMap('),source.indexOf('function validateForPlay('));
-const context={normalizeTile,blocked,columnLabel};vm.createContext(context);vm.runInContext(validation,context);
+const context={normalizeTile,blocked,columnLabel,normalizeFoldCells};vm.createContext(context);vm.runInContext(validation,context);
 const map={version:1,width:128,height:128,tiles:Array.from({length:128},()=>Array.from({length:128},()=>({color:'white',fold:null}))),spawn:{r:0,c:0,dir:0},exit:{r:127,c:127},maxSteps:0};
 map.tiles[4][5]={color:'blue',height:3,fold:'h',folds:['h','v'],prefabId:'paper_ai',blocked:false};
 const valid=context.validateMap(map);
@@ -17,3 +17,11 @@ const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 for(const match of source.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has(match[1]),'Missing DOM node '+match[1]);
 assert.ok(!/折纸测试|对称绘制|moveRegion|fillRegion|transformRegion|previewFolds|testPlay/.test(source+html));
 console.log('PASS: 128 bounds, full tile JSON round-trip, draft validation, removed tools and DOM bindings.');
+
+const demo=JSON.parse(fs.readFileSync(new URL('../outputs/fold-field-demo.json',import.meta.url),'utf8'));
+assert.doesNotThrow(()=>context.validateMap(demo,true),'Bundled demo must load before UI handlers register');
+const mechanismMap=context.validateMap(demo,true);
+mechanismMap.tiles[0][0]={height:.2,blocked:true,color:'black',folds:['h'],terrain:'campfire',terrainConfig:{}};
+assert.doesNotThrow(()=>context.validateMap(mechanismMap,true),'Editor allows folds on blocked mechanism tiles');
+assert.deepEqual(JSON.parse(JSON.stringify(context.validateMap(mechanismMap,true))).tiles[0][0].folds,['h']);
+console.log('PASS: startup demo validation and blocked mechanism fold compatibility.');

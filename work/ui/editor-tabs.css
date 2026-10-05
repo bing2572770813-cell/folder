@@ -7,3 +7,5 @@
 [data-tool=select].tool-btn{grid-column:span 2;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}[data-tool=select] .selection-mode-label{white-space:nowrap;font-size:11px}
 
 #tagSummary{display:flex;align-items:center;gap:10px;min-height:62px;padding:6px;border:1px solid var(--line);border-radius:5px;background:white;cursor:pointer}#tagSummary::before{content:'▸';flex:none}details[open]>#tagSummary::before{content:'▾'}#tagSummary svg{width:40px;height:40px;flex:none}#tagSummary::-webkit-details-marker{display:none}#blockColorPanel[hidden]{display:none}
+
+.block-entity-parameters{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}

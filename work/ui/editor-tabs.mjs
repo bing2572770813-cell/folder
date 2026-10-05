@@ -16,7 +16,7 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const entitySelector = block.querySelector('.studio-fields');
   const selectorSection = document.createElement('section');
   selectorSection.className = 'section';
-  const title = document.createElement('h2');title.className='section-label';title.textContent='实体类型';
+  const title = document.createElement('h2');title.className='section-label';title.textContent='方块实体';
   selectorSection.append(title, entitySelector);
   entitySelector.querySelector('#prefabSummary').parentElement.append(find('blockColorPanel'));
   const selectionTools = document.createElement('section');selectionTools.className='section';
@@ -29,8 +29,10 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const selectionModeLabel=document.createElement('span');selectionModeLabel.className='selection-mode-label';selectionModeLabel.textContent='选区 · 单选';selectTool.append(selectionModeLabel);
   selection.querySelector('summary').textContent='区域标签';
   selectionTools.append(selection);
-  block.querySelector('h2').textContent='放置参数与标签';
-  panels.get('map').append(tools, selectorSection, block, selectionTools, fold);
+  block.querySelector('h2').textContent='防止参数';
+  block.classList.add('block-entity-parameters');
+  selectorSection.append(block);
+  panels.get('map').append(tools, selectorSection, selectionTools, fold);
   panels.get('inspect').append(facing);
   panels.get('properties').append(dimensions);
   panels.get('layers').append(layers);

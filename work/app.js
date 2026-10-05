@@ -1,12 +1,12 @@
-import {paperSurface} from './paper-surface.mjs';
+import {paperSurface} from './render/paper-surface.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
-import {legalKeyNames,renameKeyCells} from './keys.mjs';
-import {normalizeMapName,mapFilename} from './map-name.mjs';
+import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
+import {normalizeMapName,mapFilename} from './core/map-name.mjs';
 import playerRuntime from './player.cjs';
 import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, tileThickness, tileGradualRate, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './entities/tile-model.mjs';
-import { axisKey, uniqueFoldAxes, foldGroupAt, inFoldRange, foldStrokes } from './fold-geometry.mjs';
-import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './regions.mjs';
+import { axisKey, uniqueFoldAxes, foldGroupAt, inFoldRange, foldStrokes } from './tags/fold-geometry.mjs';
+import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
 import {footprint,placeEntity,removeEntity} from './entities/placement-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';

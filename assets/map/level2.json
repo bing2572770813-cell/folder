@@ -1,0 +1,2364 @@
+{
+  "version": 1,
+  "width": 24,
+  "height": 24,
+  "tiles": [
+    [
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d1"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d1"
+      },
+      {
+        "color": "blue",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "white",
+        "fold": "h"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "blue",
+        "fold": "h"
+      },
+      {
+        "color": "red",
+        "fold": "h"
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "blue",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": "d1"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d2"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d1"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": "d2"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "d1"
+      }
+    ],
+    [
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "blue",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "green",
+        "fold": null
+      }
+    ]
+  ],
+  "spawn": {
+    "r": 11,
+    "c": 0,
+    "dir": 0
+  }
+}

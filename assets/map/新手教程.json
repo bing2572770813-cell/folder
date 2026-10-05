@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "width": 11,
+  "height": 3,
+  "tiles": [
+    [
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "green",
+        "fold": null
+      },
+      {
+        "color": "red",
+        "fold": null
+      }
+    ],
+    [
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "black",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": "v"
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      },
+      {
+        "color": "white",
+        "fold": null
+      }
+    ]
+  ],
+  "spawn": {
+    "r": 1,
+    "c": 0,
+    "dir": 0
+  }
+}

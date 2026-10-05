@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "goal_ai",
+  "name": "终点方块",
+  "tile": { "color": "red", "height": 0.09, "blocked": false, "folds": [], "terrain": "goal", "terrainConfig": {} }
+}

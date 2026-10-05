@@ -3,5 +3,10 @@
     "esbuild": "^0.25.10",
     "lucide": "^0.468.0",
     "three": "^0.180.0"
+  },
+  "scripts": {
+    "start": "node server.cjs",
+    "build": "node build.cjs",
+    "test": "node test-runner.cjs"
   }
 }

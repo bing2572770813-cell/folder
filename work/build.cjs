@@ -4,6 +4,8 @@ const esbuild = require('esbuild');
 const root = __dirname;
 const outputs = path.join(root, '../outputs');
 async function build() {
+const catalog=await require('./prefab-catalog.cjs').readCatalog();
+if(catalog.errors.length)console.warn('Prefab warnings:',catalog.errors);
 const result = await esbuild.build({
   stdin: { contents: fs.readFileSync(path.join(root, 'app.js'), 'utf8'), loader: 'js', sourcefile: path.join(root, 'app.js'), resolveDir: root },
   plugins: [{ name: 'workspace-files', setup(build) {
@@ -22,7 +24,7 @@ const result = await esbuild.build({
   target: ['es2020'],
 });
 const template = fs.readFileSync(path.join(root, 'editor.html'), 'utf8');
-const code = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+const code = 'window.__FOLD_FIELD_PREFABS__??='+JSON.stringify(catalog.prefabs).replace(/</g,'\\u003c')+';'+result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const html = template.replace('<!--APP_SCRIPT-->', () => '<script>' + code + '</script>');
 fs.mkdirSync(outputs, {recursive:true});
 fs.writeFileSync(path.join(outputs, 'index.html'), html, 'utf8');

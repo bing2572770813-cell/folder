@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "ice_ai",
+  "name": "冰河方块",
+  "tile": { "color": "blue", "height": 0.09, "blocked": false, "folds": [], "terrain": "ice", "terrainConfig": {} }
+}

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "id": "paper_ai",
+  "name": "纸张方块",
+  "tile": { "color": "white", "height": 0.09, "blocked": false, "folds": [] }
+}

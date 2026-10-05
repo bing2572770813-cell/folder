@@ -369,19 +369,9 @@ function setupPrefabs(){
   renderCatalog();$('prefabStatus').textContent='内置实体目录 · 本地服务支持实时更新';
   $('prefabType').oninput=$('prefabType').onchange=()=>{
     selectedPrefabId=$('prefabType').value||null;const prefab=prefabs.find(p=>p.id===selectedPrefabId);
-    if(prefab){color=prefab.tile.color;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('prefabName').value=prefab.name;
+    if(prefab){color=prefab.tile.color;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;
       document.querySelectorAll('[data-color]').forEach(b=>{const active=b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefab.tile.blocked?'阻挡实体':'可通行实体';}
     if(tool!=='place')setTool('paint');
-  };
-  $('savePrefab').onclick=async()=>{
-    try{brushTile();}catch(error){toast(error.message,true);return;}
-    const name=$('prefabName').value.trim();if(!name){toast('请输入实体名称',true);return;}
-    const data={version:1,id:'entity_'+Date.now()+'_ai',name,tile:brushTile()};data.tile.prefabId=data.id;
-    if(!/^https?:$/.test(location.protocol)){
-      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=data.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('实体已导出，请放入 assets/prefab 后启动本地服务');return;
-    }
-    $('savePrefab').disabled=true;
-    try{const response=await fetch('/api/prefabs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw new Error(result.error||'保存失败');await refresh();toast('实体已保存至 assets/prefab');}catch(error){toast('实体保存失败：'+error.message,true);}finally{$('savePrefab').disabled=false;}
   };
   refresh();if(!GAME_ONLY)setInterval(refresh,2000);document.addEventListener('visibilitychange',refresh);
 }

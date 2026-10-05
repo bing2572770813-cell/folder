@@ -38,3 +38,10 @@ map.tiles[0][1].tags.requiredKeys=['不存在'];assert.equal(controller.validate
 console.log('PASS: all-key exit gates, missing/blocked keys, independent collection snapshots and restart.');
 
 map.tiles[0][1].tags.requiredKeys=[];map.tiles[0][0].terrain='key';map.tiles[0][0].keyName='起点钥匙';controller.restart();assert.deepEqual(P.terrainState.collectedKeys,['起点钥匙']);
+
+// Completing either animation performs the same guarded player click as mouse input.
+delete map.tiles[0][1].tags.exitTo;delete map.tiles[0][1].tags.requiredKeys;
+map.tiles[0][2]={color:'white',regionTag:'A',height:.09,blocked:false};map.tiles[1][2]={color:'white',regionTag:'A',height:.09,blocked:false};
+map.foldCells=[0,1,2].map(r=>({r,c:1,type:'v'}));controller.restart();controller.click(0,0);controller.movePlayer(1,0);assert.equal(P.legalMoves.length,0,'动画期间不提前选中');controller.tick(performance.now()+1000);assert.equal(ring.visible,true);assert.ok(P.legalMoves.some(p=>p.r===0&&p.c===0));const moveHistory=P.playHistory.length;controller.click(0,0);assert.equal(P.steps,2,'自动选择支持直接点击下一个目标');controller.tick(performance.now()+1000);assert.equal(P.playHistory.length,moveHistory+1,'自动选择不会添加历史步骤');controller.selectFold(0,1);controller.teleport();assert.deepEqual({r:P.player.r,c:P.player.c},{r:0,c:2});controller.tick(performance.now()+1000);assert.equal(ring.visible,true);assert.equal(P.chosenFold,null);assert.ok(P.legalMoves.some(p=>p.r===0&&p.c===1));assert.equal(P.steps,3);assert.equal(P.teleports,1);
+map.exit={r:0,c:0};controller.selectFold(0,1);controller.teleport();controller.tick(performance.now()+1000);assert.equal(P.levelWon,true);assert.equal(ring.visible,false,'通关后不重新开启可移动选区');assert.equal(P.legalMoves.length,0);
+console.log('PASS: automatic player selection after walking and folding, consecutive movement, unchanged action history and terminal guard.');

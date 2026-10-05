@@ -1,5 +1,7 @@
 # FOLD FIELD 编辑器
 
+完整当前机制与跨 agent 交接见 [GAME_MECHANICS.md](GAME_MECHANICS.md)。本文后续历史追加段落可能含旧规则；机制开发请先核对完整说明与当前代码。
+
 在项目根目录运行：
 
 ```powershell

@@ -18,7 +18,11 @@ export function uniqueFoldAxes(map){
  }return groups;
 }
 export function foldGroupAt(groups,r,c,type){return groups.find(g=>g.type===type&&g.cells.some(p=>p.r===r&&p.c===c));}
-export function foldDistance(group,p){return group?.cells?.length?Math.min(...group.cells.map(cell=>Math.max(Math.abs(p.r-cell.r),Math.abs(p.c-cell.c)))):Infinity;}
+export function foldDistance(group,p){
+ const cells=group?.cells;if(!cells?.length)return Infinity;
+ const middle=Math.floor(cells.length/2),distance=cell=>Math.max(Math.abs(p.r-cell.r),Math.abs(p.c-cell.c));
+ return cells.length%2?distance(cells[middle]):Math.max(distance(cells[middle-1]),distance(cells[middle]));
+}
 export function inFoldRange(group,p){return !!group&&foldDistance(group,p)<=group.radius;}
 export function foldStrokes(group){
  const dr=group.to.r-group.from.r,dc=group.to.c-group.from.c,length=Math.hypot(dr,dc),result=[];

@@ -12,7 +12,7 @@
   "tile": {
     "color": "white",
     "height": 0.09,
-    "blocked": false,
+    "blocked": true,
     "kind": "player-token",
     "folds": []
   }

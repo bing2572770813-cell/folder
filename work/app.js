@@ -1,3 +1,4 @@
+import {entityType,entityChoices,entityHidden} from './entity-visibility.mjs';
 import {legalKeyNames,renameKeyCells} from './keys.mjs';
 import {normalizeMapName,mapFilename} from './map-name.mjs';
 import playerRuntime from './player.cjs';
@@ -27,6 +28,7 @@ const FOLDS = ['h','v','d1','d2'];
 const FOLD_NAMES = { h: '横向折线', v: '纵向折线', d1: '对角折线 ↘', d2: '对角折线 ↗' };
 const FACE_NAMES = ['北','东北','东','东南','南','西南','西','西北'];
 const TERRAIN_MARKERS={campfire:{name:'篝火',icon:FlameKindling},ice:{name:'冰河',icon:Snowflake},fire:{name:'火焰',icon:Flame},eruption:{name:'喷发',icon:Mountain},key:{name:'钥匙',icon:KeyRound}};
+const hiddenEntities=new Set();
 const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const clone = data => JSON.parse(JSON.stringify(data));
@@ -50,7 +52,7 @@ function defaultMap() {
   return validateMap(clone(demoMap),true);
 }
 function inside(r,c) { return Number.isInteger(r) && Number.isInteger(c) && r>=0 && c>=0 && r<map.height && c<map.width; }
-function cellHidden(r,c){const tile=map.tiles[r]?.[c];return !!tile&&(P.mode==='edit'?hiddenRegions.has(regionOf(tile)):!P.revealedRegions.has(regionOf(tile)));}
+function cellHidden(r,c){const tile=map.tiles[r]?.[c];return !!tile&&(P.mode==='edit'?(hiddenRegions.has(regionOf(tile))||entityHidden(tile,hiddenEntities)):!P.revealedRegions.has(regionOf(tile)));}
 function walkable(r,c) { return inside(r,c)&&!cellHidden(r,c) && map.tiles[r][c] !== null && !blocked(map.tiles[r][c]) && map.tiles[r][c].terrain!=='campfire'; }
 
 function coord(r,c) { return columnLabel(c)+(r+1); }
@@ -115,7 +117,7 @@ paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,f
 let foldAxes=[],foldAxisMesh=null,axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
 
-const visibility={coords:true,tiles:true,folds:true,player:true};
+const visibility={coords:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
 function disposableClear(group) { for(const child of [...group.children]) { child.traverse(o=>{if(o.userData.ownedTexture)o.userData.ownedTexture.dispose();if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}}); group.remove(child); } }
 
@@ -182,7 +184,7 @@ function buildPaper() {
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z+.5,x+.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
   rebuildFoldAxes();
-  renderRegionControls();
+  renderRegionControls();renderEntityVisibility();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
 }
 function addAxisLabels(maxHeight){
@@ -195,10 +197,10 @@ function addAxisLabels(maxHeight){
   const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.03;label.userData.ownedTexture=texture;boardLayer.add(label);
 }
 function applyVisibility(){
-  const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=tileLayer.visible;
-  terrainLayer.visible=!editing||visibility.tiles;
+  const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
+  terrainLayer.visible=true;
 }
-for(const [id,key] of [['coordsVisible','coords'],['tilesVisible','tiles'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();syncState();};
+for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();syncState();};
 
 function fitCamera(resetZoom=true) {
   controls.target.set(0,0,0);const distance=Math.max(24,Math.max(map.width,map.height)*2);cameraOffset.set(view==='top'?0:distance*.5,view==='top'?distance:distance*.71,view==='top'?.001:distance*.625);camera.position.copy(cameraOffset);camera.lookAt(controls.target);camera.updateMatrixWorld(true);
@@ -235,7 +237,7 @@ document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
 function editAt(r,c){
-  if(cellHidden(r,c)){toast('隐藏区域禁止编辑',true);return;}
+  if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
   if(tool==='select'){selectedCells=map.tiles[r][c]?[{r,c}]:[];editRect=selectedCells.length?rectangle({r,c},{r,c}):null;drawEditSelection();syncState();return;}
   if(['player','entry','region-exit','clear-tags'].includes(tool)){
     try{
@@ -247,7 +249,7 @@ function editAt(r,c){
     }catch(e){toast(e.message,true);}return;
   }
   if(tool==='paste'){pasteAt(r,c);return;}
-  if(tool==='paint'||tool==='place'){try{brushTile();}catch(error){toast(error.message,true);return;}}
+  if(tool==='paint'||tool==='place'){try{if(entityHidden(brushTile(),hiddenEntities))throw new Error('请先显示该实体类型');}catch(error){toast(error.message,true);return;}}
   const t=map.tiles[r][c];const isSpawn=r===map.spawn.r&&c===map.spawn.c;const isExit=map.exit&&r===map.exit.r&&c===map.exit.c;
   if(tool==='erase'){if(!t)return;if(isSpawn){toast('先把玩家起点移到其他方块',true);return;}}
   if(tool==='paint'&&!t){toast('此处为空格，请先放置方块',true);return;}
@@ -288,7 +290,7 @@ function drawEditSelection(){
 }
 $('copyRegion').onclick=()=>{if(!editRect)return;clipboard=selectionRegion(map,selectedCells);drawEditSelection();toast('选区已复制');};
 $('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.length,w:clipboard[0].length};drawEditSelection();};
-function pasteAt(r,c){try{for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);record();map=result.map;editRect=result.rect;selectedCells=unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
+function pasteAt(r,c){try{if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);record();map=result.map;editRect=result.rect;selectedCells=unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
 function updateUI(){
   if(document.activeElement!==$('mapName'))$('mapName').value=map.name;
@@ -367,7 +369,7 @@ window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 
 let renderedFrames=0;
-function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,selectedCells,hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
+function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,selectedCells,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
 function screenPoints(){
   viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeToken.children[0].geometry.type,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
@@ -395,7 +397,7 @@ function setupPrefabs(){
     for(const prefab of prefabs)select.add(new Option(prefab.name,prefab.id));
     if(!prefabs.some(p=>p.id===selectedPrefabId))selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
     if(!prefabs.length)select.add(new Option('无可用实体',''));
-    select.value=selectedPrefabId||'';$('prefabGrid').replaceChildren();for(const prefab of prefabs){const b=document.createElement('button'),img=document.createElement('img');b.className='prefab-preview';b.dataset.prefab=prefab.id;b.dataset.name=prefab.name;b.title=prefab.name;b.setAttribute('aria-label',prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;b.append(img);b.onclick=()=>{selectedPrefabId=prefab.id;select.value=prefab.id;applyPrefabBrush();$('prefabSummary').parentElement.open=false;setTool('place');};$('prefabGrid').append(b);}applyPrefabBrush();
+    select.value=selectedPrefabId||'';$('prefabGrid').replaceChildren();for(const prefab of prefabs){const b=document.createElement('button'),img=document.createElement('img');b.className='prefab-preview';b.dataset.prefab=prefab.id;b.dataset.name=prefab.name;b.title=prefab.name;b.setAttribute('aria-label',prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;b.append(img);b.onclick=()=>{selectedPrefabId=prefab.id;select.value=prefab.id;applyPrefabBrush();$('prefabSummary').parentElement.open=false;setTool('place');};$('prefabGrid').append(b);}applyPrefabBrush();renderEntityVisibility();
   }
   async function refresh(){
     if(loading||document.hidden||GAME_ONLY||!/^https?:$/.test(location.protocol))return;
@@ -468,3 +470,8 @@ function drawPlacementPreview(hit){
 $('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$('keyName').value,cellHidden);record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};
 
 $('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};
+
+function renderEntityVisibility(){const container=$('entityVisibility');container.replaceChildren();for(const prefab of entityChoices(prefabs,map)){const label=document.createElement('label'),input=document.createElement('input'),img=document.createElement('img');label.className='prefab-preview';label.title=prefab.name;label.dataset.name=prefab.name;input.type='checkbox';input.checked=!hiddenEntities.has(prefab.id);input.setAttribute('aria-label','显示实体 '+prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;input.onchange=()=>{if(input.checked)hiddenEntities.delete(prefab.id);else hiddenEntities.add(prefab.id);refreshEntityVisibility();};label.append(input,img);container.append(label);}}
+function refreshEntityVisibility(){selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();syncState();}
+$('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility();};
+$('hideAllEntities').onclick=()=>{for(const prefab of entityChoices(prefabs,map))hiddenEntities.add(prefab.id);refreshEntityVisibility();};

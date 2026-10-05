@@ -13,12 +13,13 @@ export function uniqueFoldAxes(map){
  const a={r:start.r-d.r/2,c:start.c-d.c/2},b={r:end.r+d.r/2,c:end.c+d.c/2};
  // Endpoints lie on the containing cell boundary, clamped to map bounds.
  const clamp=v=>({r:Math.max(-.5,Math.min(map.height-.5,v.r)),c:Math.max(-.5,Math.min(map.width-.5,v.c))});
- const from=clamp(a),to=clamp(b),radius=Math.abs(center.r-to.r)+Math.abs(center.c-to.c);
- groups.push({...p,cells,center,from,to,radius,id:key});
+ const from=clamp(a),to=clamp(b),contribution=cells.length*.5,radius=Math.ceil(contribution);
+ groups.push({...p,cells,center,from,to,contribution,radius,id:key});
  }return groups;
 }
 export function foldGroupAt(groups,r,c,type){return groups.find(g=>g.type===type&&g.cells.some(p=>p.r===r&&p.c===c));}
-export function inFoldRange(group,p){return !!group&&Math.abs(p.r-group.center.r)+Math.abs(p.c-group.center.c)<=group.radius+1e-9;}
+export function foldDistance(group,p){return group?.cells?.length?Math.min(...group.cells.map(cell=>Math.abs(p.r-cell.r)+Math.abs(p.c-cell.c))):Infinity;}
+export function inFoldRange(group,p){return !!group&&foldDistance(group,p)<=group.radius;}
 export function foldStrokes(group){
  const dr=group.to.r-group.from.r,dc=group.to.c-group.from.c,length=Math.hypot(dr,dc),result=[];
  if(!length)return result;

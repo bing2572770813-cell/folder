@@ -2,5 +2,19 @@
   "version": 1,
   "id": "fire_ai",
   "name": "火焰方块",
-  "tile": { "color": "red", "height": 0.09, "blocked": false, "folds": [], "terrain": "fire", "terrainConfig": {} }
+  "tile": {
+    "color": "red",
+    "height": 0.09,
+    "blocked": false,
+    "folds": [],
+    "terrain": "fire",
+    "terrainConfig": {}
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
 }

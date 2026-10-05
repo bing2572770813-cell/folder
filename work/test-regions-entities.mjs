@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {normalizePrefab} from './tile-model.mjs';
+import {footprint,placeEntity} from './entity-model.mjs';
+import {assignRegion,tagCell,validateRegions,migrateRegions} from './regions.mjs';
+const prefab=normalizePrefab({version:1,id:'large_ai',name:'large',size:{width:2,height:3},occupied:[true,false,true,true,true,true],tile:{color:'white'}});
+const map=migrateRegions({width:5,height:5,spawn:{r:4,c:4,dir:0},tiles:Array.from({length:5},()=>Array.from({length:5},()=>({color:'white'})))});
+assert.equal(footprint(prefab,0,0).length,5);assert.equal(placeEntity(map,prefab,prefab.tile,0,0).map.tiles[0][1].instance,undefined);
+assert.throws(()=>placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===1&&c===1));assert.throws(()=>placeEntity(map,prefab,prefab.tile,4,4));
+const next=assignRegion(map,[{r:0,c:0},{r:1,c:0}],'next');assert.throws(()=>assignRegion(next,[],'next'));tagCell(next,0,0,'entry',true);tagCell(next,4,4,'exitTo','next');assert.deepEqual(validateRegions(next),[]);assert.throws(()=>tagCell(next,1,0,'spawn',true));
+assert.throws(()=>normalizePrefab({...prefab,occupied:[true]}));
+console.log('PASS: footprints, holes, atomic hidden-cell rejection, duplicate region names and spawn/entry exclusion.');

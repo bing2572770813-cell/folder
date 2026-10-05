@@ -31,12 +31,18 @@ export function normalizeTile(tile) {
     if(!config||typeof config!=='object'||Array.isArray(config))throw new Error('机制参数必须是 JSON 对象');
     terrainConfig=copyTerrainConfig(config);
   }
+  const regionTag=tile.regionTag??null;if(regionTag!==null&&(typeof regionTag!=='string'||!regionTag.trim()||regionTag.length>80))throw new Error('区域标签无效');
+  const tags=tile.tags??{};if(!tags||typeof tags!=='object'||Array.isArray(tags))throw new Error('方块标签无效');
+  if(tags.exitTo!==undefined&&(typeof tags.exitTo!=='string'||!tags.exitTo.trim()||tags.exitTo.length>80))throw new Error('跳转区域名称无效');
+  for(const key of ['spawn','entry'])if(tags[key]!==undefined&&typeof tags[key]!=='boolean')throw new Error('方块标签无效');
+  if(tile.kind!==undefined&&!['block','player-token'].includes(tile.kind))throw new Error('实体外观类型无效');
   const unique=[...new Set(folds)];
-  return {...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');
-  return {version:1,id:data.id,name:data.name.trim().slice(0,80),tile:normalizeTile({...data.tile,prefabId:data.id})};
+  const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
+  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],tile:normalizeTile({...data.tile,prefabId:data.id})};
 }
 export function columnLabel(c) {
   let label='';for(let n=c+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;

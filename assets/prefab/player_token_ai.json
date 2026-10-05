@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "player_token_ai",
+  "name": "Player Token",
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ],
+  "tile": {
+    "color": "white",
+    "height": 0.09,
+    "blocked": false,
+    "kind": "player-token",
+    "folds": []
+  }
+}

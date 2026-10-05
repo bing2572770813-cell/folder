@@ -128,8 +128,8 @@ const terrainTextures=Object.fromEntries(Object.entries(TERRAIN_MARKERS).map(([t
 }));
 const exitTexture=canvasTexture((ctx,s)=>{ctx.translate(s/2,s/2);ctx.fillStyle='#fff4b1';ctx.beginPath();ctx.arc(0,0,s*.32,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#8b7635';ctx.lineWidth=8;ctx.stroke();ctx.fillStyle='#6a5a2c';ctx.beginPath();ctx.moveTo(-s*.16,s*.2);ctx.lineTo(-s*.16,-s*.13);ctx.lineTo(0,-s*.25);ctx.lineTo(s*.16,-s*.13);ctx.lineTo(s*.16,s*.2);ctx.closePath();ctx.fill();ctx.fillStyle='#fff4b1';ctx.beginPath();ctx.arc(s*.07,0,4,0,Math.PI*2);ctx.fill();});
 const playerTexture=canvasTexture((ctx,s)=>{ctx.translate(s/2,s/2);ctx.fillStyle='#ddea90';ctx.beginPath();ctx.arc(0,0,87,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#425c3b';ctx.lineWidth=7;ctx.stroke();ctx.beginPath();ctx.moveTo(0,-65);ctx.lineTo(41,45);ctx.lineTo(0,22);ctx.lineTo(-41,45);ctx.closePath();ctx.fillStyle='#3b5033';ctx.fill();ctx.strokeStyle='#eff5c9';ctx.lineWidth=3;ctx.stroke();});
-const playerDecal=new THREE.Mesh(new THREE.PlaneGeometry(.81,.81),new THREE.MeshBasicMaterial({map:playerTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
-playerDecal.rotation.x=-Math.PI/2;
+const playerDecal=new THREE.Mesh(new THREE.PlaneGeometry(.81,.81),new THREE.MeshBasicMaterial({map:playerTexture,transparent:true,depthWrite:false,depthTest:false}));
+playerDecal.rotation.x=-Math.PI/2;playerDecal.renderOrder=7;
 const playerGroup=new THREE.Group();const activeToken=makeToken('white');playerGroup.add(activeToken);paper.add(playerGroup);const spawnMarkerGroup=new THREE.Group();spawnMarkerGroup.add(playerDecal);paper.add(spawnMarkerGroup);
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
@@ -150,7 +150,7 @@ function buildPaper() {
     const cell={r,c};if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);
     const y=tileTop(r,c),x=wx(c),z=wz(r);
     if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);staticTokenLayer.add(token);}
-    if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.018,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
+    if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.04,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
 
     const edgeColor=entityEdgeColor(tile);
     if(edgeColor){
@@ -194,7 +194,7 @@ function addAxisLabels(maxHeight){
   const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.03;label.userData.ownedTexture=texture;boardLayer.add(label);
 }
 function applyVisibility(){
-  const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=editing&&visibility.player&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=tileLayer.visible;
+  const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=tileLayer.visible;
   terrainLayer.visible=!editing||visibility.tiles;
 }
 for(const [id,key] of [['coordsVisible','coords'],['tilesVisible','tiles'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();syncState();};

@@ -33,7 +33,7 @@ const previewCache=new Map();let previewRenderer;
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
 let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
 let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
-function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,prefabId:prefab.id});}
+function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,prefabId:prefab.id});}
 let map=defaultMap(),tool='paint',color='white',foldType='h';
 let hovered=null,showGrid=true;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
@@ -383,7 +383,7 @@ function setupPrefabs(){
   let fingerprint='',loading=false;
   function applyPrefabBrush(){
     const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
-    $('blockColorPanel').hidden=!colored;$('prefabSummary').textContent=prefab?.name||'无可用实体';
+    $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored;$('prefabSummary').textContent=prefab?.name||'无可用实体';
     $('blockHeight').disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';document.querySelectorAll('[data-prefab]').forEach(b=>{const active=b.dataset.prefab===selectedPrefabId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
     if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;}
     document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
@@ -461,3 +461,5 @@ function drawPlacementPreview(hit){
  for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?tileTop(p.r,p.c)+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
  $('hoverCoord').textContent=(invalid?'无法放置 · ':'占格预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
+
+$('applyKeyName').onclick=()=>{try{const name=$('keyName').value.trim();if(!name||name.length>80)throw new Error('钥匙名须为 1–80 字');const cells=selectedCells.filter(p=>map.tiles[p.r]?.[p.c]?.terrain==='key');if(!cells.length)throw new Error('先选择钥匙方块');if(cells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');record();for(const p of cells)map.tiles[p.r][p.c].keyName=name;buildPaper();persist();}catch(e){toast(e.message,true);}};

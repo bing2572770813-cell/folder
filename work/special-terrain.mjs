@@ -61,12 +61,10 @@ export function finishAction(state = createTerrainState()) {
 
 export function validateTerrains(map) {
   const errors = [];
-  let keys = 0;
+
   for (const row of map.tiles) for (const tile of row) {
     if (!tile?.terrain) continue;
     if (!TERRAIN_TYPES.includes(tile.terrain)) errors.push(`未知特殊地形：${tile.terrain}`);
-    if (tile.terrain === 'key') keys++;
   }
-  if (keys > 1) errors.push('每关最多放置一个钥匙');
   return errors;
 }

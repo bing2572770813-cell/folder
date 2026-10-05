@@ -18,7 +18,7 @@
 .game-only #resultEdit{display:none}
 .studio-section{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}.studio-section summary{cursor:pointer;font-size:11px;font-weight:600;color:#526755;margin-bottom:10px}.studio-tools{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.studio-tools button{height:31px;border:1px solid var(--line);background:#f5f7f1;border-radius:4px;display:grid;place-items:center;color:#526755}.studio-tools button.active{background:#dce9d2;border-color:#97b48a}.studio-tools svg{width:16px;height:16px}.studio-fields{display:grid;gap:8px;margin-top:10px;font-size:10px;color:#6c7c6e}.studio-fields label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.studio-fields select{width:100%;min-width:0;padding:5px;background:#f7f9f3;border:1px solid var(--line);border-radius:3px;font-size:10px;color:#526755}.studio-fields input[type=checkbox]{width:13px;height:13px;padding:0}.studio-readout{font-size:10px;color:#627667;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}.game-only #redoBtn{display:none}
 .block-color-panel{margin-top:16px}
-</style>
+.fold-radius-hint{position:absolute;left:14px;bottom:16px;max-width:calc(100% - 28px);padding:7px 10px;background:#f8faf2ed;color:#354c3b;border:1px solid #a9bbad;border-radius:4px;font-size:11px;pointer-events:none;z-index:8}.fold-radius-hint[hidden]{display:none}</style>
 </head>
 <body>
 <div class="app">
@@ -50,7 +50,7 @@
       <div class="side-meta"><span>FOLD FIELD / V1.0</span><span id="saveState">本地已保存</span></div>
     </aside>
     <main class="main">
-      <div class="canvas-wrap" id="viewport"></div>
+      <div class="canvas-wrap" id="viewport"><div id="foldRadiusHint" class="fold-radius-hint" hidden aria-live="polite"></div></div>
       <div class="canvas-top"><div><div class="scene-title">浮空纸张 / <span id="canvasMode">编辑</span></div><div class="scene-sub" id="toolStatus">改颜色</div></div><div class="view-tabs"><button id="fixedView" class="active" aria-pressed="true"><i data-lucide="box"></i>固定视角</button><button id="topView" aria-pressed="false"><i data-lucide="layers-2"></i>俯视角</button></div></div>
       <div class="game-hud" id="gameHud" hidden><strong id="gameTitle">关卡</strong><span id="gameDescription">—</span><small id="gameHint">点击玩家查看移动范围；点击折纸线高亮目标，再次点击目标方块传送。</small></div>
       <div class="legend-inline"><i></i><span id="selectionText">12 × 10 TILEMAP</span></div>

@@ -1,7 +1,7 @@
 export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black'];
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
-export const TERRAIN_TYPES=['campfire','ice','fire','eruption','goal','key'];
+export const TERRAIN_TYPES=['campfire','ice','fire','eruption','key'];
 function copyTerrainConfig(value,depth=0) {
   if(depth>16)throw new Error('机制参数嵌套过深');
   if(value===null||typeof value==='string'||typeof value==='boolean')return value;
@@ -15,6 +15,8 @@ export const blocked=tile=>!!tile&&(tile.blocked??tile.color==='black');
 export const tileHeight=tile=>tile?.height??(tile?.color==='black'?.25:.09);
 export function normalizeTile(tile) {
   if(tile===null)return null;
+  // Retired goal tiles keep their geometry and exit tags when importing old maps.
+  if(tile?.terrain==='goal'){tile={...tile};delete tile.terrain;delete tile.terrainConfig;if(tile.prefabId==='goal_ai')tile.prefabId=null;}
   if(!tile||(hasColor(tile)&&!COLOR_KEYS.includes(tile.color)))throw new Error('方块颜色无效');
   if(tile.edgeColor!==undefined&&(typeof tile.edgeColor!=='string'||!/^#[0-9a-f]{6}$/i.test(tile.edgeColor)))throw new Error('实体边缘颜色须为六位十六进制颜色');
   const height=tileHeight(tile),folds=foldsOf(tile);

@@ -8,7 +8,7 @@ import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor-model.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
-import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, DoorOpen, KeyRound } from 'lucide';
+import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
 
@@ -25,7 +25,7 @@ const COLOR_NAMES = { white: '纸白', red: '珊瑚红', yellow: '麦穗黄', bl
 const FOLDS = ['h','v','d1','d2'];
 const FOLD_NAMES = { h: '横向折线', v: '纵向折线', d1: '对角折线 ↘', d2: '对角折线 ↗' };
 const FACE_NAMES = ['北','东北','东','东南','南','西南','西','西北'];
-const TERRAIN_MARKERS={campfire:{name:'篝火',icon:FlameKindling},ice:{name:'冰河',icon:Snowflake},fire:{name:'火焰',icon:Flame},eruption:{name:'喷发',icon:Mountain},goal:{name:'终点',icon:DoorOpen},key:{name:'钥匙',icon:KeyRound}};
+const TERRAIN_MARKERS={campfire:{name:'篝火',icon:FlameKindling},ice:{name:'冰河',icon:Snowflake},fire:{name:'火焰',icon:Flame},eruption:{name:'喷发',icon:Mountain},key:{name:'钥匙',icon:KeyRound}};
 const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const clone = data => JSON.parse(JSON.stringify(data));
@@ -174,7 +174,7 @@ function buildPaper() {
     cells.forEach(({r,c},i)=>{position.set(wx(c),tileTop(r,c)+.012,wz(r));matrix.compose(position,tilt,new THREE.Vector3(.72,.72,1));mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();terrainLayer.add(mesh);
   }
-  if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&map.tiles[map.exit.r][map.exit.c].terrain!=='goal'&&!cellHidden(map.exit.r,map.exit.c)){
+  if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);
   }
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;entityEdgeLayer.add(outline);}

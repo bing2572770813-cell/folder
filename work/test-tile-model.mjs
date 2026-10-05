@@ -48,3 +48,5 @@ assert.throws(()=>normalizeTile({color:'white',instance:{id:'broken'}}),/占格/
 const instance={id:'valid',anchorR:0,anchorC:0,width:2,height:3};
 assert.deepEqual(normalizeTile({color:'white',instance}).instance,instance);
 console.log('PASS: entity instance metadata rejects malformed footprints and preserves valid identities.');
+
+const retiredGoal=normalizeTile({color:'red',terrain:'goal',terrainConfig:{},prefabId:'goal_ai',tags:{exitTo:'下一地区'}});assert.equal(retiredGoal.terrain,undefined);assert.equal(retiredGoal.prefabId,null);assert.equal(retiredGoal.color,'red');assert.equal(retiredGoal.tags.exitTo,'下一地区');

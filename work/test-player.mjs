@@ -14,10 +14,10 @@ const walkable=(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c])&
 let controller;
 const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>group,getSelectionRing:()=>ring,getEffectLayer:()=>new THREE.Group(),invalidateAxes:noop,isHidden,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer:noop,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c,wz:r=>r,tileTop:()=>.09};
 controller=runtime.createPlayerController(env);controller.resetRegions();assert.equal(controller.validateForPlay().valid,true);
-controller.setMode('play');assert.deepEqual([...P.revealedRegions],['A']);assert.equal(controller.canMoveTo(3,3),false);
+controller.setMode('play');assert.equal(P.terrainState.hasKey,false);assert.deepEqual([...P.revealedRegions],['A']);assert.equal(controller.canMoveTo(3,3),false);
 controller.click(3,4);assert.deepEqual(P.player,{r:0,c:0,dir:2});assert.equal(P.legalMoves.length,0);
 controller.click(0,0);assert.equal(P.legalMoves.length,2);controller.movePlayer(0,1);
-assert.deepEqual(P.player,{r:3,c:3,dir:2});assert.deepEqual([...P.revealedRegions],['A','B']);assert.equal(P.steps,1);assert.equal(P.animation.type,'teleport');assert.equal(controller.canMoveTo(3,4),true);
+assert.deepEqual(P.player,{r:3,c:3,dir:2});assert.deepEqual([...P.revealedRegions],['A','B']);assert.equal(P.steps,1);assert.equal(P.terrainState.hasKey,false,'区域出口不需要钥匙');assert.equal(P.levelWon,false,'区域出口跳转不会触发终点通关');assert.equal(P.animation.type,'teleport');assert.equal(controller.canMoveTo(3,4),true);
 controller.tick(performance.now()+1000);assert.equal(P.moving,false);
 const snapshot=controller.snapshot();snapshot.revealedRegions.push('unrelated');assert.equal(P.revealedRegions.has('unrelated'),false);
 controller.undo();assert.deepEqual(P.player,map.spawn);assert.deepEqual([...P.revealedRegions],['A']);assert.equal(P.steps,0);

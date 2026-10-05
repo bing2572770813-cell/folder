@@ -3,7 +3,7 @@ import { canEnterTerrain, createTerrainState, enterTerrain, finishAction, valida
 
 const map = { width: 4, height: 2, tiles: [
   [{ terrain: 'campfire' }, { terrain: 'ice' }, { terrain: 'ice' }, { terrain: 'key' }],
-  [{ terrain: null }, { terrain: 'fire' }, { terrain: 'eruption' }, { terrain: 'goal' }],
+  [{ terrain: null }, { terrain: 'fire' }, { terrain: 'eruption' }, { terrain: null }],
 ] };
 let state = createTerrainState();
 let result = enterTerrain(map, { r: 0, c: 0 }, state);
@@ -25,9 +25,9 @@ state = createTerrainState();
 result = enterTerrain(map, { r: 0, c: 3 }, state);
 assert.equal(result.state.hasKey, true);
 result = enterTerrain(map, { r: 1, c: 3 }, result.state);
-assert.equal(result.won, true);
+assert.equal(result.won, false, '钥匙不会让普通方块触发终点逻辑');
 assert.equal(canEnterTerrain(map, { r: 1, c: 2 }, createTerrainState()).valid, false, '喷发初始应关闭');
 for (const count of [1, 3, 4, 6]) assert.equal(canEnterTerrain(map, { r: 1, c: 2 }, { ...createTerrainState(), actions: count }).valid, false);
 for (const count of [2, 5, 8]) assert.equal(canEnterTerrain(map, { r: 1, c: 2 }, { ...createTerrainState(), actions: count }).valid, true);
 assert.deepEqual(validateTerrains(map), []);
-console.log('PASS: campfire, ice, fire, eruption, key and goal terrain rules.');
+console.log('PASS: campfire, ice, fire, eruption, key terrain rules; no goal victory.');

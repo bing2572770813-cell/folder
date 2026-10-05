@@ -1,4 +1,4 @@
-export const TERRAIN_TYPES = ['campfire', 'ice', 'fire', 'eruption', 'goal', 'key'];
+export const TERRAIN_TYPES = ['campfire', 'ice', 'fire', 'eruption', 'key'];
 
 export function createTerrainState() {
   return { hasKey: false, frozen: false, overheat: 0, actions: 0, gameOver: false, won: false, message: '' };
@@ -51,10 +51,6 @@ export function enterTerrain(map, position, state = createTerrainState()) {
     next.hasKey = true;
     next.message = '获得钥匙';
   }
-  if (terrain === 'goal' && next.hasKey) {
-    next.won = true;
-    next.message = '已取得钥匙并到达终点';
-  }
   return { state: next, valid: true, gameOver: false, won: next.won };
 }
 
@@ -65,14 +61,12 @@ export function finishAction(state = createTerrainState()) {
 
 export function validateTerrains(map) {
   const errors = [];
-  let keys = 0, goals = 0;
+  let keys = 0;
   for (const row of map.tiles) for (const tile of row) {
     if (!tile?.terrain) continue;
     if (!TERRAIN_TYPES.includes(tile.terrain)) errors.push(`未知特殊地形：${tile.terrain}`);
     if (tile.terrain === 'key') keys++;
-    if (tile.terrain === 'goal') goals++;
   }
   if (keys > 1) errors.push('每关最多放置一个钥匙');
-  if (goals > 1) errors.push('每关最多放置一个终点');
   return errors;
 }

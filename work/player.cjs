@@ -8,13 +8,11 @@ function canMoveTo(r,c){const map=env.getMap();return walkable(r,c)&&canEnterTer
 function validateForPlay() {const map=env.getMap();
   const errors=[...validateTerrains(map),...validateRegions(map)];
   const start=map.tiles[map.spawn.r]?.[map.spawn.c];if(!start||blocked(start)||start.terrain==='campfire')errors.push('玩家起点无效');
-  const goals=map.tiles.flat().filter(tile=>tile?.terrain==='goal');
   if(map.exit&&(!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r][map.exit.c]||blocked(map.tiles[map.exit.r][map.exit.c])))errors.push('出口必须在可行走方块上');
-  if(goals.length&&!map.tiles.flat().some(tile=>tile?.terrain==='key'))errors.push('终点实体需要配套钥匙实体');
   return {valid:errors.length===0,errors};
 }
 function exitIsValid() {const map=env.getMap(); return !!map.exit&&walkable(map.exit.r,map.exit.c); }
-function isAtExit() {const map=env.getMap(); const terrain=map.tiles[P.player.r]?.[P.player.c]?.terrain;return terrain==='goal'?P.terrainState.hasKey:exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
+function isAtExit() {const map=env.getMap(); return exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
 function foldTargetFor(axis,position=P.player) {const map=env.getMap();
   const t=reflectPoint(position.r,position.c,axis);const same=t.r===position.r&&t.c===position.c;let reason='';
   if(!inFoldRange(foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type),position))reason='超出折线作用半径';else if(!inside(t.r,t.c))reason='目标超出地图';else if(!map.tiles[t.r][t.c])reason='目标为空格';else if(!walkable(t.r,t.c))reason='目标是阻挡方块';else if(same)reason='玩家位于对称轴上';else if(P.mode==='play')reason=canEnterTerrain(map,t,P.terrainState).reason;

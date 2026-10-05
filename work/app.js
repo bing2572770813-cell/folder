@@ -430,7 +430,10 @@ function setupPrefabs(){
   let fingerprint='',loading=false;
   function applyPrefabBrush(){
     const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
-    $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored;$('prefabSummary').textContent=prefab?.name||'无可用实体';
+    $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored;
+    const summary=$('prefabSummary'),name=document.createElement('span');name.textContent=prefab?.name||'无可用实体';summary.replaceChildren();
+    if(prefab){const img=document.createElement('img');img.src=prefabPreview(prefab);img.alt='';summary.append(img);}
+    summary.append(name);
     for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';document.querySelectorAll('[data-prefab]').forEach(b=>{const active=b.dataset.prefab===selectedPrefabId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
     if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('blockThickness').value=tileThickness(prefab.tile);$('blockGradualRate').value=tileGradualRate(prefab.tile);}
     document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});

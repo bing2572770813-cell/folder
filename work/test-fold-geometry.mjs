@@ -13,14 +13,12 @@ for(const type of ['d1','d2']){const m={width:7,height:7,tiles:Array.from({lengt
 assert.throws(()=>normalizeFoldCells([{r:7,c:0,type:'h'}],7,7));
 console.log('PASS: void placement, directional adjacency, merge/split, crossing groups, Chebyshev boundary, diagonal radius, finite dash-dot strokes.');
 
-const fs=await import('node:fs');const vm=await import('node:vm');
-const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
-const gate=source.slice(source.indexOf('function foldTargetFor('),source.indexOf('function finishRun('));
+const {default:playerRuntime}=await import('./player.cjs');
 const rangeMap={width:7,height:7,tiles:Array.from({length:7},()=>Array(7).fill(null))};
 for(let c=1;c<=3;c++)applyFoldLine(rangeMap,3,c,'h');
-const ctx={mode:"edit",map:rangeMap,player:{r:1,c:3},foldAxes:uniqueFoldAxes(rangeMap),foldGroupAt,inFoldRange,reflectPoint:(r,c,a)=>({r:2*a.r-r,c}),inside:(r,c)=>r>=0&&c>=0&&r<7&&c<7,walkable:()=>true};
 rangeMap.tiles[5][3]={color:'white'};rangeMap.tiles[6][0]={color:'white'};
-vm.createContext(ctx);vm.runInContext(gate,ctx);
+const state=playerRuntime.createPlayerState({r:1,c:3});
+const ctx=playerRuntime.createPlayerController({state,getMap:()=>rangeMap,getFoldAxes:()=>uniqueFoldAxes(rangeMap),foldGroupAt,inFoldRange,inside:(r,c)=>r>=0&&c>=0&&r<7&&c<7,walkable:()=>true,createTerrainState:()=>({})});
 assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:1,c:3}).valid,true);
 assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:0,c:0}).reason,'超出折线作用半径');
 console.log('PASS: actual game teleport gate accepts in-range sources and rejects out-of-range sources with valid reflected destinations.');
@@ -55,8 +53,9 @@ for(const type of ['h','v','d1','d2']){
 console.log('PASS: odd runs use geometric center; even runs use farther central cell in every direction.');
 
 const {canEnterTerrain,createTerrainState}=await import('./special-terrain.mjs');
-ctx.mode='play';ctx.canEnterTerrain=canEnterTerrain;ctx.terrainState=createTerrainState();
+state.mode='play';state.terrainState=createTerrainState();
+const playGate=playerRuntime.createPlayerController({state,getMap:()=>rangeMap,getFoldAxes:()=>uniqueFoldAxes(rangeMap),foldGroupAt,inFoldRange,inside:(r,c)=>r>=0&&c>=0&&r<7&&c<7,walkable:()=>true,createTerrainState,canEnterTerrain});
 rangeMap.tiles[5][3]={color:'white',terrain:'campfire'};
-assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:1,c:3}).reason,'篝火方块不可进入');
+assert.equal(playGate.foldTargetFor({r:3,c:3,type:'h'},{r:1,c:3}).reason,'篝火方块不可进入');
 assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:0,c:0}).reason,'超出折线作用半径');
 console.log('PASS: merged gameplay applies both fold radius and mechanism entry restrictions.');

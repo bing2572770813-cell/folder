@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "campfire_ai",
+  "name": "篝火方块",
+  "tile": {
+    "color": "yellow",
+    "height": 0.25,
+    "blocked": true,
+    "folds": [],
+    "terrain": "campfire",
+    "terrainConfig": {}
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

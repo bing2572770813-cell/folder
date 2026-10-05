@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "id": "entry_ai",
+  "name": "区域入口",
+  "BaseEntity": [
+    "campfire_ai",
+    "entity_1791205468489_ai",
+    "eruption_ai",
+    "fire_ai",
+    "ice_ai",
+    "key_ai",
+    "large_paper_ai",
+    "obstacle_ai",
+    "paper_ai",
+    "plain_ai",
+    "player_token_ai"
+  ],
+  "behavior": {
+    "scriptId": "tag-entry",
+    "parameters": {},
+    "state": {}
+  },
+  "properties": {
+    "entry": {
+      "serializable": true,
+      "readable": true,
+      "tempEditable": true
+    }
+  }
+}

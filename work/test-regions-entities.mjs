@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {normalizePrefab} from './tile-model.mjs';
+import {footprint,placeEntity} from './entity-model.mjs';
+import {assignRegion,tagCell,validateRegions,migrateRegions} from './regions.mjs';
+const prefab=normalizePrefab({version:1,id:'large_ai',name:'large',size:{width:2,height:3},occupied:[true,false,true,true,true,true],tile:{color:'white'}});
+const map=migrateRegions({width:5,height:5,spawn:{r:4,c:4,dir:0},tiles:Array.from({length:5},()=>Array.from({length:5},()=>({color:'white'})))});
+assert.equal(footprint(prefab,0,0).length,5);assert.equal(placeEntity(map,prefab,prefab.tile,0,0).map.tiles[0][1].instance,undefined);
+assert.throws(()=>placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===1&&c===1));assert.throws(()=>placeEntity(map,prefab,prefab.tile,4,4));
+const next=assignRegion(map,[{r:0,c:0},{r:1,c:0}],'next');assert.throws(()=>assignRegion(next,[],'next'));tagCell(next,0,0,'entry',true);tagCell(next,4,4,'exitTo','next');assert.deepEqual(validateRegions(next),[]);assert.throws(()=>tagCell(next,1,0,'spawn',true));
+assert.throws(()=>normalizePrefab({...prefab,occupied:[true]}));
+console.log('PASS: footprints, holes, atomic hidden-cell rejection, duplicate region names and spawn/entry exclusion.');
+const voidMap=structuredClone(map);voidMap.tiles[0][0]=null;voidMap.foldCells=[{r:0,c:0,type:'h'}];
+const placed=placeEntity(voidMap,prefab,prefab.tile,0,0);assert.deepEqual(placed.map.tiles[0][0].folds,['h']);assert.equal(placed.map.foldCells.length,0);
+assert.equal(voidMap.tiles[0][0],null);
+const hiddenHole=placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===0&&c===1);assert.equal(hiddenHole.map.tiles[0][1].instance,undefined);
+const noStart=structuredClone(map);delete noStart.tiles[4][4].tags.spawn;migrateRegions(noStart);assert.equal(noStart.tiles[4][4].tags.spawn,undefined);
+const renamed=assignRegion(next,[{r:0,c:0},{r:1,c:0}],'renamed');assert.equal(renamed.tiles[4][4].tags.exitTo,'renamed');
+assert.throws(()=>assignRegion(next,[{r:0,c:0},{r:4,c:4}],'mixed'),/共存/);
+console.log('PASS: folds survive placement, hidden mask holes remain untouched, cleared starts stay cleared and region renames preserve exits.');
+const blockedEntry=structuredClone(next);blockedEntry.tiles[0][0].blocked=true;assert.ok(validateRegions(blockedEntry).some(e=>e.includes('可行走')));
+assert.throws(()=>tagCell(next,4,4,'exitTo','missing'),/不存在/);
+
+const joined=assignRegion(next,[{r:2,c:0}],'next',true);assert.equal(joined.tiles[2][0].regionTag,'next');assert.equal(next.tiles[2][0].regionTag,'默认区域');assert.throws(()=>assignRegion(next,[{r:2,c:0}],'missing',true));assert.throws(()=>assignRegion(next,[{r:4,c:4}],'next',true),/共存/);
+
+const {legalKeyNames,renameKeyCells}=await import('./keys.mjs');const keyMap=structuredClone(next);keyMap.tiles[1][0].terrain='key';keyMap.tiles[1][0].keyName='旧名';keyMap.tiles[4][4].tags.requiredKeys=['旧名'];const keyRenamed=renameKeyCells(keyMap,[{r:1,c:0}],'新名');assert.deepEqual(legalKeyNames(keyRenamed),['新名']);assert.deepEqual(keyRenamed.tiles[4][4].tags.requiredKeys,['新名']);assert.throws(()=>renameKeyCells(keyMap,[{r:1,c:0}],'新名',(r,c)=>r===4&&c===4),/隐藏出口/);assert.equal(keyMap.tiles[1][0].keyName,'旧名');

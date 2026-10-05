@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {copy,rectangle,region,pasteRegion} from './editor-model.mjs';
+import {copy,rectangle,region,pasteRegion,unionCells,selectionRegion} from './editor-model.mjs';
 const base={width:4,height:4,tiles:Array.from({length:4},()=>Array(4).fill(null)),spawn:{r:0,c:0,dir:0},exit:{r:3,c:3}};
 base.tiles[0][0]={color:'blue',fold:'h',height:2,prefabId:'paper_ai'};
 const before=copy(base),rect=rectangle({r:1,c:1},{r:0,c:0}),clip=region(base,rect);
@@ -17,3 +17,19 @@ assert.equal(voidPaste.map.tiles[1][2],null);
 assert.equal(voidClip.foldCells.length,1);
 assert.equal(pasteRegion(base,region({...base,foldCells:[]},rect),2,2).map.foldCells.some(p=>p.r===3&&p.c===3),false);
 console.log('PASS: clipboard preserves independent void folds and clears overwritten markers.');
+
+const cells=unionCells([{r:0,c:0}],{r:2,c:2,h:1,w:2},(r,c)=>c!==3);
+assert.deepEqual(cells,[{r:0,c:0},{r:2,c:2}]);
+base.tiles[0][0].instance={id:'original',anchorR:0,anchorC:0,width:1,height:1};
+base.tiles[0][0].tags={spawn:true};base.tiles[0][0].regionTag='A';
+base.tiles[1][2]={color:'red'};base.foldCells.push({r:1,c:2,type:'d1'});
+const sparse=selectionRegion(base,cells),pasted=pasteRegion(base,sparse,1,1);
+assert.equal(pasted.map.tiles[1][2].color,'red');
+assert.ok(pasted.map.foldCells.some(p=>p.r===1&&p.c===2&&p.type==='d1'));
+assert.notEqual(pasted.map.tiles[1][1].instance.id,'original');
+assert.equal(pasted.map.tiles[1][1].instance.anchorR,1);
+assert.equal(pasted.map.tiles[1][1].tags.spawn,undefined);
+assert.throws(()=>pasteRegion(base,sparse,1,1,(r,c)=>r===3&&c===3),/隐藏/);
+assert.doesNotThrow(()=>pasteRegion(base,sparse,1,1,(r,c)=>r===1&&c===2));
+assert.throws(()=>pasteRegion(base,[[null]],0,0),/起点/);
+console.log('PASS: additive sparse selections, untouched gaps/folds, independent pasted instances, unique start tags and hidden-cell guards.');

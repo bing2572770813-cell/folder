@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {assertHiddenContentUnchanged} from './editor/visibility-policy.mjs';
+const before={width:3,height:3,tiles:[[null,{folds:['h'],tags:{exitTo:'A',requiredKeys:['铜钥匙']}}],[],[]],foldCells:[]};
+const next=JSON.parse(JSON.stringify(before));next.tiles[0][1]=null;next.foldCells=[{r:0,c:1,type:'h'}];
+assert.doesNotThrow(()=>assertHiddenContentUnchanged(before,next,{folds:false,player:true}),'Entity erasure may preserve the same fold on void');
+assert.throws(()=>assertHiddenContentUnchanged(before,next,{folds:true,player:false}),/标签/);
+next.foldCells=[];assert.throws(()=>assertHiddenContentUnchanged(before,next,{folds:false,player:true}),/折线/);
+assert.doesNotThrow(()=>assertHiddenContentUnchanged(before,next,{folds:true,player:true}));
+assert.doesNotThrow(()=>assertHiddenContentUnchanged(before,JSON.parse(JSON.stringify(before)),{folds:false,player:false}));
+console.log('PASS: hidden tag/fold mutation guard covers destructive edits while allowing preserved virtual folds.');

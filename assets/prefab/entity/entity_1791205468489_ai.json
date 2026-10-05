@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "entity_1791205468489_ai",
+  "name": "高台方块",
+  "tile": {
+    "color": "white",
+    "height": 2,
+    "blocked": false,
+    "fold": null,
+    "folds": [],
+    "prefabId": "entity_1791205468489_ai"
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

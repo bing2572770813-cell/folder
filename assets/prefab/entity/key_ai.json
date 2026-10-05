@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "key_ai",
+  "name": "钥匙方块",
+  "tile": {
+    "color": "green",
+    "height": 0.09,
+    "blocked": false,
+    "folds": [],
+    "terrain": "key",
+    "terrainConfig": {},
+    "keyName": "钥匙"
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

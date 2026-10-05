@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {VoidEntity,inspectCell} from './entities/cell-entity.mjs';
+const map={width:3,height:3,tiles:Array.from({length:3},()=>Array(3).fill(null)),foldCells:[{r:1,c:1,type:'d1'}]};
+const voidEntity=inspectCell(map,1,1);assert.ok(voidEntity instanceof VoidEntity);
+assert.equal(voidEntity.transparent,true);assert.equal(voidEntity.placeable,false);assert.equal(voidEntity.blocked,true);
+assert.deepEqual(voidEntity.folds,['d1']);assert.equal(JSON.stringify(voidEntity),'null');
+voidEntity.folds.push('v');assert.equal(map.foldCells.length,1);
+map.tiles[0][0]={prefabId:'key_ai',terrain:'key',keyName:'铜钥匙',tags:{requiredKeys:['银钥匙']}};
+const entity=inspectCell(map,0,0);entity.properties.tags.requiredKeys.push('金钥匙');
+assert.deepEqual(map.tiles[0][0].tags.requiredKeys,['银钥匙']);
+assert.throws(()=>inspectCell(map,0,0,()=>true),/隐藏/);assert.throws(()=>inspectCell(map,-1,0),/超出/);
+assert.throws(()=>inspectCell(map,.5,0),/超出/);
+console.log('PASS: transparent unplaceable void objects, fold compatibility, independent entity inspection and hidden/bounds guards.');

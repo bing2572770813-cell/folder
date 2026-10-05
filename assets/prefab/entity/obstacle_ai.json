@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "obstacle_ai",
+  "name": "阻挡方块",
+  "tile": {
+    "color": "black",
+    "height": 0.25,
+    "blocked": true,
+    "folds": []
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

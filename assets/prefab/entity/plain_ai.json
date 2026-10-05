@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "plain_ai",
+  "name": "无颜色方块",
+  "tile": {
+    "height": 0.25,
+    "blocked": false,
+    "folds": []
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

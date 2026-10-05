@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "eruption_ai",
+  "name": "喷发方块",
+  "tile": {
+    "color": "purple",
+    "height": 0.09,
+    "blocked": false,
+    "folds": [],
+    "terrain": "eruption",
+    "terrainConfig": {}
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ]
+}

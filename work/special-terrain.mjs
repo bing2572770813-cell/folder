@@ -1,7 +1,7 @@
 export const TERRAIN_TYPES = ['campfire', 'ice', 'fire', 'eruption', 'key'];
 
 export function createTerrainState() {
-  return { hasKey: false, frozen: false, overheat: 0, actions: 0, gameOver: false, won: false, message: '' };
+  return { collectedKeys: [], hasKey: false, frozen: false, overheat: 0, actions: 0, gameOver: false, won: false, message: '' };
 }
 
 function isTerrain(map, r, c, terrain) {

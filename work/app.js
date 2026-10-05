@@ -1,3 +1,4 @@
+import {legalKeyNames} from './keys.mjs';
 import {normalizeMapName,mapFilename} from './map-name.mjs';
 import playerRuntime from './player.cjs';
 import * as THREE from 'three';
@@ -241,7 +242,7 @@ function editAt(r,c){
       if(!walkable(r,c))throw new Error('标签需要可行走方块');
       const tag=tool==='player'?'spawn':tool==='entry'?'entry':'exitTo';
       if(tool==='player'&&taggedCells(map,'spawn').some(p=>cellHidden(p.r,p.c))||tool==='entry'&&taggedCells(map,'entry').some(p=>regionOf(p.tile)===regionOf(map.tiles[r][c])&&cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域标签');
-      const next=clone(map);if(tool==='clear-tags')next.tiles[r][c].tags={};else tagCell(next,r,c,tag,tool==='region-exit'?$('exitRegion').value:true);
+      const next=clone(map);if(tool==='clear-tags')next.tiles[r][c].tags={};else {tagCell(next,r,c,tag,tool==='region-exit'?$('exitRegion').value:true);if(tool==='region-exit')next.tiles[r][c].tags.requiredKeys=[...document.querySelectorAll('#requiredKeyList input:checked')].map(i=>i.value);}
       record();map=next;controller.resetPosition();buildPaper();persist();
     }catch(e){toast(e.message,true);}return;
   }
@@ -432,6 +433,7 @@ function rebuildFoldAxes(){
 function updateFoldAxes(){}
 
 function renderRegionControls(){
+ const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));keyList.replaceChildren();for(const key of legalKeyNames(map)){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=key;input.checked=chosenKeys.has(key);input.setAttribute('aria-label','所需钥匙 '+key);label.append(input,document.createTextNode(key));keyList.append(label);}if(!keyList.children.length)keyList.textContent='地图上没有可收集的钥匙';
  const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;container.replaceChildren();$('exitRegion').replaceChildren();
  for(const name of names){$('exitRegion').add(new Option(name,name));const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=!hiddenRegions.has(name);input.setAttribute('aria-label','显示区域 '+name);input.onchange=()=>{if(input.checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();};label.append(input,document.createTextNode(name));container.append(label);}
  if(names.includes(current))$('exitRegion').value=current;

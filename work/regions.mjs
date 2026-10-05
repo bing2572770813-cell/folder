@@ -1,3 +1,4 @@
+import {legalKeyNames} from './keys.mjs';
 import {blocked} from './tile-model.mjs';
 export const DEFAULT_REGION='默认区域';
 export const regionOf=tile=>tile?.regionTag??DEFAULT_REGION;
@@ -14,10 +15,10 @@ export function validateRegions(map){
  const errors=[],spawn=taggedCells(map,'spawn'),entries=taggedCells(map,'entry');
  if(spawn.length!==1)errors.push('必须且只能有一个玩家起点标签');
  for(const p of [...spawn,...entries])if(blocked(p.tile)||p.tile.terrain==='campfire')errors.push('起点与区域入口必须在可行走方块上');
- const names=new Set(regionNames(map)),counts=new Map();
+ const names=new Set(regionNames(map)),counts=new Map(),keys=new Set(legalKeyNames(map));
  for(const p of entries){const name=regionOf(p.tile);counts.set(name,(counts.get(name)??0)+1);if(spawn.some(s=>regionOf(s.tile)===name))errors.push('区域入口不能与玩家起点共存于区域：'+name);}
  for(const [name,count] of counts)if(count>1)errors.push('区域只能有一个入口：'+name);
- for(const p of taggedCells(map,'exitTo')){const target=p.tile.tags.exitTo;if(!names.has(target))errors.push('跳转区域不存在：'+target);else if(counts.get(target)!==1)errors.push('跳转区域需要唯一入口：'+target);}
+ for(const p of taggedCells(map,'exitTo')){const target=p.tile.tags.exitTo;for(const key of p.tile.tags.requiredKeys??[])if(!keys.has(key))errors.push('出口所需钥匙不存在或不可收集：'+key);if(!names.has(target))errors.push('跳转区域不存在：'+target);else if(counts.get(target)!==1)errors.push('跳转区域需要唯一入口：'+target);}
  return [...new Set(errors)];
 }
 export function assignRegion(map,cells,name){

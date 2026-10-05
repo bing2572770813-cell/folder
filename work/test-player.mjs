@@ -26,3 +26,13 @@ controller.turn(-1);assert.equal(P.player.dir,1);
 controller.setMode('edit');assert.deepEqual(P.player,map.spawn);
 const bad=structuredClone(map);bad.tiles[1][0].tags={entry:true};assert.ok(validateRegions(bad).length);
 console.log('PASS: player-only control, initial region, cumulative transitions, terrain actions, animation, independent snapshots, undo, restart and facing.');
+
+map.tiles[1][0].terrain='key';map.tiles[1][0].keyName='铜';map.tiles[1][1]={color:'yellow',terrain:'key',keyName:'银',regionTag:'A',height:.09,blocked:false};map.tiles[0][1].tags.requiredKeys=['铜','银'];
+controller.setMode('play');assert.equal(controller.validateForPlay().valid,true);
+P.player={r:0,c:1,dir:2};controller.applyTerrainEntry();assert.equal(P.player.r,0);assert.deepEqual([...P.revealedRegions],['A']);
+P.player={r:1,c:0,dir:2};controller.applyTerrainEntry();assert.deepEqual(P.terrainState.collectedKeys,['铜']);
+P.player={r:0,c:1,dir:2};controller.applyTerrainEntry();assert.equal(P.player.r,0,'一把钥匙不足以跳转');
+const keysSnapshot=controller.snapshot();P.player={r:1,c:1,dir:2};controller.applyTerrainEntry();assert.deepEqual(P.terrainState.collectedKeys,['铜','银']);assert.deepEqual(keysSnapshot.terrainState.collectedKeys,['铜']);
+P.player={r:0,c:1,dir:2};controller.applyTerrainEntry();assert.deepEqual(P.player,{r:3,c:3,dir:2});controller.restore(keysSnapshot);assert.deepEqual(P.terrainState.collectedKeys,['铜']);controller.restart();assert.deepEqual(P.terrainState.collectedKeys,[]);
+map.tiles[0][1].tags.requiredKeys=['不存在'];assert.equal(controller.validateForPlay().valid,false);map.tiles[0][1].tags.requiredKeys=[];assert.equal(controller.validateForPlay().valid,true);map.tiles[1][1].blocked=true;map.tiles[0][1].tags.requiredKeys=['银'];assert.equal(controller.validateForPlay().valid,false);
+console.log('PASS: all-key exit gates, missing/blocked keys, independent collection snapshots and restart.');

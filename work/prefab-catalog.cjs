@@ -16,13 +16,13 @@ async function readCatalog(folder=directory){
   }
   return {prefabs,errors};
 }
-async function savePrefab(data){
+async function savePrefab(data,folder=directory){
   const {normalizePrefab}=await import('./tile-model.mjs');
   const prefab=normalizePrefab(data);
   if(!prefab.id.endsWith('_ai'))throw new Error('编辑器生成的实体 ID 须以 _ai 结尾');
-  const current=await readCatalog();
+  const current=await readCatalog(folder);
   if(current.prefabs.some(p=>p.id===prefab.id))throw new Error('实体 ID 已存在，请使用新 ID');
-  await fs.writeFile(path.join(directory,prefab.id+'.json'),JSON.stringify(prefab,null,2)+'\n',{flag:'wx'});
+  await fs.writeFile(path.join(folder,prefab.id+'.json'),JSON.stringify(prefab,null,2)+'\n',{flag:'wx'});
   return prefab;
 }
 module.exports={readCatalog,savePrefab};

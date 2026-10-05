@@ -24,7 +24,7 @@ const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const clone = data => JSON.parse(JSON.stringify(data));
 const blankTile = () => normalizeTile({color:'white',fold:null});
 let brushHeight=.09, selectedPrefabId=null, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
-function brushTile(){const prefab=prefabs.find(p=>p.id===selectedPrefabId);return normalizeTile({...prefab?.tile,color,height:brushHeight,blocked:prefab?prefab.tile.blocked:color==='black',prefabId:prefab?.id??null});}
+function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);return normalizeTile({...prefab?.tile,color,height:brushHeight,blocked:prefab?prefab.tile.blocked:color==='black',prefabId:prefab?.id??null});}
 let map = defaultMap(), player = { ...map.spawn }, mode = GAME_ONLY ? 'play' : 'edit', tool = 'paint', color = 'white', foldType = 'h';
 let steps = 0, teleports = 0, moving = false, levelWon = false, stepLimitHit = false, legalMoves = [], chosenFold = null, hovered = null, showGrid = true;
 let editHistory = [], playHistory = [], animation = null, saveTimer = null, tooltipTimer = null;
@@ -213,6 +213,7 @@ function animatePlayer(from,to,type){moving=true;animation={start:performance.no
 function movePlayer(r,c){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!legalMoves.some(t=>t.r===r&&t.c===c)||!walkable(r,c)){toast(walkable(r,c)?'请先点击玩家查看可移动范围':'黑色或空格方块不可移动',true);return;}record();const prev={...player},dr=r-player.r,dc=c-player.c;player.r=r;player.c=c;player.dir=(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8;steps++;clearSelection();animatePlayer(prev,player,'move');updateUI();}
 function teleport(){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!chosenFold){toast('请先选择折纸线',true);return;}const t=foldTarget(chosenFold);if(!t.valid){toast(t.reason+'，无法传送',true);return;}record();const prev={...player},a={...chosenFold};const forward=reflectPoint(player.r-Math.cos(player.dir*Math.PI/4),player.c+Math.sin(player.dir*Math.PI/4),a);const dr=forward.r-t.r,dc=forward.c-t.c;player={r:t.r,c:t.c,dir:(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8};steps++;teleports++;clearSelection();animatePlayer(prev,player,'teleport');updateUI();toast('折纸传送 · '+coord(prev.r,prev.c)+' → '+coord(t.r,t.c));}
 $('teleportBtn').onclick=teleport;
+$('blockHeight').oninput=()=>{const n=Number($('blockHeight').value);if(Number.isFinite(n)&&n>=.01&&n<=16){brushHeight=n;syncState();}};
 $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number.isFinite(n)||n<.01||n>16){toast('方块高度须为 0.01–16',true);$('blockHeight').value=brushHeight;return;}brushHeight=n;if(tool!=='place')setTool('paint');};
 
 function setTool(next){pendingRegion=null;tool=next;drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
@@ -223,6 +224,7 @@ $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('ar
 function editAt(r,c){
   if(tool==='select'){editRect=rectangle({r,c},{r,c});drawEditSelection();return;}
   if(tool==='paste'){pasteAt(r,c);return;}
+  if(tool==='paint'||tool==='place'){try{brushTile();}catch(error){toast(error.message,true);return;}}
   const t=map.tiles[r][c];const isSpawn=r===map.spawn.r&&c===map.spawn.c;const isExit=map.exit&&r===map.exit.r&&c===map.exit.c;
   if(tool==='erase'){if(!t)return;if(isSpawn){toast('先把玩家起点移到其他方块',true);return;}}
   if(tool==='paint'&&!t){toast('此处为空格，请先放置方块',true);return;}
@@ -362,7 +364,7 @@ function setupPrefabs(){
     }catch(error){$('prefabStatus').textContent='使用内置实体目录 · '+error.message;}finally{loading=false;}
   }
   renderCatalog();$('prefabStatus').textContent='内置实体目录 · 本地服务支持实时更新';
-  $('prefabType').onchange=()=>{
+  $('prefabType').oninput=$('prefabType').onchange=()=>{
     selectedPrefabId=$('prefabType').value||null;const prefab=prefabs.find(p=>p.id===selectedPrefabId);
     if(prefab){color=prefab.tile.color;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('prefabName').value=prefab.name;
       document.querySelectorAll('[data-color]').forEach(b=>{const active=b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefab.tile.blocked?'阻挡实体':'可通行实体';}

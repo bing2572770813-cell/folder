@@ -17,3 +17,5 @@ const noStart=structuredClone(map);delete noStart.tiles[4][4].tags.spawn;migrate
 const renamed=assignRegion(next,[{r:0,c:0},{r:1,c:0}],'renamed');assert.equal(renamed.tiles[4][4].tags.exitTo,'renamed');
 assert.throws(()=>assignRegion(next,[{r:0,c:0},{r:4,c:4}],'mixed'),/共存/);
 console.log('PASS: folds survive placement, hidden mask holes remain untouched, cleared starts stay cleared and region renames preserve exits.');
+const blockedEntry=structuredClone(next);blockedEntry.tiles[0][0].blocked=true;assert.ok(validateRegions(blockedEntry).some(e=>e.includes('可行走')));
+assert.throws(()=>tagCell(next,4,4,'exitTo','missing'),/不存在/);

@@ -43,3 +43,8 @@ for(const terrain of TERRAIN_TYPES){
   assert.deepEqual(normalizeTile(JSON.parse(JSON.stringify(tile))),tile);
 }
 console.log('PASS: bridged mechanism properties coexist with optional color and intrinsic edges.');
+
+assert.throws(()=>normalizeTile({color:'white',instance:{id:'broken'}}),/占格/);
+const instance={id:'valid',anchorR:0,anchorC:0,width:2,height:3};
+assert.deepEqual(normalizeTile({color:'white',instance}).instance,instance);
+console.log('PASS: entity instance metadata rejects malformed footprints and preserves valid identities.');

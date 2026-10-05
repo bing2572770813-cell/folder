@@ -1,3 +1,4 @@
+import {blocked} from './tile-model.mjs';
 export const DEFAULT_REGION='默认区域';
 export const regionOf=tile=>tile?.regionTag??DEFAULT_REGION;
 export function migrateRegions(map){
@@ -12,6 +13,7 @@ export function taggedCells(map,tag){const cells=[];for(let r=0;r<map.height;r++
 export function validateRegions(map){
  const errors=[],spawn=taggedCells(map,'spawn'),entries=taggedCells(map,'entry');
  if(spawn.length!==1)errors.push('必须且只能有一个玩家起点标签');
+ for(const p of [...spawn,...entries])if(blocked(p.tile)||p.tile.terrain==='campfire')errors.push('起点与区域入口必须在可行走方块上');
  const names=new Set(regionNames(map)),counts=new Map();
  for(const p of entries){const name=regionOf(p.tile);counts.set(name,(counts.get(name)??0)+1);if(spawn.some(s=>regionOf(s.tile)===name))errors.push('区域入口不能与玩家起点共存于区域：'+name);}
  for(const [name,count] of counts)if(count>1)errors.push('区域只能有一个入口：'+name);

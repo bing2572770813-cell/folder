@@ -1,6 +1,15 @@
 export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black'];
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
+export const TERRAIN_TYPES=['campfire','ice','fire','eruption','goal','key'];
+function copyTerrainConfig(value,depth=0) {
+  if(depth>16)throw new Error('机制参数嵌套过深');
+  if(value===null||typeof value==='string'||typeof value==='boolean')return value;
+  if(typeof value==='number'&&Number.isFinite(value))return value;
+  if(Array.isArray(value))return value.map(item=>copyTerrainConfig(item,depth+1));
+  if(value&&typeof value==='object'&&(Object.getPrototypeOf(value)===Object.prototype||Object.getPrototypeOf(value)===null))return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,copyTerrainConfig(item,depth+1)]));
+  throw new Error('机制参数必须是有效 JSON 数据');
+}
 export const foldsOf=tile=>tile?.folds??(tile?.fold?[tile.fold]:[]);
 export const blocked=tile=>!!tile&&(tile.blocked??tile.color==='black');
 export const tileHeight=tile=>tile?.height??(tile?.color==='black'?.25:.09);
@@ -13,8 +22,17 @@ export function normalizeTile(tile) {
   if(!Array.isArray(folds)||folds.some(f=>!FOLD_TYPES.includes(f))||(tile.fold!=null&&!FOLD_TYPES.includes(tile.fold)))throw new Error('折纸方向无效');
   if(tile.blocked!==undefined&&typeof tile.blocked!=='boolean')throw new Error('通行属性无效');
   if(tile.prefabId!=null&&(typeof tile.prefabId!=='string'||!tile.prefabId||tile.prefabId.length>80))throw new Error('实体类型无效');
+  const terrain=tile.terrain??null;
+  if(terrain!==null&&!TERRAIN_TYPES.includes(terrain))throw new Error('方块机制类型无效');
+  if(terrain===null&&tile.terrainConfig!=null)throw new Error('机制参数需要指定机制类型');
+  let terrainConfig;
+  if(terrain!==null){
+    const config=tile.terrainConfig??{};
+    if(!config||typeof config!=='object'||Array.isArray(config))throw new Error('机制参数必须是 JSON 对象');
+    terrainConfig=copyTerrainConfig(config);
+  }
   const unique=[...new Set(folds)];
-  return {...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null};
+  return {...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');

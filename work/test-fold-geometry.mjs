@@ -18,7 +18,7 @@ const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const gate=source.slice(source.indexOf('function foldTargetFor('),source.indexOf('function finishRun('));
 const rangeMap={width:7,height:7,tiles:Array.from({length:7},()=>Array(7).fill(null))};
 for(let c=1;c<=3;c++)applyFoldLine(rangeMap,3,c,'h');
-const ctx={map:rangeMap,player:{r:1,c:3},foldAxes:uniqueFoldAxes(rangeMap),foldGroupAt,inFoldRange,reflectPoint:(r,c,a)=>({r:2*a.r-r,c}),inside:(r,c)=>r>=0&&c>=0&&r<7&&c<7,walkable:()=>true};
+const ctx={mode:"edit",map:rangeMap,player:{r:1,c:3},foldAxes:uniqueFoldAxes(rangeMap),foldGroupAt,inFoldRange,reflectPoint:(r,c,a)=>({r:2*a.r-r,c}),inside:(r,c)=>r>=0&&c>=0&&r<7&&c<7,walkable:()=>true};
 rangeMap.tiles[5][3]={color:'white'};rangeMap.tiles[6][0]={color:'white'};
 vm.createContext(ctx);vm.runInContext(gate,ctx);
 assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:1,c:3}).valid,true);
@@ -53,3 +53,10 @@ for(const type of ['h','v','d1','d2']){
  }
 }
 console.log('PASS: odd runs use geometric center; even runs use farther central cell in every direction.');
+
+const {canEnterTerrain,createTerrainState}=await import('./special-terrain.mjs');
+ctx.mode='play';ctx.canEnterTerrain=canEnterTerrain;ctx.terrainState=createTerrainState();
+rangeMap.tiles[5][3]={color:'white',terrain:'campfire'};
+assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:1,c:3}).reason,'篝火方块不可进入');
+assert.equal(ctx.foldTargetFor({r:3,c:3,type:'h'},{r:0,c:0}).reason,'超出折线作用半径');
+console.log('PASS: merged gameplay applies both fold radius and mechanism entry restrictions.');

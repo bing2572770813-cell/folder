@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { normalizeTile, normalizePrefab, foldsOf, blocked, tileHeight, columnLabel, applyFoldLine } from './tile-model.mjs';
+import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, columnLabel, applyFoldLine } from './tile-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion } from './editor-model.mjs';
 import { Copy, ClipboardPaste, Redo2 } from 'lucide';
@@ -22,9 +22,10 @@ const FACE_NAMES = ['北','东北','东','东南','南','西南','西','西北']
 const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const clone = data => JSON.parse(JSON.stringify(data));
-const blankTile = () => normalizeTile({color:'white',fold:null});
-let brushHeight=.09, selectedPrefabId=null, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
-function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);return normalizeTile({...prefab?.tile,color,height:brushHeight,blocked:prefab?prefab.tile.blocked:color==='black',prefabId:prefab?.id??null});}
+const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
+let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
+let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
+function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,prefabId:prefab.id});}
 let map = defaultMap(), player = { ...map.spawn }, mode = GAME_ONLY ? 'play' : 'edit', tool = 'paint', color = 'white', foldType = 'h';
 let steps = 0, teleports = 0, moving = false, levelWon = false, stepLimitHit = false, legalMoves = [], chosenFold = null, hovered = null, showGrid = true;
 let editHistory = [], playHistory = [], animation = null, saveTimer = null, tooltipTimer = null;
@@ -153,7 +154,7 @@ function buildPaper() {
   }
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
   for(const [color,cells] of buckets){
-    const mesh=new THREE.InstancedMesh(tileGeo,materials[color],cells.length);mesh.userData.cells=cells;
+    const mesh=new THREE.InstancedMesh(tileGeo,materials[color??'white'],cells.length);mesh.userData.cells=cells;
     cells.forEach(({r,c},i)=>{const height=tileTop(r,c);position.set(wx(c),height/2,wz(r));scale.set(1,height,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();tileLayer.add(mesh);
   }
@@ -218,7 +219,7 @@ $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number
 
 function setTool(next){pendingRegion=null;tool=next;drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
-document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=color==='black'?'阻挡方块':'普通方块';if(tool!=='place')setTool('paint');});
+document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile))return;color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefabs.find(p=>p.id===selectedPrefabId)?.tile.blocked?'阻挡实体':'可通行实体';if(tool!=='place')setTool('paint');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();};
 function editAt(r,c){
@@ -229,7 +230,7 @@ function editAt(r,c){
   if(tool==='erase'){if(!t)return;if(isSpawn){toast('先把玩家起点移到其他方块',true);return;}}
   if(tool==='paint'&&!t){toast('此处为空格，请先放置方块',true);return;}
   if((tool==='paint'||tool==='place')&&blocked(brushTile())&&isSpawn){toast('玩家起点不能设为阻挡方块',true);return;}
-  if((tool==='paint'||tool==='place')&&color==='black'&&isExit){toast('出口不能设为阻挡方块，请先移动出口',true);return;}
+  if((tool==='paint'||tool==='place')&&blocked(brushTile())&&isExit){toast('出口不能设为阻挡方块，请先移动出口',true);return;}
   
   if(tool==='fold'&&!t){toast('折纸线需要放在方块上',true);return;}
   
@@ -270,7 +271,7 @@ function updateUI(){
   applyVisibility();const playing=mode==='play';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
-  const names={select:'左键拖拽框选 · 右键拖拽平移',paste:'点击粘贴落点',paint:'方块工具 · '+COLOR_NAMES[color]+' / 高度 '+brushHeight,place:'放置方块 · '+COLOR_NAMES[color],erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',exit:'设置出口'};if(!chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(player.r,player.c):names[tool];
+  const names={select:'左键拖拽框选 · 右键拖拽平移',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',exit:'设置出口'};if(!chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(player.r,player.c):names[tool];
   $('steps').textContent=$('canvasSteps').textContent=String(steps).padStart(2,'0');$('teleports').textContent=String(teleports).padStart(2,'0');$('playerCoord').textContent=coord(player.r,player.c)+' · 朝'+FACE_NAMES[player.dir];$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[player.dir];
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
@@ -314,7 +315,7 @@ renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);if(activePointers.size>1)multiTouch=true;pointerDown={x:e.clientX,y:e.clientY,button:e.button,pointerType:e.pointerType};lastEditKey=null;dragEdited=false;manualPan=e.button===2;renderer.domElement.setPointerCapture(e.pointerId);});
 renderer.domElement.addEventListener('pointermove',e=>{
   if(manualPan){hoverOutline.visible=false;return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
-  if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));$('hoverCoord').textContent=coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?COLOR_NAMES[map.tiles[hit.r][hit.c].color]:'空格');}else{hoverOutline.visible=false;$('hoverCoord').textContent='—';}
+  if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));$('hoverCoord').textContent=coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?(COLOR_NAMES[map.tiles[hit.r][hit.c].color]||'无颜色属性'):'空格');}else{hoverOutline.visible=false;$('hoverCoord').textContent='—';}
   if(mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.length,w:clipboard[0].length};drawEditSelection();}
   if(mode==='edit'&&tool==='select'&&pointerDown?.button===0&&!multiTouch&&hit){const start=hitAt(pointerDown.x,pointerDown.y);if(start){editRect=rectangle(start,hit);dragEdited=true;drawEditSelection();}return;}
   const dragTools=new Set(['paint','place','erase','fold']);
@@ -351,11 +352,20 @@ window.foldField={getState:()=>clone({map,player,mode,tool,color,foldType,steps,
 
 function setupPrefabs(){
   let fingerprint='',loading=false;
+  function applyPrefabBrush(){
+    const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
+    $('blockColorPanel').hidden=!colored;
+    $('blockHeight').disabled=!prefab;
+    if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;}
+    document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+    $('colorName').textContent=colored?COLOR_NAMES[color]:'';$('colorType').textContent=prefab?.tile.blocked?'阻挡实体':'可通行实体';
+  }
   function renderCatalog(){
-    const select=$('prefabType');select.replaceChildren(new Option('普通方块（自定义）',''));
+    const select=$('prefabType');select.replaceChildren();
     for(const prefab of prefabs)select.add(new Option(prefab.name,prefab.id));
-    if(selectedPrefabId&&!prefabs.some(p=>p.id===selectedPrefabId)){selectedPrefabId=null;toast('当前实体文件已移除，切换为自定义方块');}
-    select.value=selectedPrefabId||'';
+    if(!prefabs.some(p=>p.id===selectedPrefabId))selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
+    if(!prefabs.length)select.add(new Option('无可用实体',''));
+    select.value=selectedPrefabId||'';applyPrefabBrush();
   }
   async function refresh(){
     if(loading||document.hidden||GAME_ONLY||!/^https?:$/.test(location.protocol))return;
@@ -368,10 +378,7 @@ function setupPrefabs(){
   }
   renderCatalog();$('prefabStatus').textContent='内置实体目录 · 本地服务支持实时更新';
   $('prefabType').oninput=$('prefabType').onchange=()=>{
-    selectedPrefabId=$('prefabType').value||null;const prefab=prefabs.find(p=>p.id===selectedPrefabId);
-    if(prefab){color=prefab.tile.color;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;
-      document.querySelectorAll('[data-color]').forEach(b=>{const active=b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefab.tile.blocked?'阻挡实体':'可通行实体';}
-    if(tool!=='place')setTool('paint');
+    selectedPrefabId=$('prefabType').value||null;applyPrefabBrush();if(tool!=='place')setTool('paint');else updateUI();
   };
   refresh();if(!GAME_ONLY)setInterval(refresh,2000);document.addEventListener('visibilitychange',refresh);
 }

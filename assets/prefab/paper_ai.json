@@ -2,5 +2,5 @@
   "version": 1,
   "id": "paper_ai",
   "name": "纸张方块",
-  "tile": { "color": "white", "height": 0.09, "blocked": false, "folds": [] }
+  "tile": { "color": "white", "edgeColor": "#414140", "height": 0.09, "blocked": false, "folds": [] }
 }

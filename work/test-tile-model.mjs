@@ -15,3 +15,10 @@ assert.deepEqual(foldsOf(map.tiles[2][2]),['h','v','d1','d2']);
 assert.deepEqual(foldsOf(map.tiles[0][0]),['d1']);assert.deepEqual(foldsOf(map.tiles[0][4]),['d2']);
 applyFoldLine(map,2,2,null);assert.deepEqual(foldsOf(map.tiles[2][2]),[]);assert.deepEqual(foldsOf(map.tiles[0][0]),[]);
 console.log('PASS: legacy tiles, height validation, prefab identity, DX coordinates, whole axes, crossing markers and whole-axis removal.');
+
+const uncolored=normalizePrefab({version:1,id:'plain_ai',name:'无颜色',tile:{height:.25,blocked:false}});
+assert.equal(Object.hasOwn(uncolored.tile,'color'),false);
+assert.equal(Object.hasOwn(normalizeTile(JSON.parse(JSON.stringify(uncolored.tile))),'color'),false);
+assert.equal(normalizeTile({color:'white',edgeColor:'#414140'}).edgeColor,'#414140');
+for(const edgeColor of ['414140','#fff','red',null])assert.throws(()=>normalizeTile({edgeColor}));
+console.log('PASS: optional prefab color survives roundtrip and intrinsic edge colors are validated.');

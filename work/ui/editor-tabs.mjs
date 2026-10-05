@@ -2,6 +2,8 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const list = root.querySelector('[role="tablist"]');
   const tabs = [...list.querySelectorAll('[role="tab"]')];
   const panels = new Map([...root.querySelectorAll('[role="tabpanel"]')].map(panel => [panel.dataset.panel, panel]));
+  // Live DOM is cloned for standalone export: only arrange an unmounted template.
+  if(root.dataset.tabLayout!=='v1'){
   const find = id => root.querySelector('#' + id);
   const selection = find('copyRegion').closest('details');
   const layers = find('entityVisibility').closest('.studio-section');
@@ -25,6 +27,8 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   panels.get('properties').append(dimensions);
   panels.get('layers').append(layers);
   layers.open=true;
+  root.dataset.tabLayout='v1';
+  }
   let active='map';
   function activate(name, focus=false, notify=true) {
     if(!panels.has(name))throw new Error('Unknown editor tab: '+name);

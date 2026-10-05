@@ -207,12 +207,15 @@ function movePlayer(r,c){if(mode!=='play'||moving||levelWon||stepLimitHit)return
 function teleport(){if(mode!=='play'||moving||levelWon||stepLimitHit)return;if(!chosenFold){toast('请先选择折纸线',true);return;}const t=foldTarget(chosenFold);if(!t.valid){toast(t.reason+'，无法传送',true);return;}record();const prev={...player},a={...chosenFold};const forward=reflectPoint(player.r-Math.cos(player.dir*Math.PI/4),player.c+Math.sin(player.dir*Math.PI/4),a);const dr=forward.r-t.r,dc=forward.c-t.c;player={r:t.r,c:t.c,dir:(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8};steps++;teleports++;clearSelection();animatePlayer(prev,player,'teleport');updateUI();toast('折纸传送 · '+coord(prev.r,prev.c)+' → '+coord(t.r,t.c));}
 $('teleportBtn').onclick=teleport;
 
-function setTool(next){tool=next;document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
+function setTool(next){pendingRegion=null;tool=next;drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=color==='black'?'阻挡方块':'普通方块';if(tool!=='place')setTool('paint');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);gridLayer.children.filter(o=>o.userData.isGrid).forEach(o=>o.visible=showGrid);};
-function editAt(r,c){const t=map.tiles[r][c];const isSpawn=r===map.spawn.r&&c===map.spawn.c;const isExit=map.exit&&r===map.exit.r&&c===map.exit.c;
+function editAt(r,c){
+  if(tool==='select'){editRect=rectangle({r,c},{r,c});drawEditSelection();return;}
+  if(tool==='paste'){pasteAt(r,c);return;}
+  const t=map.tiles[r][c];const isSpawn=r===map.spawn.r&&c===map.spawn.c;const isExit=map.exit&&r===map.exit.r&&c===map.exit.c;
   if(tool==='erase'){if(!t)return;if(isSpawn){toast('先把玩家起点移到其他方块',true);return;}}
   if(tool==='paint'&&!t){toast('此处为空格，请先放置方块',true);return;}
   if((tool==='paint'||tool==='place')&&color==='black'&&isSpawn){toast('玩家起点不能设为阻挡方块',true);return;}
@@ -233,8 +236,24 @@ function setMode(next){if(mode===next)return;if(next==='play'){const check=valid
 $('editMode').onclick=()=>setMode('edit');$('playMode').onclick=()=>setMode('play');$('startBtn').onclick=()=>setMode(mode==='edit'?'play':'edit');
 $('restartBtn').onclick=()=>{if(moving)return;animation=null;moving=false;levelWon=false;stepLimitHit=false;player={...map.spawn};steps=teleports=0;playHistory=[];clearSelection();renderPlayer();updateUI();toast('已回到玩家起点');};
 $('resultRetry').onclick=()=>{$('restartBtn').click();$('resultOverlay').hidden=true;};$('resultEdit').onclick=()=>{$('resultOverlay').hidden=true;setMode('edit');};
-function undo(){if(moving)return;const previous=currentHistory().pop();if(!previous)return;clearSelection();if(mode==='edit'){map=previous;player={...map.spawn};buildPaper();fitCamera(false);persist();}else{player=previous.player;steps=previous.steps;teleports=previous.teleports;renderPlayer();}updateUI();}
+function undo(){if(moving)return;const previous=currentHistory().pop();if(!previous)return;clearSelection();if(mode==='edit'){redoHistory.push(editSnapshot());map=previous.map;editRect=previous.rect;player={...map.spawn};buildPaper();fitCamera(false);persist();}else{player=previous.player;steps=previous.steps;teleports=previous.teleports;levelWon=false;stepLimitHit=false;renderPlayer();}updateUI();}
 $('undoBtn').onclick=undo;
+$('redoBtn').onclick=()=>{if(mode!=='edit'||moving)return;const next=redoHistory.pop();if(!next)return;editHistory.push(editSnapshot());map=next.map;editRect=next.rect;player={...map.spawn};buildPaper();persist();};
+const editSelectionLayer=new THREE.Group();paper.add(editSelectionLayer);
+function drawEditSelection(){
+  disposableClear(editSelectionLayer);const rect=pendingRegion||editRect;
+  if(rect&&mode==='edit'){
+    const geo=new THREE.PlaneGeometry(rect.w,rect.h);const valid=rect.r>=0&&rect.c>=0&&rect.r+rect.h<=map.height&&rect.c+rect.w<=map.width;
+    const line=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:valid?'#447db0':'#ce554c',depthTest:false}));geo.dispose();
+    line.rotation.x=-Math.PI/2;line.position.set(wx(rect.c+(rect.w-1)/2),.4,wz(rect.r+(rect.h-1)/2));line.renderOrder=10;editSelectionLayer.add(line);
+  }
+  $('regionStatus').textContent=pendingRegion?'点击粘贴落点 · Esc 取消':editRect?coord(editRect.r,editRect.c)+' · '+editRect.w+' × '+editRect.h:'左键拖拽框选';
+  $('copyRegion').disabled=!editRect;$('pasteRegion').disabled=!clipboard;
+}
+$('copyRegion').onclick=()=>{if(!editRect)return;clipboard=region(map,editRect);drawEditSelection();toast('选区已复制');};
+$('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.length,w:clipboard[0].length};drawEditSelection();};
+function pasteAt(r,c){try{const result=pasteRegion(map,clipboard,r,c);record();map=result.map;editRect=result.rect;pendingRegion=null;tool='select';player={...map.spawn};buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
+
 function updateUI(){
   const playing=mode==='play';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
@@ -249,7 +268,7 @@ function updateUI(){
   syncState();
 }
 
-function replaceMap(next,save=true){record();map=validateMap(next);player={...map.spawn};steps=teleports=0;playHistory=[];buildPaper();fitCamera();if(save)persist();updateUI();}
+function replaceMap(next,save=true){record();editRect=null;pendingRegion=null;map=validateMap(next);player={...map.spawn};steps=teleports=0;playHistory=[];buildPaper();fitCamera();if(save)persist();updateUI();}
 $('newMap').onclick=()=>{setMode('edit');const tiles=Array.from({length:map.height},()=>Array.from({length:map.width},blankTile));replaceMap({version:1,width:map.width,height:map.height,tiles,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null});toast('已新建空白地图');};
 $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>24||height>24){toast('宽度和高度须为 3–24 的整数',true);return;}if(width===map.width&&height===map.height)return;const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||tiles[spawn.r][spawn.c].color==='black')tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;replaceMap({version:1,width,height,tiles,spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps});toast('地图尺寸已更新');};
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='fold-field-map.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
@@ -274,9 +293,11 @@ renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.poin
 renderer.domElement.addEventListener('pointermove',e=>{
   if(manualPan){hoverOutline.visible=false;return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
   if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));$('hoverCoord').textContent=coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?COLOR_NAMES[map.tiles[hit.r][hit.c].color]:'空格');}else{hoverOutline.visible=false;$('hoverCoord').textContent='—';}
+  if(mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.length,w:clipboard[0].length};drawEditSelection();}
+  if(mode==='edit'&&tool==='select'&&pointerDown?.button===0&&!multiTouch&&hit){const start=hitAt(pointerDown.x,pointerDown.y);if(start){editRect=rectangle(start,hit);dragEdited=true;drawEditSelection();}return;}
   const dragTools=new Set(['paint','place','erase','fold']);
   if(mode==='edit'&&pointerDown?.button===0&&!multiTouch&&!dragEdited&&dragTools.has(tool)&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){
-    const start=hitAt(pointerDown.x,pointerDown.y);
+    gestureBefore=editSnapshot();const start=hitAt(pointerDown.x,pointerDown.y);
     if(start){editAt(start.r,start.c);lastEditKey=start.r+','+start.c;}
     dragEdited=true;
   }
@@ -286,9 +307,9 @@ renderer.domElement.addEventListener('pointermove',e=>{
   }
 });
 renderer.domElement.addEventListener('pointerleave',()=>{hoverOutline.visible=false;hovered=null;$('hoverCoord').textContent='—';});
-renderer.domElement.addEventListener('pointercancel',e=>{activePointers.delete(e.pointerId);if(!activePointers.size)multiTouch=false;pointerDown=null;lastEditKey=null;dragEdited=false;manualPan=false;});
-renderer.domElement.addEventListener('pointerup',e=>{activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){clearSelection();return;}const {r,c}=hit;lastClickTile={r,c};if(mode==='edit'){editAt(r,c);return;}if(chosenFold){const target=foldTarget(chosenFold);if(target.valid&&target.r===r&&target.c===c){teleport();return;}}if(r===player.r&&c===player.c){selectPlayer();return;}if(legalMoves.some(t=>t.r===r&&t.c===c)){movePlayer(r,c);return;}if(map.tiles[r][c]?.fold){selectFold(r,c);return;}if(legalMoves.length){toast(walkable(r,c)?'该方块不在可移动范围内':'黑色或空格方块不可移动',true);}else if(!walkable(r,c)){toast('黑色或空格方块不可移动',true);}clearSelection();});
-window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape')clearSelection();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
+renderer.domElement.addEventListener('pointercancel',e=>{finishGesture();activePointers.delete(e.pointerId);if(!activePointers.size)multiTouch=false;pointerDown=null;lastEditKey=null;dragEdited=false;manualPan=false;});
+renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){clearSelection();return;}const {r,c}=hit;lastClickTile={r,c};if(mode==='edit'){editAt(r,c);return;}if(chosenFold){const target=foldTarget(chosenFold);if(target.valid&&target.r===r&&target.c===c){teleport();return;}}if(r===player.r&&c===player.c){selectPlayer();return;}if(legalMoves.some(t=>t.r===r&&t.c===c)){movePlayer(r,c);return;}if(map.tiles[r][c]?.fold){selectFold(r,c);return;}if(legalMoves.length){toast(walkable(r,c)?'该方块不在可移动范围内':'黑色或空格方块不可移动',true);}else if(!walkable(r,c)){toast('黑色或空格方块不可移动',true);}clearSelection();});
+window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape'){pendingRegion=null;editRect=null;clearSelection();drawEditSelection();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
 
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 

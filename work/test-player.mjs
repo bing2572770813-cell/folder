@@ -36,3 +36,5 @@ const keysSnapshot=controller.snapshot();P.player={r:1,c:1,dir:2};controller.app
 P.player={r:0,c:1,dir:2};controller.applyTerrainEntry();assert.deepEqual(P.player,{r:3,c:3,dir:2});controller.restore(keysSnapshot);assert.deepEqual(P.terrainState.collectedKeys,['铜']);controller.restart();assert.deepEqual(P.terrainState.collectedKeys,[]);
 map.tiles[0][1].tags.requiredKeys=['不存在'];assert.equal(controller.validateForPlay().valid,false);map.tiles[0][1].tags.requiredKeys=[];assert.equal(controller.validateForPlay().valid,true);map.tiles[1][1].blocked=true;map.tiles[0][1].tags.requiredKeys=['银'];assert.equal(controller.validateForPlay().valid,false);
 console.log('PASS: all-key exit gates, missing/blocked keys, independent collection snapshots and restart.');
+
+map.tiles[0][1].tags.requiredKeys=[];map.tiles[0][0].terrain='key';map.tiles[0][0].keyName='起点钥匙';controller.restart();assert.deepEqual(P.terrainState.collectedKeys,['起点钥匙']);

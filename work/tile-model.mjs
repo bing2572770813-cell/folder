@@ -36,6 +36,7 @@ export function normalizeTile(tile) {
   if(tags.exitTo!==undefined&&(typeof tags.exitTo!=='string'||!tags.exitTo.trim()||tags.exitTo.length>80))throw new Error('跳转区域名称无效');
   for(const key of ['spawn','entry'])if(tags[key]!==undefined&&typeof tags[key]!=='boolean')throw new Error('方块标签无效');
   if(tile.kind!==undefined&&!['block','player-token'].includes(tile.kind))throw new Error('实体外观类型无效');
+  if(tile.instance!==undefined){const i=tile.instance;if(!i||typeof i.id!=='string'||!i.id||i.id.length>100||!Number.isInteger(i.anchorR)||!Number.isInteger(i.anchorC)||!Number.isInteger(i.width)||!Number.isInteger(i.height)||i.width<1||i.height<1||i.width>128||i.height>128)throw new Error('实体实例占格信息无效');}
   const unique=[...new Set(folds)];
   return {...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }

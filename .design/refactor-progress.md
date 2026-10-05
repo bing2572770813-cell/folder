@@ -1,17 +1,9 @@
 # 编辑器重构进度与验证
 
-已实施：选区/剪贴板模块、编辑快照与预算模块、实体 prefab 子目录兼容迁移、原生四 Tab 组件。地图配置字段保存按用户最新确认；前端仍不写 prefab。
+已实施：core/entities/tags/editor/ui/render/resources 模块边界、选区与配置历史、四 Tab、虚空与实体检视、嵌套属性 Inspector、受控覆盖行为、BaseEntity 附着校验、entity/tag 目录兼容、EventBus、序列化投影及独立调试状态。标签权限与实体权限取交集；虚空折线同样遵守导出权限。前端不回写 prefab。
 
-四 Tab 迁移使用既有 DOM 节点，未重建其事件、字段值或折叠状态。已在独立后台 localhost:4175 验证地图编辑、检视、地图属性、图层显示，检视到地图属性的方向键及 End 导航，游玩侧栏保持原测试选项，返回编辑仍选择原 Tab。控制台未记录 error，截图见 outputs/editor-tabs-verification.png。
+构建及全部 20 个测试套件通过。浏览器验证四 Tab、方向键/End 导航、编辑/游玩往返、虚空检视、地图名保存、实例高度修改与撤销、独立 HTML 启动。截图见 outputs/editor-tabs-verification.png、outputs/void-inspector-verification.png、outputs/property-inspector-verification.png。
 
-构建和全部 14 个测试套件通过，涵盖纸张连接/厚度、玩家行为、选区和虚空折线、隐藏保护、目录兼容、独立 HTML 与唯一六步示范路线。未运行屏幕阅读器、窄屏或 200% 缩放测试，不声明完整可访问性验收。
+保持原生 UI、Three.js、玩家逻辑集中于 player.cjs、纸张连接/厚度/过渡比例和现有覆盖规则。新叠层仍需确认；新脚本需注册。通用调试覆盖目前由 Inspector 消费，行为扩展需显式接入。app.js 保留场景/DOM 适配。未运行窄屏、200% 缩放或屏幕阅读器验收。
 
-尚待实施：虚空检视工具、实体/标签行为注册、tag prefab 加载与附着合同、属性权限/嵌套 Inspector、序列化投影、EventBus 和剩余编辑/渲染适配拆分。具体新增叠层、属性权限默认与调试重置规则仍需确认。未提交用户的 player token 修改或 paper_render.md。
-
-后续：虚空只读检视工具已接入，浏览器点击 A1 透明空格显示“虚空”，展开后显示 transparent=true、placeable=false、blocked=true 和折线。截图为 outputs/void-inspector-verification.png；独立检视、隐藏/范围保护与旧 null/foldCells 合同通过新增测试，全部 15 个套件通过。属性权限默认与调试生命周期已获用户确认，但通用属性系统尚未接入。
-
-EventBus 已通过 map:changed 通知连接既有防抖保存，不改玩家动作或保存数据范围。浏览器修改地图名后显示“本地已保存”，再用编辑撤销恢复原名称；事件取消、订阅变更、异常隔离与清理通过测试，全部 16 个套件通过。
-
-实体放置已恢复受控行为对象并执行 BaseEntity 检查；现有定义仍使用兼容覆盖行为。五类标签 prefab 已由程序生成，目录读写、热刷新、独立构建及导出内嵌已接入；标签/折线附着及区域分配检查 BaseEntity。隐藏折线/标签的工具、破坏性删除与粘贴保护已补充，全部 19 个测试套件通过。真实浏览器导出的游戏已重新加载并持续渲染，无启动 error；下载事件工具超时后通过本地生成文件核实并完成验证。
-
-通用字段描述与 Inspector 已接入，支持嵌套权限、自定义 properties、只读身份、序列化投影及独立调试覆盖。浏览器在 B3 将 height 从 0.09 改为 0.4，实际地图状态更新，Tab 焦点保持在厚度字段，再用撤销恢复 0.09；截图为 outputs/property-inspector-verification.png。单位测试验证非序列化值不写入配置，清空覆盖后恢复基线；模式切换/重启重置钩子位于 player.cjs。全部 20 个测试套件通过。
+未纳入用户已有的 player_token_ai.json 修改和 paper_render.md。

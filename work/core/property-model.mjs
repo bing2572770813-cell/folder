@@ -47,13 +47,16 @@ export function updateProperty(values,schema,path,nextValue){
   check(original.value,value,original.definition,original.permissions);
   const next=copyJson(values);let target=next;for(const key of path.slice(0,-1))target=target[key];target[path.at(-1)]=value;return next;
 }
-export function serializeMapConfiguration(map){
+export function serializeMapConfiguration(map,schemaFor=tile=>tile.propertySchema??{}){
   const next=copyJson(map);next.tiles=map.tiles.map(row=>row.map(tile=>{
-    if(!tile)return null;const result=projectProperties(tile,tile.propertySchema??{});
+    if(!tile)return null;const result=projectProperties(tile,schemaFor(tile));
     // Structural identity is not an editable property and is required for import.
-    for(const key of identityFields)if(Object.hasOwn(tile,key))result[key]=copyJson(tile[key]);
+    for(const key of identityFields)if(key!=='fold'&&Object.hasOwn(tile,key))result[key]=copyJson(tile[key]);
+    if(tile.folds!==undefined){if(result.folds===undefined)delete result.fold;else if(Object.hasOwn(result,'fold'))result.fold=result.folds[0]??null;}
     return result;
-  }));return next;
+  }));
+  if(map.foldCells!==undefined){const schema=schemaFor({prefabId:'void_ai'});next.foldCells=map.foldCells.filter(marker=>projectProperties({folds:[marker.type]},schema).folds?.length).map(copy=>({...copy}));}
+  return next;
 }
 export function mergeSerializableProperties(before,after,schema={}){
   const walk=(old,value,definition,parent)=>{

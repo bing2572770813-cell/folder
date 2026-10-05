@@ -7,3 +7,5 @@
 当前注册 tag-region、tag-fold、tag-spawn、tag-entry、tag-exit。折线方向与出口钥匙条件属于标签参数，requiredKeys 不作为独立标签。实例数据继续兼容 regionTag、folds/foldCells 和 tags，不引入新的地图版本或折纸规则。
 
 assertTagAttachment 校验目标实体 ID，虚空使用 void_ai。可附着不替代可通行、隐藏、唯一起点/入口或区域约束；调用者必须继续执行既有规则。前端目录只读，写入使用 node work/write-tag-prefab.cjs。
+
+entityPropertySchema 将标签字段权限与实体描述合并，任一来源禁止则最终禁止。区域、折线、起点/入口/出口参数在 Inspector 和三个配置输出中共用此合同；非序列化折线同时排除实体 folds、兼容 fold 和虚空 foldCells。

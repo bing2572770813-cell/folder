@@ -9,7 +9,7 @@ import { axisKey, uniqueFoldAxes, foldGroupAt, inFoldRange, foldStrokes } from '
 import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './regions.mjs';
 import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
-import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor-model.mjs';
+import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';

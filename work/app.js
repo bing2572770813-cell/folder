@@ -12,6 +12,7 @@ import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
 import {mountEditorTabs} from './ui/editor-tabs.mjs';
+import {inspectCell} from './entities/cell-entity.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -23,7 +24,7 @@ for (const node of document.querySelectorAll('[data-lucide]')) {
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
 const $ = id => document.getElementById(id);
-const editorTabs = mountEditorTabs($('editPanel'));
+const editorTabs = mountEditorTabs($('editPanel'),{onActivate:name=>{if(name==='inspect')setTool('inspect');else if(name==='map'&&tool==='inspect')setTool('select');}});
 const GAME_ONLY = Boolean(window.__FOLD_FIELD_GAME_ONLY__);
 if (GAME_ONLY) document.body.classList.add('game-only');
 const COLORS = { white: '#f4f5ed', red: '#e97c73', yellow: '#e9cf72', blue: '#7ebed3', green: '#91bd83', purple: '#b6a0d0', black: '#303a38' };
@@ -244,6 +245,7 @@ document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.da
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
 function editAt(r,c){
   if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
+  if(tool==='inspect'){try{const entity=inspectCell(map,r,c,cellHidden);$('inspectedEntity').textContent=coord(r,c)+' · '+(entity.name||prefabs.find(p=>p.id===entity.prefabId)?.name||entity.prefabId);$('inspectedProperties').textContent=JSON.stringify(entity.properties??{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds},null,2);}catch(error){toast(error.message,true);}return;}
   if(tool==='select'){selectedCells=map.tiles[r][c]?[{r,c}]:[];editRect=selectedCells.length?rectangle({r,c},{r,c}):null;drawEditSelection();syncState();return;}
   if(['player','entry','region-exit','clear-tags'].includes(tool)){
     try{
@@ -304,7 +306,7 @@ function updateUI(){
   applyVisibility();const playing=P.mode==='play';$('playHints').textContent=P.freeTeleport?'测试传送已开启：点击任意可通行实体即可传送；目标区域会自动显示。':P.foldHints?'点击玩家显示行走与所有合法折纸传送落点；点击高亮方块即可移动。':'点击玩家显示行走范围；点击折纸线仍会高亮传送落点，也可按 F 传送。';$('freeTeleportToggle').setAttribute('aria-pressed',String(P.freeTeleport));$('freeTeleportToggle').querySelector('span').textContent=P.freeTeleport?'开启':'关闭';$('foldHintsToggle').setAttribute('aria-pressed',String(P.foldHints));$('foldHintsToggle').querySelector('span').textContent=P.foldHints?'开启':'关闭';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩编辑':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
-  const names={select:'左键拖拽框选 · 右键拖拽平移',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',entry:'设置区域入口','region-exit':'设置区域出口','clear-tags':'清除方块标签'};if(!P.chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(P.player.r,P.player.c):names[tool];
+  const names={inspect:'点击实体或虚空检视 · 不修改地图',select:'左键拖拽框选 · 右键拖拽平移',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',entry:'设置区域入口','region-exit':'设置区域出口','clear-tags':'清除方块标签'};if(!P.chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(P.player.r,P.player.c):names[tool];
   $('steps').textContent=$('canvasSteps').textContent=String(P.steps).padStart(2,'0');$('teleports').textContent=String(P.teleports).padStart(2,'0');$('playerCoord').textContent=coord(P.player.r,P.player.c)+' · 朝'+FACE_NAMES[P.player.dir]+(playing?' · '+(P.terrainState.frozen?'冰冻 · ':'')+'过热 '+P.terrainState.overheat+(P.terrainState.hasKey?' · 持有钥匙':''):'');$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[P.player.dir];
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
@@ -370,7 +372,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
 });
 renderer.domElement.addEventListener('pointerleave',()=>{disposableClear(placementLayer);hoverOutline.visible=false;hovered=null;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';});
 renderer.domElement.addEventListener('pointercancel',e=>{finishGesture();activePointers.delete(e.pointerId);if(!activePointers.size)multiTouch=false;pointerDown=null;lastEditKey=null;dragEdited=false;manualPan=false;});
-renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;syncState();if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||P.moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){selectedCells=[];editRect=null;clearSelection();drawEditSelection();syncState();return;}const {r,c}=hit;lastClickTile={r,c};if(P.mode==='edit'){if(!map.tiles[r][c]){selectedCells=[];editRect=null;drawEditSelection();syncState();if(tool==='select')return;}editAt(r,c);return;}controller.click(r,c);});
+renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;syncState();if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||P.moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){selectedCells=[];editRect=null;clearSelection();drawEditSelection();syncState();return;}const {r,c}=hit;lastClickTile={r,c};if(P.mode==='edit'){if(!map.tiles[r][c]&&tool!=='inspect'){selectedCells=[];editRect=null;drawEditSelection();syncState();if(tool==='select')return;}editAt(r,c);return;}controller.click(r,c);});
 window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape'){pendingRegion=null;editRect=null;selectedCells=[];clearSelection();drawEditSelection();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
 
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
@@ -486,3 +488,4 @@ $('hideAllEntities').onclick=()=>{for(const prefab of entityChoices(prefabs,map)
 $('foldHintsToggle').onclick=()=>controller.setFoldHints(!P.foldHints);
 
 $('freeTeleportToggle').onclick=()=>controller.setFreeTeleport(!P.freeTeleport);
+

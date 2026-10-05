@@ -7,3 +7,5 @@
 构建和全部 14 个测试套件通过，涵盖纸张连接/厚度、玩家行为、选区和虚空折线、隐藏保护、目录兼容、独立 HTML 与唯一六步示范路线。未运行屏幕阅读器、窄屏或 200% 缩放测试，不声明完整可访问性验收。
 
 尚待实施：虚空检视工具、实体/标签行为注册、tag prefab 加载与附着合同、属性权限/嵌套 Inspector、序列化投影、EventBus 和剩余编辑/渲染适配拆分。具体新增叠层、属性权限默认与调试重置规则仍需确认。未提交用户的 player token 修改或 paper_render.md。
+
+后续：虚空只读检视工具已接入，浏览器点击 A1 透明空格显示“虚空”，展开后显示 transparent=true、placeable=false、blocked=true 和折线。截图为 outputs/void-inspector-verification.png；独立检视、隐藏/范围保护与旧 null/foldCells 合同通过新增测试，全部 15 个套件通过。属性权限默认与调试生命周期已获用户确认，但通用属性系统尚未接入。

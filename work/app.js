@@ -143,11 +143,11 @@ function renderPlayer() {playerGroup.position.set(wx(player.c),tileTop(player.r,
 
 function buildPaper() {
   disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);clearSelection();hovered=null;hoverOutline.visible=false;
-  const buckets=new Map(),axes=new Map(FOLDS.map(f=>[f,[]])),edges=[];let maxHeight=0;
+  const buckets=new Map(),axes=new Map(FOLDS.map(f=>[f,[]])),edges=[];
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r][c];if(!tile)continue;
     const cell={r,c};if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);
-    const y=tileTop(r,c),x=wx(c),z=wz(r);maxHeight=Math.max(maxHeight,y);
+    const y=tileTop(r,c),x=wx(c),z=wz(r);
     for(const direction of foldsOf(tile))axes.get(direction).push(cell);
     edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
   }
@@ -285,13 +285,16 @@ function replaceMap(next,save=true){record();editRect=null;pendingRegion=null;ma
 $('newMap').onclick=()=>{setMode('edit');const tiles=Array.from({length:map.height},()=>Array.from({length:map.width},blankTile));replaceMap({version:1,width:map.width,height:map.height,tiles,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null});toast('已新建空白地图');};
 $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>128||height>128){toast('宽度和高度须为 3–128 的整数',true);return;}if(width===map.width&&height===map.height)return;const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||blocked(tiles[spawn.r][spawn.c]))tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;replaceMap({version:1,width,height,tiles,spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps});toast('地图尺寸已更新');};
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='fold-field-map.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
-$('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=validateMap(JSON.parse(await file.text()));setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
+$('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=validateMap(JSON.parse(await file.text()),true);setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
 
 
 function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
-  const current=document.documentElement.outerHTML;
+  const documentCopy=document.documentElement.cloneNode(true);
+  const exportedViewport=documentCopy.querySelector('#viewport');exportedViewport.replaceChildren();for(const attribute of [...exportedViewport.attributes])if(attribute.name.startsWith('data-'))exportedViewport.removeAttribute(attribute.name);
+  documentCopy.querySelector('#resultOverlay').setAttribute('hidden','');
+  const current=documentCopy.outerHTML;
   const boot='<script>window.__FOLD_FIELD_PREFABS__='+JSON.stringify(prefabs).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(map).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
   const html='<!doctype html>\n'+current.replace(/<script>/i,boot+'<script>');
   const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
@@ -371,6 +374,7 @@ function setupPrefabs(){
     if(tool!=='place')setTool('paint');
   };
   $('savePrefab').onclick=async()=>{
+    try{brushTile();}catch(error){toast(error.message,true);return;}
     const name=$('prefabName').value.trim();if(!name){toast('请输入实体名称',true);return;}
     const data={version:1,id:'entity_'+Date.now()+'_ai',name,tile:brushTile()};data.tile.prefabId=data.id;
     if(!/^https?:$/.test(location.protocol)){

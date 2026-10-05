@@ -6,6 +6,8 @@
     "color": "white",
     "edgeColor": "#adada9",
     "height": 0.09,
+    "thickness": 0.09,
+    "gradualRate": 0.6666666666666666,
     "blocked": false,
     "folds": []
   },

@@ -13,13 +13,17 @@ function copyTerrainConfig(value,depth=0) {
 export const foldsOf=tile=>tile?.folds??(tile?.fold?[tile.fold]:[]);
 export const blocked=tile=>!!tile&&(tile.blocked??tile.color==='black');
 export const tileHeight=tile=>tile?.height??(tile?.color==='black'?.25:.09);
+export const tileThickness=tile=>tile?.thickness??tileHeight(tile);
+export const tileGradualRate=tile=>tile?.gradualRate??(2/3);
 export function normalizeTile(tile) {
   if(tile===null)return null;
   // Retired goal tiles keep their geometry and exit tags when importing old maps.
   if(tile?.terrain==='goal'){tile={...tile};delete tile.terrain;delete tile.terrainConfig;if(tile.prefabId==='goal_ai')tile.prefabId=null;}
   if(!tile||(hasColor(tile)&&!COLOR_KEYS.includes(tile.color)))throw new Error('方块颜色无效');
   if(tile.edgeColor!==undefined&&(typeof tile.edgeColor!=='string'||!/^#[0-9a-f]{6}$/i.test(tile.edgeColor)))throw new Error('实体边缘颜色须为六位十六进制颜色');
-  const height=tileHeight(tile),folds=foldsOf(tile);
+  const height=tileHeight(tile),thickness=tileThickness(tile),gradualRate=tileGradualRate(tile),folds=foldsOf(tile);
+  if(typeof thickness!=='number'||!Number.isFinite(thickness)||thickness<.001||thickness>16)throw new Error('方块厚度须为 0.001–16');
+  if(typeof gradualRate!=='number'||!Number.isFinite(gradualRate)||gradualRate<0||gradualRate>100)throw new Error('gradual rate 须为 0–100');
   if(typeof height!=='number'||!Number.isFinite(height)||height<.01||height>16)throw new Error('方块高度须为 0.01–16');
   if(!Array.isArray(folds)||folds.some(f=>!FOLD_TYPES.includes(f))||(tile.fold!=null&&!FOLD_TYPES.includes(tile.fold)))throw new Error('折纸方向无效');
   if(tile.blocked!==undefined&&typeof tile.blocked!=='boolean')throw new Error('通行属性无效');
@@ -43,7 +47,7 @@ export function normalizeTile(tile) {
   if(keyName!==undefined&&(typeof keyName!=='string'||!keyName.trim()||keyName.trim().length>80))throw new Error('钥匙名须为 1–80 字');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
   const unique=[...new Set(folds)];
-  return {...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');

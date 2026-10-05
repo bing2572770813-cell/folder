@@ -4,7 +4,7 @@ import {legalKeyNames,renameKeyCells} from './keys.mjs';
 import {normalizeMapName,mapFilename} from './map-name.mjs';
 import playerRuntime from './player.cjs';
 import * as THREE from 'three';
-import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './tile-model.mjs';
+import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, tileThickness, tileGradualRate, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './tile-model.mjs';
 import { axisKey, uniqueFoldAxes, foldGroupAt, inFoldRange, foldStrokes } from './fold-geometry.mjs';
 import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './regions.mjs';
 import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
@@ -37,7 +37,7 @@ const previewCache=new Map();let previewRenderer;
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
 let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
 let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
-function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,prefabId:prefab.id});}
+function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let map=defaultMap(),tool='paint',color='white',foldType='h';
 let hovered=null,showGrid=true;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
@@ -157,20 +157,20 @@ function buildPaper() {
     if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.04,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
 
     const edgeColor=entityEdgeColor(tile);
-    if(edgeColor&&surface){if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);for(let i=0;i<surface.boundary.length;i++)for(const p of [surface.boundary[i],surface.boundary[(i+1)%surface.boundary.length]])lines.push(x+p[0],p[1]+.004,z+p[2]);}
+    if(edgeColor&&surface){if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);for(const segment of surface.boundarySegments)for(const p of segment)lines.push(x+p[0],p[1]+.004,z+p[2]);}
     if(edgeColor&&!surface){
       if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);
-      const corners=[[x-.5,0,z-.5],[x+.5,0,z-.5],[x+.5,0,z+.5],[x-.5,0,z+.5],[x-.5,y+.004,z-.5],[x+.5,y+.004,z-.5],[x+.5,y+.004,z+.5],[x-.5,y+.004,z+.5]];
+      const bottom=y-tileThickness(tile);const corners=[[x-.5,bottom,z-.5],[x+.5,bottom,z-.5],[x+.5,bottom,z+.5],[x-.5,bottom,z+.5],[x-.5,y+.004,z-.5],[x+.5,y+.004,z-.5],[x+.5,y+.004,z+.5],[x-.5,y+.004,z+.5]];
       for(const [a,b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])lines.push(...corners[a],...corners[b]);
     }
     if(tile.terrain){if(!terrains.has(tile.terrain))terrains.set(tile.terrain,[]);terrains.get(tile.terrain).push(cell);}
-    if(surface){for(let i=0;i<surface.boundary.length;i++)for(const p of [surface.boundary[i],surface.boundary[(i+1)%surface.boundary.length]])edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
+    if(surface){for(const segment of surface.boundarySegments)for(const p of segment)edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
   }
   for(const [color,bucket] of surfaces){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(bucket.positions,3));geometry.computeVertexNormals();const mesh=new THREE.Mesh(geometry,materials[color??'white']);mesh.userData.triangleCells=bucket.triangleCells;mesh.userData.surfaceCells=bucket.cells;tileLayer.add(mesh);}
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
   for(const [color,cells] of buckets){
     const mesh=new THREE.InstancedMesh(tileGeo,materials[color??'white'],cells.length);mesh.userData.cells=cells;
-    cells.forEach(({r,c},i)=>{const height=tileTop(r,c);position.set(wx(c),height/2,wz(r));scale.set(1,height,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
+    cells.forEach(({r,c},i)=>{const height=tileTop(r,c);const thickness=tileThickness(map.tiles[r][c]);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();tileLayer.add(mesh);
   }
   for(const [type,cells] of terrains){
@@ -231,6 +231,7 @@ function tileOutline(r,c,hex){const line=new THREE.LineSegments(new THREE.EdgesG
 
 
 $('teleportBtn').onclick=()=>teleport();
+for(const id of ['blockThickness','blockGradualRate'])$(id).onchange=()=>{try{brushTile();if(tool!=='place')setTool('paint');syncState();}catch(e){toast(e.message,true);}};
 $('blockHeight').oninput=()=>{const n=Number($('blockHeight').value);if(Number.isFinite(n)&&n>=.01&&n<=16){brushHeight=n;syncState();}};
 $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number.isFinite(n)||n<.01||n>16){toast('方块高度须为 0.01–16',true);$('blockHeight').value=brushHeight;return;}brushHeight=n;if(tool!=='place')setTool('paint');};
 
@@ -391,8 +392,8 @@ function setupPrefabs(){
   function applyPrefabBrush(){
     const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
     $('keyNamePanel').hidden=prefab?.tile.terrain!=='key';$('blockColorPanel').hidden=!colored;$('prefabSummary').textContent=prefab?.name||'无可用实体';
-    $('blockHeight').disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';document.querySelectorAll('[data-prefab]').forEach(b=>{const active=b.dataset.prefab===selectedPrefabId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
-    if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;}
+    for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';document.querySelectorAll('[data-prefab]').forEach(b=>{const active=b.dataset.prefab===selectedPrefabId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+    if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('blockThickness').value=tileThickness(prefab.tile);$('blockGradualRate').value=tileGradualRate(prefab.tile);}
     document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
     $('colorName').textContent=colored?COLOR_NAMES[color]:'';$('colorType').textContent=prefab?.tile.blocked?'阻挡实体':'可通行实体';
   }
@@ -453,7 +454,7 @@ function prefabPreview(prefab){
  const height=prefab.tile.height,span=Math.max(prefab.size.width,prefab.size.height,height+(prefab.tile.kind==='player-token'?.8:0))*.7+.3;
  const cam=new THREE.OrthographicCamera(-span,span,span*.8,-span*.8,.1,100);cam.position.set(span*1.5,span*1.6+height/2,span*2);cam.lookAt(0,height/2,0);
  for(const p of footprint(prefab,0,0)){
-   const tile=new THREE.Mesh(new THREE.BoxGeometry(.98,height,.98),new THREE.MeshStandardMaterial({color:COLORS[prefab.tile.color]??COLORS.white}));tile.position.set(p.c-(prefab.size.width-1)/2,height/2,p.r-(prefab.size.height-1)/2);world.add(tile);
+   const tile=new THREE.Mesh(new THREE.BoxGeometry(.98,tileThickness(prefab.tile),.98),new THREE.MeshStandardMaterial({color:COLORS[prefab.tile.color]??COLORS.white}));tile.position.set(p.c-(prefab.size.width-1)/2,height-tileThickness(prefab.tile)/2,p.r-(prefab.size.height-1)/2);world.add(tile);
    if(prefab.tile.edgeColor){const edge=new THREE.LineSegments(new THREE.EdgesGeometry(tile.geometry),new THREE.LineBasicMaterial({color:prefab.tile.edgeColor}));edge.position.copy(tile.position);world.add(edge);}
    if(prefab.tile.kind==='player-token'){const token=makeToken(prefab.tile.color);token.rotation.y=-Math.PI*.75;token.position.copy(tile.position);token.position.y=height;world.add(token);}
    if(prefab.tile.terrain){const marker=new THREE.Mesh(new THREE.PlaneGeometry(.72,.72),new THREE.MeshBasicMaterial({map:terrainTextures[prefab.tile.terrain],transparent:true,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.copy(tile.position);marker.position.y=height+.012;world.add(marker);}

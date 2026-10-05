@@ -109,3 +109,5 @@ npm --prefix work test
 任意位置传送是测试开关：开启后点击地图内任意可通行实体即可传送，包括尚未揭示的区域；揭示目标区域，正常处理钥匙和出口等机制，计入一步与一次传送，支持撤销。虚空、阻挡和当前不可进入的机制不允许作为落点；返回编辑关闭该开关。
 
 纸张方块不同高度时使用平坦中心与三角斜面：中心 0.6×0.6 保留自身高度，外围宽度 0.2；共边中点取两侧纸块平均高度，共角取接触该角的可见纸块平均高度（含斜向）。仅纸张相连，虚空/其他实体保留外壁；属性高度与玩家中心高度不变。合并每种颜色的网格，并记录三角面所属格子以保证拾取准确，网格与自带勾线跟随斜面边界。
+
+Paper tile properties: `thickness` (0.001–16) sets the horizontal bottom at height minus thickness; sloping triangles and outlines below it are clipped. Missing thickness defaults to height for old maps. `gradualRate` (0–100) is total transition width / flat width: flat width = 1/(1+rate), each rim = rate/(2*(1+rate)); default 2/3 preserves the former 0.6 center, 0 disables slopes. Properties are edited alongside height and persist in map/prefab JSON; gameplay elevation remains height (Three.js Y is vertical).

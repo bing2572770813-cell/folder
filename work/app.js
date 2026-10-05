@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, foldsOf, blocked, tileHeight, columnLabel, applyFoldLine } from './tile-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
-import { contains, rectangle, region, pasteRegion } from './editor-model.mjs';
+import { rectangle, region, pasteRegion } from './editor-model.mjs';
 import { Copy, ClipboardPaste, Redo2 } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
@@ -32,7 +32,7 @@ let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, gestureBe
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); player = { ...map.spawn }; } } catch { /* An invalid saved map falls back to the sample map. */ }
 
 function defaultMap() {
-  return clone(demoMap);
+  return validateMap(clone(demoMap),true);
 }
 function inside(r,c) { return Number.isInteger(r) && Number.isInteger(c) && r>=0 && c>=0 && r<map.height && c<map.width; }
 function walkable(r,c) { return inside(r,c) && map.tiles[r][c] !== null && !blocked(map.tiles[r][c]); }
@@ -88,9 +88,10 @@ function checkRunEnd() {
 function persist() { clearTimeout(saveTimer); $('saveState').textContent='保存中'; saveTimer=setTimeout(() => { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(map)); $('saveState').textContent='本地已保存'; } catch { $('saveState').textContent='仅当前会话'; } },120); }
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return mode==='edit'?editHistory:playHistory; }
+function trimHistory(history){let cells=history.reduce((total,item)=>total+(item.map?item.map.width*item.map.height:1),0);while(history.length>150||(history.length>1&&cells>100000)){const first=history.shift();cells-=first.map?first.map.width*first.map.height:1;}}
 function editSnapshot(){return {map:clone(map),rect:editRect?{...editRect}:null};}
-function record() { if(mode==='edit'&&gestureBefore)return; const history=currentHistory(); history.push(mode==='edit'?editSnapshot():{player:{...player},steps,teleports}); if(mode==='edit')redoHistory=[];if(history.length>150)history.shift(); updateUI(); }
-function finishGesture(){if(!gestureBefore)return;const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(map)){editHistory.push(before);if(editHistory.length>150)editHistory.shift();redoHistory=[];updateUI();}}
+function record() { if(mode==='edit'&&gestureBefore)return; const history=currentHistory(); history.push(mode==='edit'?editSnapshot():{player:{...player},steps,teleports}); if(mode==='edit')redoHistory=[];trimHistory(history); updateUI(); }
+function finishGesture(){if(!gestureBefore)return;const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(map)){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
 
 const viewport=$('viewport');
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#cbd8d0');
@@ -115,21 +116,14 @@ const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(
 sunlight.shadow.mapSize.set(2048,2048); sunlight.shadow.camera.left=-20;sunlight.shadow.camera.right=20;sunlight.shadow.camera.top=20;sunlight.shadow.camera.bottom=-20;sunlight.shadow.camera.near=1;sunlight.shadow.camera.far=55;sunlight.shadow.bias=-.0006;sunlight.shadow.normalBias=.025; sunlight.shadow.radius=4;scene.add(sunlight);
 const fill=new THREE.DirectionalLight('#d1e8ee',1.1); fill.position.set(12,5,-8); scene.add(fill);
 const tileGeo=new THREE.BoxGeometry(1,1,1);
-const blockGeo=new THREE.BoxGeometry(.963,.25,.963);
 const markerGeo=new THREE.PlaneGeometry(.94,.94);
-const cellGeo=new THREE.PlaneGeometry(.98,.98);
 const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new THREE.MeshStandardMaterial({color:v,roughness:.86,flatShading:true})]));
-const edgeGeo=new THREE.EdgesGeometry(tileGeo),blockEdgeGeo=new THREE.EdgesGeometry(blockGeo);
-const edgeMat=new THREE.LineBasicMaterial({color:'#8a9983',transparent:true,opacity:.22});
-const blockEdgeMat=new THREE.LineBasicMaterial({color:'#627465',transparent:true,opacity:.4});
-const ghostMat=new THREE.MeshBasicMaterial({color:'#809984',transparent:true,opacity:.055,depthWrite:false,side:THREE.DoubleSide});
-const hitMaterial=new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false});
 const gridMaterial=new THREE.LineBasicMaterial({color:'#b9bdbb',transparent:true,opacity:.8});
-const sharedGeometries=new Set([tileGeo,blockGeo,markerGeo,cellGeo,edgeGeo,blockEdgeGeo]);
-const sharedMaterials=new Set([...Object.values(materials),edgeMat,blockEdgeMat,ghostMat,gridMaterial,hitMaterial]);
+const sharedGeometries=new Set([tileGeo,markerGeo]);
+const sharedMaterials=new Set([...Object.values(materials),gridMaterial]);
 let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group();
 paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer);
-let hitCells=[], tileObjects=new Map();
+
 const visibility={coords:true,tiles:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
 function disposableClear(group) { for(const child of [...group.children]) { child.traverse(o=>{if(o.userData.ownedTexture)o.userData.ownedTexture.dispose();if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}}); group.remove(child); } }
@@ -144,12 +138,11 @@ const playerGroup=new THREE.Group(); playerGroup.add(playerDecal);paper.add(play
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
-const northTexture=canvasTexture((ctx,s)=>{ctx.fillStyle='#718469';ctx.font='500 30px Segoe UI';ctx.textAlign='center';ctx.fillText('N',s/2,57);ctx.strokeStyle='#8c9f7e';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(s/2,90);ctx.lineTo(s/2,150);ctx.moveTo(s/2-8,103);ctx.lineTo(s/2,90);ctx.lineTo(s/2+8,103);ctx.stroke();});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 function renderPlayer() {playerGroup.position.set(wx(player.c),tileTop(player.r,player.c)+.018,wz(player.r));playerGroup.rotation.y=-player.dir*Math.PI/4;}
 
 function buildPaper() {
-  disposableClear(boardLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);clearSelection();hitCells=[];tileObjects.clear();hovered=null;hoverOutline.visible=false;
+  disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const buckets=new Map(),axes=new Map(FOLDS.map(f=>[f,[]])),edges=[];let maxHeight=0;
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r][c];if(!tile)continue;
@@ -175,7 +168,7 @@ function buildPaper() {
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);
   }
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
-  addAxisLabels(maxHeight);renderPlayer();applyVisibility();updateUI();
+  if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
 }
 function addAxisLabels(maxHeight){
   const w=map.width,h=map.height,size=Math.min(4096,Math.max(w,h)*32+64);
@@ -282,6 +275,7 @@ function updateUI(){
   $('resultOverlay').hidden=!(playing&&(levelWon||stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';
   $('undoBtn').disabled=!currentHistory().length||moving;$('restartBtn').disabled=!playing||moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=moving);$('teleportBtn').disabled=moving||!chosenFold||!foldTarget(chosenFold).valid;
+  $('redoBtn').disabled=mode!=='edit'||!redoHistory.length||moving;drawEditSelection();
   syncState();
 }
 
@@ -324,7 +318,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
     if(start){editAt(start.r,start.c);lastEditKey=start.r+','+start.c;}
     dragEdited=true;
   }
-  if(mode==='edit'&&pointerDown?.button===0&&dragEdited&&dragTools.has(tool)&&hit){
+  if(mode==='edit'&&pointerDown?.button===0&&!multiTouch&&dragEdited&&dragTools.has(tool)&&hit){
     const key=hit.r+','+hit.c;
     if(key!==lastEditKey){editAt(hit.r,hit.c);lastEditKey=key;}
   }
@@ -337,8 +331,11 @@ window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 
 let renderedFrames=0;
-function syncState(){viewport.dataset.state=JSON.stringify({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view});}
-function screenPoints(){viewport.dataset.frames=String(renderedFrames);}
+function syncState(){viewport.dataset.state=JSON.stringify({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid});}
+function screenPoints(){
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible}});
+  if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
+}
 function tick(now){requestAnimationFrame(tick);controls.update();
   if(animation){const t=Math.min(1,(now-animation.start)/animation.duration),smooth=t*t*(3-2*t);if(animation.type==='teleport'){if(t<.5){playerGroup.position.copy(animation.from);playerGroup.scale.setScalar(Math.max(.03,1-t*2));}else{playerGroup.position.copy(animation.to);playerGroup.scale.setScalar(Math.max(.03,(t-.5)*2));}}else{playerGroup.position.lerpVectors(animation.from,animation.to,smooth);}playerGroup.rotation.y=-player.dir*Math.PI/4;if(t>=1){animation=null;moving=false;playerGroup.scale.setScalar(1);renderPlayer();updateUI();checkRunEnd();}}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}

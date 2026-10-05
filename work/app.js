@@ -242,9 +242,6 @@ function updateUI(){
   const names={paint:'改颜色 · '+COLOR_NAMES[color],place:'放置方块 · '+COLOR_NAMES[color],erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',exit:'设置出口'};if(!chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(player.r,player.c):names[tool];
   $('steps').textContent=$('canvasSteps').textContent=String(steps).padStart(2,'0');$('teleports').textContent=String(teleports).padStart(2,'0');$('playerCoord').textContent=coord(player.r,player.c)+' · 朝'+FACE_NAMES[player.dir];$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[player.dir];
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
-  $('levelName').value=map.name;$('levelDescription').value=map.description;$('maxSteps').value=map.maxSteps;
-  $('bestStepsLabel').textContent='最佳步数：'+(map.bestSteps===null?'—':map.bestSteps);
-  $('exitStatus').textContent=map.exit&&inside(map.exit.r,map.exit.c)?'出口：'+coord(map.exit.r,map.exit.c):'出口：未设置';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&(levelWon||stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(t.color==='black')blocks++;if(t.fold)folds++;}$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';
@@ -258,20 +255,6 @@ $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Numbe
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(map,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='fold-field-map.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>2000000)throw new Error('地图文件过大');const next=validateMap(JSON.parse(await file.text()));setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
 
-function updateLevelField(field,value){
-  const next=clone(map);
-  if(field==='name')next.name=String(value).slice(0,48);
-  if(field==='description')next.description=String(value).slice(0,240);
-  if(field==='maxSteps'){
-    const n=Number(value);
-    if(!Number.isInteger(n)||n<0||n>999){toast('最大步数须为 0–999 的整数',true);updateUI();return;}
-    next.maxSteps=n;
-  }
-  map=validateMap(next);persist();updateUI();
-}
-$('levelName').addEventListener('change',e=>updateLevelField('name',e.target.value));
-$('levelDescription').addEventListener('change',e=>updateLevelField('description',e.target.value));
-$('maxSteps').addEventListener('change',e=>updateLevelField('maxSteps',e.target.value));
 
 function exportGameHtml(){
   const check=validateForPlay();

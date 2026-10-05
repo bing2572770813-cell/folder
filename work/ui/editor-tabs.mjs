@@ -21,9 +21,10 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const selectionTitle = document.createElement('h2');selectionTitle.className='section-label';selectionTitle.textContent='选区与剪贴板';
   selectionTools.append(selectionTitle, selection.querySelector('.studio-tools'));
   selection.querySelector('summary').textContent='区域标签';
+  selectionTools.append(selection);
   block.querySelector('h2').textContent='实例属性与标签';
   panels.get('map').append(tools, selectorSection, selectionTools, fold);
-  panels.get('inspect').append(block, selection, facing);
+  panels.get('inspect').append(block, facing);
   panels.get('properties').append(dimensions);
   panels.get('layers').append(layers);
   layers.open=true;

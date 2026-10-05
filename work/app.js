@@ -11,6 +11,7 @@ import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
+import {mountEditorTabs} from './ui/editor-tabs.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -22,6 +23,7 @@ for (const node of document.querySelectorAll('[data-lucide]')) {
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
 const $ = id => document.getElementById(id);
+const editorTabs = mountEditorTabs($('editPanel'));
 const GAME_ONLY = Boolean(window.__FOLD_FIELD_GAME_ONLY__);
 if (GAME_ONLY) document.body.classList.add('game-only');
 const COLORS = { white: '#f4f5ed', red: '#e97c73', yellow: '#e9cf72', blue: '#7ebed3', green: '#91bd83', purple: '#b6a0d0', black: '#303a38' };

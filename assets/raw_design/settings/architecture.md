@@ -149,7 +149,7 @@ work/
   tests/         # 模块与迁移回归
 ```
 
-UI 框架尚未选定，组件化不以新增框架为前提；未确认前不改成 React/Vue。
+已确认继续原生 HTML/JavaScript。四个 Tab 已由 work/ui/editor-tabs.mjs 组织，采用现有控件节点与状态；未引入 React/Vue。
 
 可扩展模块随实现提供 README.md 与适用的 AGENTS.md，说明职责、数据类型、注册方法、扩展步骤、禁止事项、测试入口。沿用仓库 AGENTS.md 命名，不建立职责重复的 agent.md。
 
@@ -217,6 +217,8 @@ Q1（实例修改保存）、Q2（MonoBehaviour 含义）及地图导出的结�
 ### 实施 TODO（仅规划）
 
 实施进度：选区/剪贴板已迁入 work/editor/selection-model.mjs，旧 editor-model.mjs 保留转发兼容；编辑快照与历史预算已迁入 work/editor/history-model.mjs。两者已接入 app.js 并通过构建及全部 14 个测试套件。玩家状态机、预览渲染和游玩侧栏未调整。其余项目仍待后续实施，不能据此认为完整架构迁移已经完成。
+
+四个 Tab 已接入 work/ui/editor-tabs.mjs，原控件身份与字段值保留；浏览器已验证面板切换、方向键/End 导航及编辑/游玩往返保留 Tab。仅检视面板组织已完成，实际实例拾取与通用属性系统仍待后续实现。截图为 outputs/editor-tabs-verification.png；尚未完成窄屏、200% 缩放或屏幕阅读器验收。
 
 1. 完成待确认项，固定数据合同、版本与兼容映射。
 2. 建立旧地图/prefab 迁移用例，覆盖虚空折线、多格、标签与钥匙引用。

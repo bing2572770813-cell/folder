@@ -31,6 +31,16 @@
     <aside class="sidebar">
       <div class="mode-tabs"><button id="editMode" class="active"><i data-lucide="pencil"></i>编辑模式</button><button id="playMode"><i data-lucide="play"></i>游玩模式</button></div>
       <div id="editPanel">
+        <div class="editor-tabs" role="tablist" aria-label="编辑器工具面板">
+          <button type="button" id="tabMap" role="tab" data-tab="map" aria-controls="panelMap" aria-selected="true">地图编辑</button>
+          <button type="button" id="tabInspect" role="tab" data-tab="inspect" aria-controls="panelInspect" aria-selected="false" tabindex="-1">检视</button>
+          <button type="button" id="tabProperties" role="tab" data-tab="properties" aria-controls="panelProperties" aria-selected="false" tabindex="-1">地图属性</button>
+          <button type="button" id="tabLayers" role="tab" data-tab="layers" aria-controls="panelLayers" aria-selected="false" tabindex="-1">图层</button>
+        </div>
+        <div id="panelMap" role="tabpanel" data-panel="map" aria-labelledby="tabMap" tabindex="0"></div>
+        <div id="panelInspect" role="tabpanel" data-panel="inspect" aria-labelledby="tabInspect" tabindex="0" hidden></div>
+        <div id="panelProperties" role="tabpanel" data-panel="properties" aria-labelledby="tabProperties" tabindex="0" hidden><p class="studio-readout">地图名称在顶部中央编辑；结构与可序列化配置随地图导出。</p></div>
+        <div id="panelLayers" role="tabpanel" data-panel="layers" aria-labelledby="tabLayers" tabindex="0" hidden></div>
         <details class="studio-section" open><summary>选区与批量操作</summary><div class="studio-tools">
           <button data-tool="select" data-tip="框选" aria-label="框选"><i data-lucide="scan"></i></button>
           <button id="copyRegion" data-tip="复制选区" aria-label="复制选区"><i data-lucide="copy"></i></button>

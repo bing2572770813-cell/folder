@@ -23,7 +23,7 @@ const result = await esbuild.build({
   legalComments: 'inline',
   target: ['es2020'],
 });
-const template = fs.readFileSync(path.join(root, 'editor.html'), 'utf8');
+const template = fs.readFileSync(path.join(root, 'editor.html'), 'utf8').replace('</style>',fs.readFileSync(path.join(root,'ui/editor-tabs.css'),'utf8')+'\n</style>');
 const code = 'window.__FOLD_FIELD_PREFABS__??='+JSON.stringify(catalog.prefabs).replace(/</g,'\\u003c')+';'+result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 const html = template.replace('<!--APP_SCRIPT-->', () => '<script>' + code + '</script>');
 fs.mkdirSync(outputs, {recursive:true});

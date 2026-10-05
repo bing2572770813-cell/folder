@@ -21,7 +21,7 @@ const {readCatalog,savePrefab}=require('./prefab-catalog.cjs');
     assert.equal(catalog.prefabs[0].tile.height,3,'New entity directory takes precedence over a duplicate legacy file');
     await fs.mkdir(path.join(folder,'tag'));
     await fs.writeFile(path.join(folder,'tag','not-an-entity.json'),'not an entity');
-    catalog=await readCatalog(folder);assert.equal(catalog.errors.length,2,'Tag definitions are never parsed as entities');
+    catalog=await readCatalog(folder);assert.equal(catalog.errors.length,3,'Invalid tag is reported separately without dropping entities');assert.equal(catalog.prefabs.length,1);
     await fs.writeFile(path.join(folder,'legacy.json'),JSON.stringify({...data,id:'legacy_ai'}));
     catalog=await readCatalog(folder);assert.ok(catalog.prefabs.some(p=>p.id==='legacy_ai'));
     await assert.rejects(savePrefab({...data,id:'legacy_ai'},folder),/已存在/);

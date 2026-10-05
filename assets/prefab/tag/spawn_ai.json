@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "id": "spawn_ai",
+  "name": "玩家起点",
+  "BaseEntity": [
+    "campfire_ai",
+    "entity_1791205468489_ai",
+    "eruption_ai",
+    "fire_ai",
+    "ice_ai",
+    "key_ai",
+    "large_paper_ai",
+    "obstacle_ai",
+    "paper_ai",
+    "plain_ai",
+    "player_token_ai"
+  ],
+  "behavior": {
+    "scriptId": "tag-spawn",
+    "parameters": {},
+    "state": {}
+  },
+  "properties": {
+    "spawn": {
+      "serializable": true,
+      "readable": true,
+      "tempEditable": true
+    }
+  }
+}

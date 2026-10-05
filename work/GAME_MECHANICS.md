@@ -219,9 +219,9 @@ ID 为 1–80 位字母、数字、下划线或连字符；name 为非空字符�
 
 ### 8.3 目录、写入与加载
 
-prefab 位于 `assets/prefab/*.json`，只能由后端程序写入。前端无创建/保存 prefab 功能；`GET /api/prefabs` 只读，其他方法拒绝。服务逐次读盘，编辑器约每 2 秒刷新；坏文件/重复 ID 隔离报错，其他定义仍可用。
+实体 prefab 已迁入 `assets/prefab/entity/*.json`，兼容读取根目录旧 JSON；tag 子目录不作为实体扫描。目录中未提交的 player token 定义暂留根目录。prefab 只能由后端程序写入。前端无创建/保存 prefab 功能；`GET /api/prefabs` 只读，其他方法拒绝。服务逐次读盘，编辑器约每 2 秒刷新；坏文件/跨目录重复 ID 隔离报错，其他定义仍可用。
 
-`node work/write-prefab.cjs <定义.json>` 校验写入新定义，不覆盖已有文件或 ID。地图保存属性快照；修改/删除 prefab 不自动迁移已放置实例。文件协议使用构建内置目录，无法扫描磁盘；独立导出内嵌地图和目录。
+`node work/write-prefab.cjs <定义.json>` 校验后写入 entity 子目录，不覆盖已有文件或 ID（包括根目录旧定义）。地图保存属性快照；修改/删除 prefab 不自动迁移已放置实例。文件协议使用构建内置目录，无法扫描磁盘；独立导出内嵌地图和目录。
 
 资源目录遵循 `assets/README.md`：raw_design 设计资料、texture PNG、model FBX、audio WAV、prefab JSON、map JSON。AI 资源名后缀 `_ai`，网络资源 `_web`；不要擅改作者资产。
 

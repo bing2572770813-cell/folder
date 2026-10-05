@@ -1,10 +1,11 @@
+import {migrateRegions} from './regions.mjs';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {normalizeTile,blocked,columnLabel,normalizeFoldCells} from './tile-model.mjs';
 const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
-const validation=source.slice(source.indexOf('function validateMap('),source.indexOf('function validateForPlay('));
-const context={normalizeTile,blocked,columnLabel,normalizeFoldCells};vm.createContext(context);vm.runInContext(validation,context);
+const validation=source.slice(source.indexOf('function validateMap('),source.indexOf('function persist('));
+const context={normalizeTile,blocked,columnLabel,normalizeFoldCells,migrateRegions};vm.createContext(context);vm.runInContext(validation,context);
 const map={version:1,width:128,height:128,tiles:Array.from({length:128},()=>Array.from({length:128},()=>({color:'white',fold:null}))),spawn:{r:0,c:0,dir:0},exit:{r:127,c:127},maxSteps:0};
 map.tiles[4][5]={color:'blue',height:3,fold:'h',folds:['h','v'],prefabId:'paper_ai',blocked:false};
 const valid=context.validateMap(map);
@@ -13,7 +14,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(context.validateMap(JSON.parse(JSON.s
 assert.throws(()=>context.validateMap({...map,width:129}));
 map.tiles[0][0]=null;assert.throws(()=>context.validateMap(map));assert.equal(context.validateMap(map,true).tiles[0][0],null);
 const html=fs.readFileSync(new URL('./editor.html',import.meta.url),'utf8');
-const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
+const idList=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);const ids=new Set(idList);assert.equal(ids.size,idList.length,'DOM IDs must be unique');
 for(const match of source.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has(match[1]),'Missing DOM node '+match[1]);
 assert.ok(!/折纸测试|对称绘制|moveRegion|fillRegion|transformRegion|previewFolds|testPlay/.test(source+html));
 console.log('PASS: 128 bounds, full tile JSON round-trip, draft validation, removed tools and DOM bindings.');

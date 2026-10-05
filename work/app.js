@@ -114,9 +114,7 @@ const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambi
 const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(-9,18,8); sunlight.castShadow=true;
 sunlight.shadow.mapSize.set(2048,2048); sunlight.shadow.camera.left=-20;sunlight.shadow.camera.right=20;sunlight.shadow.camera.top=20;sunlight.shadow.camera.bottom=-20;sunlight.shadow.camera.near=1;sunlight.shadow.camera.far=55;sunlight.shadow.bias=-.0006;sunlight.shadow.normalBias=.025; sunlight.shadow.radius=4;scene.add(sunlight);
 const fill=new THREE.DirectionalLight('#d1e8ee',1.1); fill.position.set(12,5,-8); scene.add(fill);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(250,250),new THREE.MeshBasicMaterial({color:'#d3ddd2',toneMapped:false}));ground.rotation.x=-Math.PI/2;ground.position.y=-2.61;scene.add(ground);
-const shadowFloor=new THREE.Mesh(new THREE.PlaneGeometry(250,250),new THREE.ShadowMaterial({opacity:.19}));shadowFloor.rotation.x=-Math.PI/2;shadowFloor.position.y=-2.6;shadowFloor.receiveShadow=true;scene.add(shadowFloor);
-const tileGeo=new THREE.BoxGeometry(.963,.09,.963);
+const tileGeo=new THREE.BoxGeometry(1,1,1);
 const blockGeo=new THREE.BoxGeometry(.963,.25,.963);
 const markerGeo=new THREE.PlaneGeometry(.94,.94);
 const cellGeo=new THREE.PlaneGeometry(.98,.98);
@@ -126,14 +124,15 @@ const edgeMat=new THREE.LineBasicMaterial({color:'#8a9983',transparent:true,opac
 const blockEdgeMat=new THREE.LineBasicMaterial({color:'#627465',transparent:true,opacity:.4});
 const ghostMat=new THREE.MeshBasicMaterial({color:'#809984',transparent:true,opacity:.055,depthWrite:false,side:THREE.DoubleSide});
 const hitMaterial=new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false});
-const gridMaterial=new THREE.LineBasicMaterial({color:'#9cae98',transparent:true,opacity:.3});
+const gridMaterial=new THREE.LineBasicMaterial({color:'#b9bdbb',transparent:true,opacity:.8});
 const sharedGeometries=new Set([tileGeo,blockGeo,markerGeo,cellGeo,edgeGeo,blockEdgeGeo]);
 const sharedMaterials=new Set([...Object.values(materials),edgeMat,blockEdgeMat,ghostMat,gridMaterial,hitMaterial]);
 let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group();
 paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer);
 let hitCells=[], tileObjects=new Map();
+const visibility={coords:true,tiles:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
-function disposableClear(group) { for(const child of [...group.children]) { child.traverse(o=>{if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}}); group.remove(child); } }
+function disposableClear(group) { for(const child of [...group.children]) { child.traverse(o=>{if(o.userData.ownedTexture)o.userData.ownedTexture.dispose();if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}}); group.remove(child); } }
 
 function canvasTexture(draw,size=256) { const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t; }
 const foldTextures=Object.fromEntries(FOLDS.map(f=>[f,canvasTexture((ctx,s)=>{ctx.strokeStyle='#ffffff';ctx.lineWidth=8;ctx.setLineDash([18,13]);ctx.beginPath();const a=14,b=s-14,m=s/2;if(f==='h'){ctx.moveTo(a,m);ctx.lineTo(b,m)}if(f==='v'){ctx.moveTo(m,a);ctx.lineTo(m,b)}if(f==='d1'){ctx.moveTo(a,a);ctx.lineTo(b,b)}if(f==='d2'){ctx.moveTo(a,b);ctx.lineTo(b,a)}ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(m,m,5,0,Math.PI*2);ctx.fill();})]));
@@ -150,31 +149,47 @@ function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; 
 function renderPlayer() {playerGroup.position.set(wx(player.c),tileTop(player.r,player.c)+.018,wz(player.r));playerGroup.rotation.y=-player.dir*Math.PI/4;}
 
 function buildPaper() {
-  disposableClear(boardLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);clearSelection(); hitCells=[];tileObjects.clear();hovered=null;hoverOutline.visible=false;
-  const w=map.width,h=map.height;
-  const base=new THREE.Mesh(new THREE.BoxGeometry(w+.17,.11,h+.17),new THREE.MeshStandardMaterial({color:'#e7ecdd',roughness:1,flatShading:true}));base.position.y=-.035;base.castShadow=true;base.receiveShadow=true;boardLayer.add(base);
-  const lower=new THREE.Mesh(new THREE.BoxGeometry(w+.13,.035,h+.13),new THREE.MeshStandardMaterial({color:'#ccd5c2',roughness:1}));lower.position.set(.03,-.106,.015);lower.castShadow=true;boardLayer.add(lower);
-  // A triangular curled corner makes the floating surface read as a sheet of paper.
-  const cornerGeo=new THREE.BufferGeometry();const right=w/2+.086,near=h/2+.086;
-  cornerGeo.setAttribute('position',new THREE.Float32BufferAttribute([right,-.018,near,right,-.018,near-1.08,right+.45,.44,near+.15,right-.94,-.018,near,right,-.018,near,right+.45,.44,near+.15],3));cornerGeo.computeVertexNormals();
-  const corner=new THREE.Mesh(cornerGeo,new THREE.MeshStandardMaterial({color:'#eff1e5',side:THREE.DoubleSide,roughness:1,flatShading:true}));corner.castShadow=true;boardLayer.add(corner);
-  const crease=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(right,-.01,near-1.08),new THREE.Vector3(right+.45,.445,near+.15),new THREE.Vector3(right-.94,-.01,near)]),new THREE.LineBasicMaterial({color:'#b3c0a7'}));boardLayer.add(crease);
-  for(let r=0;r<h;r++)for(let c=0;c<w;c++){
-    const tile=map.tiles[r][c];
-    const hit=new THREE.Mesh(cellGeo,hitMaterial);hit.rotation.x=-Math.PI/2;hit.position.set(wx(c),.28,wz(r));hit.userData={r,c};hitCells.push(hit);gridLayer.add(hit);
-    if(!tile){const ghost=new THREE.Mesh(cellGeo,ghostMat);ghost.rotation.x=-Math.PI/2;ghost.position.set(wx(c),.026,wz(r));gridLayer.add(ghost);continue;}
-    const isBlocked=blocked(tile);const mesh=new THREE.Mesh(tileGeo,materials[tile.color]);mesh.scale.y=tileHeight(tile)/.09;mesh.position.set(wx(c),tileHeight(tile)/2,wz(r));mesh.castShadow=true;mesh.receiveShadow=true;
-    const edges=new THREE.LineSegments(edgeGeo,edgeMat);mesh.add(edges);tileLayer.add(mesh);tileObjects.set(r+','+c,mesh);
-    for(const direction of foldsOf(tile)){const decal=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:foldTextures[direction],color:isBlocked?'#e3edb9':'#4b6949',transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}));decal.rotation.x=-Math.PI/2;decal.position.set(wx(c),tileTop(r,c)+.007,wz(r));foldLayer.add(decal);}
+  disposableClear(boardLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);clearSelection();hitCells=[];tileObjects.clear();hovered=null;hoverOutline.visible=false;
+  const buckets=new Map(),axes=new Map(FOLDS.map(f=>[f,[]])),edges=[];let maxHeight=0;
+  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
+    const tile=map.tiles[r][c];if(!tile)continue;
+    const cell={r,c};if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);
+    const y=tileTop(r,c),x=wx(c),z=wz(r);maxHeight=Math.max(maxHeight,y);
+    for(const direction of foldsOf(tile))axes.get(direction).push(cell);
+    edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
   }
-  if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]){const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);}
-  const pts=[];for(let i=0;i<=w;i++)pts.push(new THREE.Vector3(i-w/2,.024,-h/2),new THREE.Vector3(i-w/2,.024,h/2));for(let i=0;i<=h;i++)pts.push(new THREE.Vector3(-w/2,.024,i-h/2),new THREE.Vector3(w/2,.024,i-h/2));
-  const grid=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),gridMaterial);grid.visible=showGrid;grid.userData.isGrid=true;gridLayer.add(grid);
-  addAxisLabels();renderPlayer();updateUI();
+  const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
+  for(const [color,cells] of buckets){
+    const mesh=new THREE.InstancedMesh(tileGeo,materials[color],cells.length);mesh.userData.cells=cells;
+    cells.forEach(({r,c},i)=>{const height=tileTop(r,c);position.set(wx(c),height/2,wz(r));scale.set(1,height,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
+    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();tileLayer.add(mesh);
+  }
+  for(const [direction,cells] of axes){
+    if(!cells.length)continue;
+    const material=new THREE.MeshBasicMaterial({map:foldTextures[direction],color:'#49664f',transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
+    const mesh=new THREE.InstancedMesh(markerGeo,material,cells.length);
+    const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
+    cells.forEach(({r,c},i)=>{position.set(wx(c),tileTop(r,c)+.007,wz(r));matrix.compose(position,tilt,new THREE.Vector3(1,1,1));mesh.setMatrixAt(i,matrix);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();foldLayer.add(mesh);
+  }
+  if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]){
+    const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);
+  }
+  const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
+  addAxisLabels(maxHeight);renderPlayer();applyVisibility();updateUI();
 }
-function addAxisLabels(){
-  const label=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:northTexture,transparent:true,depthWrite:false}));label.rotation.x=-Math.PI/2;label.position.set(-map.width/2-.7,-.04,-map.height/2+.6);boardLayer.add(label);
+function addAxisLabels(maxHeight){
+  const w=map.width,h=map.height,size=Math.min(4096,Math.max(w,h)*32+64);
+  const texture=canvasTexture((ctx,s)=>{
+    const sx=s/(w+2),sy=s/(h+2);ctx.fillStyle='#50665a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='500 '+Math.max(10,Math.min(sx,sy)*.42)+'px Segoe UI';
+    for(let c=0;c<w;c++){ctx.fillText(columnLabel(c),(c+1.5)*sx,.5*sy);ctx.fillText(columnLabel(c),(c+1.5)*sx,(h+1.5)*sy);}
+    for(let r=0;r<h;r++){ctx.fillText(String(r+1),.5*sx,(r+1.5)*sy);ctx.fillText(String(r+1),(w+1.5)*sx,(r+1.5)*sy);}
+  },size);
+  const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.03;label.userData.ownedTexture=texture;boardLayer.add(label);
 }
+function applyVisibility(){
+  const editing=mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=!editing||visibility.tiles;gridLayer.visible=showGrid&&(!editing||visibility.tiles);foldLayer.visible=!editing||visibility.folds;playerGroup.visible=!editing||visibility.player;
+}
+for(const [id,key] of [['coordsVisible','coords'],['tilesVisible','tiles'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();};
 
 function fitCamera(resetZoom=true) {
   controls.target.set(0,0,0);const distance=Math.max(24,Math.max(map.width,map.height)*2);cameraOffset.set(view==='top'?0:distance*.5,view==='top'?distance:distance*.71,view==='top'?.001:distance*.625);camera.position.copy(cameraOffset);camera.lookAt(controls.target);camera.updateMatrixWorld(true);
@@ -211,7 +226,7 @@ function setTool(next){pendingRegion=null;tool=next;drawEditSelection();document
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=color==='black'?'阻挡方块':'普通方块';if(tool!=='place')setTool('paint');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
-$('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);gridLayer.children.filter(o=>o.userData.isGrid).forEach(o=>o.visible=showGrid);};
+$('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();};
 function editAt(r,c){
   if(tool==='select'){editRect=rectangle({r,c},{r,c});drawEditSelection();return;}
   if(tool==='paste'){pasteAt(r,c);return;}
@@ -257,7 +272,7 @@ $('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegio
 function pasteAt(r,c){try{const result=pasteRegion(map,clipboard,r,c);record();map=result.map;editRect=result.rect;pendingRegion=null;tool='select';player={...map.spawn};buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
 function updateUI(){
-  const playing=mode==='play';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
+  applyVisibility();const playing=mode==='play';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
   const names={select:'左键拖拽框选 · 右键拖拽平移',paste:'点击粘贴落点',paint:'方块工具 · '+COLOR_NAMES[color]+' / 高度 '+brushHeight,place:'放置方块 · '+COLOR_NAMES[color],erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',exit:'设置出口'};if(!chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(player.r,player.c):names[tool];
@@ -289,7 +304,13 @@ function exportGameHtml(){
 $('exportGame').onclick=exportGameHtml;
 
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=null,lastClickTile=null,lastEditKey=null,dragEdited=false,multiTouch=false;const activePointers=new Set();
-function hitAt(clientX,clientY){const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);return raycaster.intersectObjects(hitCells,false)[0]?.object.userData??null;}
+function hitAt(clientX,clientY){
+  const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);
+  const surface=raycaster.intersectObjects(tileLayer.children,false)[0];
+  if(surface?.instanceId!==undefined)return surface.object.userData.cells[surface.instanceId];
+  const point=raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());if(!point)return null;
+  const local=paper.worldToLocal(point),c=Math.floor(local.x+map.width/2),r=Math.floor(local.z+map.height/2);return inside(r,c)?{r,c}:null;
+}
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);if(activePointers.size>1)multiTouch=true;pointerDown={x:e.clientX,y:e.clientY,button:e.button,pointerType:e.pointerType};lastEditKey=null;dragEdited=false;manualPan=e.button===2;renderer.domElement.setPointerCapture(e.pointerId);});
 renderer.domElement.addEventListener('pointermove',e=>{
@@ -317,14 +338,14 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 
 let renderedFrames=0;
 function syncState(){viewport.dataset.state=JSON.stringify({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view});}
-function screenPoints(){const b=renderer.domElement.getBoundingClientRect();const points={};for(const cell of hitCells){const {r,c}=cell.userData;const p=new THREE.Vector3(wx(c),.28+paper.position.y,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);viewport.dataset.frames=String(renderedFrames);}
-function tick(now){requestAnimationFrame(tick);controls.update();paper.position.y=Math.sin(now*.0006)*.025;
+function screenPoints(){viewport.dataset.frames=String(renderedFrames);}
+function tick(now){requestAnimationFrame(tick);controls.update();
   if(animation){const t=Math.min(1,(now-animation.start)/animation.duration),smooth=t*t*(3-2*t);if(animation.type==='teleport'){if(t<.5){playerGroup.position.copy(animation.from);playerGroup.scale.setScalar(Math.max(.03,1-t*2));}else{playerGroup.position.copy(animation.to);playerGroup.scale.setScalar(Math.max(.03,(t-.5)*2));}}else{playerGroup.position.lerpVectors(animation.from,animation.to,smooth);}playerGroup.rotation.y=-player.dir*Math.PI/4;if(t>=1){animation=null;moving=false;playerGroup.scale.setScalar(1);renderPlayer();updateUI();checkRunEnd();}}
-  $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();syncState();}
+  $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}
 }
 setupPrefabs();buildPaper();fitCamera();if(mode==='play')checkRunEnd();requestAnimationFrame(tick);
 // Read-only diagnostics support visual and interaction checks without bypassing the UI.
-window.foldField={getState:()=>clone({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,renderedFrames}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),.28+paper.position.y,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
+window.foldField={getState:()=>clone({map,player,mode,tool,color,foldType,steps,teleports,moving,legalMoves,chosenFold,view,renderedFrames}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),tileTop(r,c)+paper.position.y+.01,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
 
 function setupPrefabs(){
   let fingerprint='',loading=false;

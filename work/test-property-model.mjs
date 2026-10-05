@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {normalizePropertySchema,projectProperties,propertyAt,updateProperty,serializeMapConfiguration} from './core/property-model.mjs';
+import {normalizePropertySchema,projectProperties,propertyAt,updateProperty,serializeMapConfiguration,mergeSerializableProperties,debugChanges} from './core/property-model.mjs';
+import {DebugState} from './editor/debug-state.mjs';
 import {normalizePrefab,normalizeTile} from './tile-model.mjs';
 const schema={secret:{readable:false},debug:{serializable:false},locked:{tempEditable:false,children:{child:{tempEditable:true}}},list:{items:{children:{hidden:{serializable:false}}}}};
 const values={prefabId:'paper_ai',secret:2,debug:3,locked:{child:1},list:[{hidden:2,visible:['铜钥匙']}]};
@@ -11,6 +12,10 @@ assert.throws(()=>updateProperty(values,schema,['locked'],{child:2}),/不可编�
 assert.throws(()=>updateProperty(values,schema,['prefabId'],'other'),/不可编辑/);
 assert.throws(()=>updateProperty(values,schema,['secret'],5),/不可编辑/);
 const changed=updateProperty(values,schema,['debug'],8);assert.equal(changed.debug,8);assert.equal(values.debug,3);
+assert.equal(mergeSerializableProperties(values,changed,schema).debug,3);
+const debug=new DebugState();for(const change of debugChanges(values,changed,schema))debug.set('cell',change.path,change.value);
+assert.equal(debug.values('cell',values,schema).debug,8);assert.equal(values.debug,3);
+debug.clear();assert.equal(debug.values('cell',values,schema).debug,3);
 assert.throws(()=>normalizePropertySchema({height:{readable:'yes'}}),/布尔/);
 const prefab=normalizePrefab({version:1,id:'test_ai',name:'测试',tile:{height:1,properties:{nested:[[1]],debug:3}},propertySchema:{properties:{children:{debug:{serializable:false}}}}});
 const tile=normalizeTile(JSON.parse(JSON.stringify(prefab.tile)));assert.deepEqual(tile.properties.nested,[[1]]);

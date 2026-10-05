@@ -16,7 +16,9 @@ import {inspectCell} from './entities/cell-entity.mjs';
 import {EventBus} from './core/event-bus.mjs';
 import {normalizeTagPrefab,assertTagAttachment} from './tags/tag-model.mjs';
 import {assertHiddenContentUnchanged} from './editor/visibility-policy.mjs';
-import {projectProperties,serializeMapConfiguration} from './core/property-model.mjs';
+import {projectProperties,serializeMapConfiguration,updateProperty,mergeSerializableProperties,debugChanges} from './core/property-model.mjs';
+import {DebugState} from './editor/debug-state.mjs';
+import {renderPropertyInspector} from './ui/property-inspector.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -52,12 +54,15 @@ let hovered=null,showGrid=true;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectedCells=[],selectionBase=[],hiddenRegions=new Set();
 let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, gestureBefore=null;
+let inspectedCell=null;
+let inspectionFrame=0;
+const debugOverrides=new DebugState();
 const editorBus=new EventBus();
 const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer);$('saveState').textContent='保存中';saveTimer=setTimeout(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(serializeMapConfiguration(map)));$('saveState').textContent='本地已保存';}catch{$('saveState').textContent='仅当前会话';}},120);});
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();clearInspection();},getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -253,7 +258,7 @@ document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.da
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
 function editAt(r,c){
   if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
-  if(tool==='inspect'){try{const entity=inspectCell(map,r,c,cellHidden);$('inspectedEntity').textContent=coord(r,c)+' · '+(entity.name||prefabs.find(p=>p.id===entity.prefabId)?.name||entity.prefabId);$('inspectedProperties').textContent=JSON.stringify(entity.properties?projectProperties(entity.properties,entity.properties.propertySchema??{},'readable'):{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds},null,2);}catch(error){toast(error.message,true);}return;}
+  if(tool==='inspect'){try{inspectAtCell(r,c);}catch(error){toast(error.message,true);}return;}
   if(tool==='select'){selectedCells=map.tiles[r][c]?[{r,c}]:[];editRect=selectedCells.length?rectangle({r,c},{r,c}):null;drawEditSelection();syncState();return;}
   if(['player','entry','region-exit','clear-tags'].includes(tool)){
     try{
@@ -283,6 +288,42 @@ function editAt(r,c){
   if(tool==='erase'){try{const cells=removeEntity(map,r,c,cellHidden);if(!visibility.player&&cells.some(p=>Object.keys(map.tiles[p.r][p.c]?.tags??{}).length))throw new Error('删除实体会改变隐藏标签');if(cells.some(p=>map.tiles[p.r][p.c]?.tags?.spawn))throw new Error('先移动玩家起点标签');record();for(const p of cells){const tile=map.tiles[p.r][p.c];map.foldCells.push(...foldsOf(tile).map(type=>({...p,type})));map.tiles[p.r][p.c]=null;}buildPaper();persist();}catch(e){toast(e.message,true);}return;}
   record();if(tool==='paint')map.tiles[r][c]={...painted,regionTag:t.regionTag,tags:t.tags,instance:t.instance};
   buildPaper();persist();updateUI();
+}
+
+function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;$('propertyInspector').replaceChildren();$('inspectedEntity').textContent='点击地图上的实体或虚空进行检视';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';}
+function scheduleInspection(){if(!inspectedCell)return;cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;if(inspectedCell){try{inspectAtCell(inspectedCell.r,inspectedCell.c);}catch{clearInspection();}}});}
+function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
+function inspectAtCell(r,c){
+  const entity=inspectCell(map,r,c,cellHidden);inspectedCell={r,c};
+  $('inspectedEntity').textContent=coord(r,c)+' · '+(entity.name||prefabs.find(p=>p.id===entity.prefabId)?.name||entity.prefabId);
+  const values=entity.properties??{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds};
+  const schema=entity.properties?.propertySchema??(entity.properties?{}:Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}])));
+  const effective=entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values;
+  $('inspectedProperties').textContent=JSON.stringify(projectProperties(effective,schema,'readable'),null,2);
+  renderPropertyInspector($('propertyInspector'),effective,schema,applyInspectedProperty,error=>toast(error.message,true));
+}
+function applyInspectedProperty(path,value){
+  if(P.mode!=='edit'||!inspectedCell)throw new Error('请先在编辑模式检视实体');
+  const {r,c}=inspectedCell;if(cellHidden(r,c))throw new Error('隐藏实体禁止编辑');
+  const tile=map.tiles[r]?.[c];if(!tile)throw new Error('虚空实体属性只读');
+  const schema=tile.propertySchema??{},key=inspectionKey(r,c,tile),source=debugOverrides.values(key,tile,schema);
+  const edited=updateProperty(source,schema,path,value),merged=mergeSerializableProperties(tile,edited,schema);
+  if((merged.tags?.spawn||merged.tags?.entry)&&(blocked(merged)||merged.terrain==='campfire'))throw new Error('起点或入口不能设为不可通行');
+  if(JSON.stringify(merged)!==JSON.stringify(tile)){
+    let next=clone(map);next.tiles[r][c]=normalizeTile(merged);
+    if(path[0]==='keyName'){next=renameKeyCells(map,[{r,c}],merged.keyName,cellHidden);next.tiles[r][c]=normalizeTile(merged);}
+    if(path[0]==='regionTag'){assertTagAttachment(tagCatalog,'tag-region',map,r,c);next=assignRegion(map,[{r,c}],merged.regionTag,regionNames(map).includes(merged.regionTag));}
+    if(path[0]==='tags'){
+      const tag=path[1];if(['spawn','entry','exitTo'].includes(tag)&&merged.tags[tag]){assertTagAttachment(tagCatalog,tag==='spawn'?'tag-spawn':tag==='entry'?'tag-entry':'tag-exit',map,r,c);tagCell(next,r,c,tag,merged.tags[tag]);}
+      const errors=validateRegions(next).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
+    }
+    if(path[0]==='folds'||path[0]==='fold')assertTagAttachment(tagCatalog,'tag-fold',map,r,c);
+    assertHiddenContentUnchanged(map,next,visibility);
+    for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)if(cellHidden(y,x)&&JSON.stringify(map.tiles[y][x])!==JSON.stringify(next.tiles[y][x]))throw new Error('不能改写隐藏实体的引用');
+    next=validateMap(next,true);record();map=next;controller.resetPosition();buildPaper();persist();
+  }
+  for(const change of debugChanges(source,edited,schema))debugOverrides.set(key,change.path,change.value);
+  $('propertyEditStatus').textContent='属性已应用 · 可序列化配置随地图保存，其他值仅当前调试';updateUI();scheduleInspection();
 }
 
 document.querySelectorAll('.rotate-left').forEach(b=>b.onclick=()=>turn(-1));document.querySelectorAll('.rotate-right').forEach(b=>b.onclick=()=>turn(1));
@@ -324,10 +365,11 @@ function updateUI(){
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}folds+=(map.foldCells??[]).length;$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';
   $('undoBtn').disabled=!currentHistory().length||P.moving;$('restartBtn').disabled=!playing||P.moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=P.moving);$('teleportBtn').disabled=P.moving||!P.chosenFold||!foldTarget(P.chosenFold).valid;
   $('redoBtn').disabled=P.mode!=='edit'||!redoHistory.length||P.moving;drawEditSelection();
+  scheduleInspection();
   syncState();
 }
 
-function replaceMap(next,save=true){record();editRect=null;selectedCells=[];pendingRegion=null;hiddenRegions.clear();map=validateMap(next,true);controller.resetPosition();controller.resetProgress();buildPaper();fitCamera();if(save)persist();updateUI();}
+function replaceMap(next,save=true){record();debugOverrides.clear();clearInspection();editRect=null;selectedCells=[];pendingRegion=null;hiddenRegions.clear();map=validateMap(next,true);controller.resetPosition();controller.resetProgress();buildPaper();fitCamera();if(save)persist();updateUI();}
 let renaming=false;
 $('mapName').oninput=()=>{if(!renaming){editHistory.push(editSnapshot());trimHistory(editHistory);redoHistory=[];renaming=true;}map.name=normalizeMapName($('mapName').value);persist();updateUI();};
 $('mapName').onblur=()=>{renaming=false;$('mapName').value=map.name;};

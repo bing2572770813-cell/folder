@@ -1,6 +1,6 @@
 import {copyJson} from './json-value.mjs';
 const flags=['readable','serializable','tempEditable'];
-export const identityFields=new Set(['prefabId','instance','kind','terrain','propertySchema']);
+export const identityFields=new Set(['prefabId','instance','kind','terrain','propertySchema','fold']);
 export function normalizePropertySchema(schema={},depth=0){
   if(depth>16||!schema||typeof schema!=='object'||Array.isArray(schema))throw new Error('属性描述须为嵌套对象');
   const result={};
@@ -54,4 +54,19 @@ export function serializeMapConfiguration(map){
     for(const key of identityFields)if(Object.hasOwn(tile,key))result[key]=copyJson(tile[key]);
     return result;
   }));return next;
+}
+export function mergeSerializableProperties(before,after,schema={}){
+  const walk=(old,value,definition,parent)=>{
+    const permissions=fieldPermissions(definition,parent);if(!permissions.serializable)return old===undefined?undefined:copyJson(old);
+    if(value===undefined)return undefined;
+    if(Array.isArray(value))return value.map((item,index)=>walk(old?.[index],item,definition.items??{},permissions));
+    if(value&&typeof value==='object'){const result={};for(const key of new Set([...Object.keys(old??{}),...Object.keys(value)])){const item=walk(old?.[key],value[key],definition.children?.[key]??{},permissions);if(item!==undefined)Object.defineProperty(result,key,{value:item,enumerable:true,writable:true});}return result;}
+    return copyJson(value);
+  };
+  const result={};for(const key of new Set([...Object.keys(before),...Object.keys(after)])){const value=identityFields.has(key)?copyJson(before[key]):walk(before[key],after[key],schema[key]??{},{readable:true,serializable:true,tempEditable:true});if(value!==undefined)Object.defineProperty(result,key,{value,enumerable:true,writable:true});}return result;
+}
+export function debugChanges(before,after,schema={}){
+  const changes=[];
+  const walk=(old,value,definition,parent,path)=>{const permissions=fieldPermissions(definition,parent);if(JSON.stringify(old)===JSON.stringify(value))return;if(!permissions.serializable){if(value!==undefined)changes.push({path,value:copyJson(value)});return;}if(value&&typeof value==='object'){for(const [key,item] of Object.entries(value))walk(old?.[key],item,Array.isArray(value)?definition.items??{}:definition.children?.[key]??{},permissions,[...path,Array.isArray(value)?Number(key):key]);}};
+  for(const [key,value] of Object.entries(after))walk(before[key],value,schema[key]??{},{readable:true,serializable:true,tempEditable:true},[key]);return changes;
 }

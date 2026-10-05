@@ -13,6 +13,7 @@ import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } 
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
 import {mountEditorTabs} from './ui/editor-tabs.mjs';
 import {inspectCell} from './entities/cell-entity.mjs';
+import {EventBus} from './core/event-bus.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -47,6 +48,9 @@ let hovered=null,showGrid=true;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectedCells=[],selectionBase=[],hiddenRegions=new Set();
 let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, gestureBefore=null;
+const editorBus=new EventBus();
+const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer);$('saveState').textContent='保存中';saveTimer=setTimeout(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(map));$('saveState').textContent='本地已保存';}catch{$('saveState').textContent='仅当前会话';}},120);});
+window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
 const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
@@ -81,7 +85,7 @@ function validateMap(data,allowDraft=false) {
 
 
 
-function persist() { clearTimeout(saveTimer); $('saveState').textContent='保存中'; saveTimer=setTimeout(() => { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(map)); $('saveState').textContent='本地已保存'; } catch { $('saveState').textContent='仅当前会话'; } },120); }
+function persist() {for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
 function editSnapshot(){return createEditSnapshot(map,editRect,selectedCells);}
@@ -488,4 +492,3 @@ $('hideAllEntities').onclick=()=>{for(const prefab of entityChoices(prefabs,map)
 $('foldHintsToggle').onclick=()=>controller.setFoldHints(!P.foldHints);
 
 $('freeTeleportToggle').onclick=()=>controller.setFreeTeleport(!P.freeTeleport);
-

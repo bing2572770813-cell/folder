@@ -9,3 +9,5 @@
 尚待实施：虚空检视工具、实体/标签行为注册、tag prefab 加载与附着合同、属性权限/嵌套 Inspector、序列化投影、EventBus 和剩余编辑/渲染适配拆分。具体新增叠层、属性权限默认与调试重置规则仍需确认。未提交用户的 player token 修改或 paper_render.md。
 
 后续：虚空只读检视工具已接入，浏览器点击 A1 透明空格显示“虚空”，展开后显示 transparent=true、placeable=false、blocked=true 和折线。截图为 outputs/void-inspector-verification.png；独立检视、隐藏/范围保护与旧 null/foldCells 合同通过新增测试，全部 15 个套件通过。属性权限默认与调试生命周期已获用户确认，但通用属性系统尚未接入。
+
+EventBus 已通过 map:changed 通知连接既有防抖保存，不改玩家动作或保存数据范围。浏览器修改地图名后显示“本地已保存”，再用编辑撤销恢复原名称；事件取消、订阅变更、异常隔离与清理通过测试，全部 16 个套件通过。

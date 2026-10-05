@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {EventBus} from './core/event-bus.mjs';
+const bus=new EventBus(),received=[];
+const stop=bus.on('map:changed',payload=>received.push(payload));
+const payload={map:{name:'关卡'}};assert.deepEqual(bus.emit('map:changed',payload),[]);assert.equal(received[0],payload);
+stop();stop();bus.emit('map:changed',{});assert.equal(received.length,1);
+let later=0,remove;
+bus.on('change',()=>remove());remove=bus.on('change',()=>later++);bus.emit('change',{});assert.equal(later,0);
+const error=new Error('test');bus.on('failure',()=>{throw error;});bus.on('failure',()=>later++);
+assert.deepEqual(bus.emit('failure'),[error]);assert.equal(later,1);
+let added=false,count=0;bus.on('new',()=>{if(!added){added=true;bus.on('new',()=>count++);}});
+bus.emit('new');assert.equal(count,0);bus.emit('new');assert.equal(count,1);
+bus.clear();bus.emit('new');assert.equal(count,1);assert.throws(()=>bus.on('',()=>{}));
+console.log('PASS: notification unsubscribe/clear, mutation-safe dispatch, deferred subscription and listener failure isolation.');

@@ -1,5 +1,5 @@
 import {fieldPermissions,identityFields} from '../core/property-model.mjs';
-export function renderPropertyInspector(container,values,schema,onChange,onError=()=>{}){
+export function renderPropertyInspector(container,values,schema,onChange,onError=()=>{},mixed=new Set()){
   const focused=container.contains(document.activeElement)?document.activeElement.getAttribute('aria-label'):null;
   const expanded=new Set([...container.querySelectorAll('details[open]')].map(node=>node.dataset.path));
   container.replaceChildren();
@@ -17,8 +17,9 @@ export function renderPropertyInspector(container,values,schema,onChange,onError
     if(typeof value==='boolean'){input.type='checkbox';input.checked=value;}
     else if(typeof value==='number'){input.type='number';input.step='any';input.value=String(value);}
     else input.value=Array.isArray(value)||value===null?JSON.stringify(value):String(value);
-    input.onchange=()=>{try{const next=typeof value==='boolean'?input.checked:typeof value==='number'?Number(input.value):Array.isArray(value)||value===null?JSON.parse(input.value):input.value;onChange(path,next);input.removeAttribute('aria-invalid');}catch(error){input.setAttribute('aria-invalid','true');status.textContent=error.message;onError(error);}};
-    const status=document.createElement('small');status.textContent=!access.tempEditable?'只读':access.serializable?'地图配置 · 随地图保存':'临时调试 · 不保存';label.append(input,status);parent.append(label);
+    const isMixed=mixed.has(JSON.stringify(path));if(isMixed){if(typeof value==='boolean')input.indeterminate=true;else{input.value='';input.placeholder='多个不同值';}}
+    input.onchange=()=>{try{if(isMixed&&input.type==='number'&&input.value==='')throw new Error('请输入批量修改值');const next=typeof value==='boolean'?input.checked:typeof value==='number'?Number(input.value):Array.isArray(value)||value===null?JSON.parse(input.value):input.value;onChange(path,next);input.removeAttribute('aria-invalid');}catch(error){input.setAttribute('aria-invalid','true');status.textContent=error.message;onError(error);}};
+    const status=document.createElement('small');status.textContent=!access.tempEditable?'只读':access.serializable?'地图配置 · 随地图保存':'临时调试 · 不保存';if(isMixed)status.textContent='多个不同值 · '+status.textContent;label.append(input,status);parent.append(label);
   }
   for(const [name,value] of Object.entries(values))render(container,value,schema[name]??{},[name],{readable:true,serializable:true,tempEditable:true});
   if(focused)[...container.querySelectorAll('input,textarea')].find(input=>input.getAttribute('aria-label')===focused)?.focus({preventScroll:true});

@@ -6,9 +6,10 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   if(root.dataset.tabLayout!=='v1'){
   const find = id => root.querySelector('#' + id);
   const selection = find('copyRegion').closest('details');
+  const selectTool = selection.querySelector('[data-tool="select"]');
   const layers = find('entityVisibility').closest('.studio-section');
   const block = find('prefabGrid').closest('section');
-  const tools = root.querySelector('[data-tool="paint"]').closest('section');
+  const tools = root.querySelector('[data-tool="place"]').closest('section');
   const fold = root.querySelector('[data-fold="h"]').closest('section');
   const facing = find('facingLabel').closest('section');
   const dimensions = find('mapWidth').closest('section');
@@ -20,11 +21,16 @@ export function mountEditorTabs(root, {onActivate = () => {}} = {}) {
   const selectionTools = document.createElement('section');selectionTools.className='section';
   const selectionTitle = document.createElement('h2');selectionTitle.className='section-label';selectionTitle.textContent='选区与剪贴板';
   selectionTools.append(selectionTitle, selection.querySelector('.studio-tools'));
+  tools.querySelector('.tool-grid').append(selectTool);
+  selectTool.classList.add('tool-btn');
+  selectTool.setAttribute('aria-label','选区');
+  selectTool.dataset.tip='选区';
+  const selectionModeLabel=document.createElement('span');selectionModeLabel.className='selection-mode-label';selectionModeLabel.textContent='选区 · 单选';selectTool.append(selectionModeLabel);
   selection.querySelector('summary').textContent='区域标签';
   selectionTools.append(selection);
-  block.querySelector('h2').textContent='实例属性与标签';
-  panels.get('map').append(tools, selectorSection, selectionTools, fold);
-  panels.get('inspect').append(block, facing);
+  block.querySelector('h2').textContent='放置参数与标签';
+  panels.get('map').append(tools, selectorSection, block, selectionTools, fold);
+  panels.get('inspect').append(facing);
   panels.get('properties').append(dimensions);
   panels.get('layers').append(layers);
   layers.open=true;

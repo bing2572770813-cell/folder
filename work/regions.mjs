@@ -1,9 +1,10 @@
 export const DEFAULT_REGION='默认区域';
 export const regionOf=tile=>tile?.regionTag??DEFAULT_REGION;
 export function migrateRegions(map){
+ const legacy=!map.tiles.flat().some(t=>t&&(t.regionTag!==undefined||t.tags!==undefined));
  for(const row of map.tiles)for(const tile of row)if(tile)tile.regionTag??=DEFAULT_REGION;
  const tagged=map.tiles.flat().some(t=>t?.tags?.spawn);
- if(!tagged&&map.spawn&&map.tiles[map.spawn.r]?.[map.spawn.c])map.tiles[map.spawn.r][map.spawn.c].tags={...map.tiles[map.spawn.r][map.spawn.c].tags,spawn:true};
+ if(!tagged&&legacy&&map.spawn&&map.tiles[map.spawn.r]?.[map.spawn.c])map.tiles[map.spawn.r][map.spawn.c].tags={...map.tiles[map.spawn.r][map.spawn.c].tags,spawn:true};
  return map;
 }
 export function regionNames(map){return [...new Set(map.tiles.flat().filter(Boolean).map(regionOf))].sort();}
@@ -19,11 +20,16 @@ export function validateRegions(map){
 }
 export function assignRegion(map,cells,name){
  name=name.trim();if(!name||name.length>80)throw new Error('区域名称须为 1–80 字');if(regionNames(map).includes(name))throw new Error('区域名称已存在');
- const next=JSON.parse(JSON.stringify(map));for(const p of cells)if(next.tiles[p.r]?.[p.c])next.tiles[p.r][p.c].regionTag=name;
+ const next=JSON.parse(JSON.stringify(map)),oldNames=new Set();let count=0;for(const p of cells)if(next.tiles[p.r]?.[p.c]){oldNames.add(regionOf(next.tiles[p.r][p.c]));next.tiles[p.r][p.c].regionTag=name;count++;}
+ if(!count)throw new Error('选区中没有可设置标签的方块');
+ const remaining=new Set(regionNames(next));for(const p of taggedCells(next,'exitTo'))if(oldNames.has(p.tile.tags.exitTo)&&!remaining.has(p.tile.tags.exitTo))p.tile.tags.exitTo=name;
+ const conflicts=validateRegions(next).filter(e=>e.startsWith('区域入口不能')||e.startsWith('区域只能'));if(conflicts.length)throw new Error(conflicts.join('；'));
  return next;
 }
 export function tagCell(map,r,c,tag,value){
  const tile=map.tiles[r]?.[c];if(!tile)throw new Error('标签需要已有方块');
+ if(!['spawn','entry','exitTo'].includes(tag))throw new Error('未知方块标签');
+ if(tag==='exitTo'&&(!regionNames(map).includes(value)||!value))throw new Error('跳转区域不存在');
  const name=regionOf(tile);if(tag==='spawn'&&taggedCells(map,'entry').some(p=>regionOf(p.tile)===name)||tag==='entry'&&taggedCells(map,'spawn').some(p=>regionOf(p.tile)===name))throw new Error('同一区域不能同时包含玩家起点与区域入口');
  if(tag==='spawn')for(const p of taggedCells(map,'spawn'))delete p.tile.tags.spawn;
  if(tag==='entry')for(const p of taggedCells(map,'entry'))if(regionOf(p.tile)===name)delete p.tile.tags.entry;

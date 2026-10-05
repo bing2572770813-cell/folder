@@ -9,3 +9,11 @@ assert.throws(()=>placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===1&&c===1));a
 const next=assignRegion(map,[{r:0,c:0},{r:1,c:0}],'next');assert.throws(()=>assignRegion(next,[],'next'));tagCell(next,0,0,'entry',true);tagCell(next,4,4,'exitTo','next');assert.deepEqual(validateRegions(next),[]);assert.throws(()=>tagCell(next,1,0,'spawn',true));
 assert.throws(()=>normalizePrefab({...prefab,occupied:[true]}));
 console.log('PASS: footprints, holes, atomic hidden-cell rejection, duplicate region names and spawn/entry exclusion.');
+const voidMap=structuredClone(map);voidMap.tiles[0][0]=null;voidMap.foldCells=[{r:0,c:0,type:'h'}];
+const placed=placeEntity(voidMap,prefab,prefab.tile,0,0);assert.deepEqual(placed.map.tiles[0][0].folds,['h']);assert.equal(placed.map.foldCells.length,0);
+assert.equal(voidMap.tiles[0][0],null);
+const hiddenHole=placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===0&&c===1);assert.equal(hiddenHole.map.tiles[0][1].instance,undefined);
+const noStart=structuredClone(map);delete noStart.tiles[4][4].tags.spawn;migrateRegions(noStart);assert.equal(noStart.tiles[4][4].tags.spawn,undefined);
+const renamed=assignRegion(next,[{r:0,c:0},{r:1,c:0}],'renamed');assert.equal(renamed.tiles[4][4].tags.exitTo,'renamed');
+assert.throws(()=>assignRegion(next,[{r:0,c:0},{r:4,c:4}],'mixed'),/共存/);
+console.log('PASS: folds survive placement, hidden mask holes remain untouched, cleared starts stay cleared and region renames preserve exits.');

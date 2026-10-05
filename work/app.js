@@ -10,6 +10,7 @@ import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRe
 import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
+import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './special-terrain.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -80,8 +81,7 @@ function validateMap(data,allowDraft=false) {
 function persist() { clearTimeout(saveTimer); $('saveState').textContent='保存中'; saveTimer=setTimeout(() => { try { localStorage.setItem(STORAGE_KEY,JSON.stringify(map)); $('saveState').textContent='本地已保存'; } catch { $('saveState').textContent='仅当前会话'; } },120); }
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
-function trimHistory(history){let cells=history.reduce((total,item)=>total+(item.map?item.map.width*item.map.height:1),0);while(history.length>150||(history.length>1&&cells>100000)){const first=history.shift();cells-=first.map?first.map.width*first.map.height:1;}}
-function editSnapshot(){return {map:clone(map),rect:editRect?{...editRect}:null,selectedCells:clone(selectedCells)};}
+function editSnapshot(){return createEditSnapshot(map,editRect,selectedCells);}
 function record() {if(P.mode==='play'){controller.recordPlay();updateUI();return;}if(gestureBefore)return;editHistory.push(editSnapshot());redoHistory=[];trimHistory(editHistory);updateUI();}
 function finishGesture(){if(!gestureBefore)return;const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(map)){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
 

@@ -6,3 +6,4 @@
 - Keep unrelated changes out of each commit and use messages describing the concrete change.
 - Run checks appropriate to each change before committing.
 - Push when the user requests it.
+- Unless the user explicitly requests a separate documentation commit, include related documentation updates in the corresponding feature or fix commit; do not add a standalone documentation follow-up commit.

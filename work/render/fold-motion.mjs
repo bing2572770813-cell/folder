@@ -109,7 +109,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
         const indices = Array.from({ length: primitive }, (_, j) =>
           index ? index.getX(i + j) : i + j,
         );
-        const cell = object.userData.triangleCells?.[i / 3];
+        const cell = object.userData.triangleCells?.[i / primitive];
         const x = indices.reduce((n, k) => n + position.getX(k), 0) / primitive,
           z = indices.reduce((n, k) => n + position.getZ(k), 0) / primitive;
         const key = cell

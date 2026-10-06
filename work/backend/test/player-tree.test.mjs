@@ -41,6 +41,17 @@ test('stacked fire and named keys apply once, undo restores runtime, restart iso
  f.move(1,1);f.controller.restart();assert.deepEqual(f.state.terrainState.collectedKeys,[]);assert.deepEqual(f.world.snapshotRuntime(),{});assert.equal(f.state.terrainState.actions,0);
 });
 
+test('lift runtime follows the player without counting movement or terrain actions',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,durationMs:1000}}]]);
+ assert.equal(f.world.runtime('lift','lift').height,.1);
+ f.controller.tick(0);f.controller.tick(500);assert.ok(f.map.tiles[1][1].height>.1);
+ const before=f.state.terrainState.actions;f.move(1,1);f.controller.updateLifts(501);
+ assert.equal(f.state.terrainState.actions,before+1);
+ const occupied=f.world.runtime('lift','lift');assert.equal(occupied.occupied,true);assert.equal(occupied.direction,-1);
+ f.world.setRuntime('lift','lift',{height:.5,direction:1,occupied:true,lastTime:0});f.controller.updateLifts(1);assert.ok(f.map.tiles[1][1].height<.5);
+ f.controller.restart();assert.equal(f.map.tiles[1][1].height,.1);assert.equal(f.world.runtime('lift','lift').height,.1);
+});
+
 test('stacked collision rejects movement atomically before leave, hazards or history',()=>{
  const f=fixture([['key',1,1,{key:{name:'铜'}}],['fire',1,1,{fire:{}}],['wall',1,1,{collision:{blocked:true}}]]);
  f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5}})}});f.add('departure',1,0,{departure:{}});

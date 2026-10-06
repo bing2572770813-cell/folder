@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "id": "lift_paper_ai",
+  "name": "升降纸张方块",
+  "tile": {
+    "color": "white",
+    "edgeColor": "#adada9",
+    "height": 0.09,
+    "thickness": 0.09,
+    "gradualRate": 0.6666666666666666,
+    "blocked": false,
+    "folds": [],
+    "lift": {
+      "minHeight": 0.09,
+      "maxHeight": 0.75,
+      "initialHeight": 0.09,
+      "durationMs": 1800
+    }
+  },
+  "components": {
+    "lift": {
+      "minHeight": 0.09,
+      "maxHeight": 0.75,
+      "initialHeight": 0.09,
+      "durationMs": 1800
+    }
+  },
+  "propertySchema": {
+    "minHeight": {"label": "最低高度", "tempEditable": true},
+    "maxHeight": {"label": "最高高度", "tempEditable": true},
+    "initialHeight": {"label": "初始高度", "tempEditable": true},
+    "durationMs": {"label": "升降时长（毫秒）", "tempEditable": true},
+    "components": {"children": {"lift": {"children": {
+      "minHeight": {"label": "最低高度", "tempEditable": true},
+      "maxHeight": {"label": "最高高度", "tempEditable": true},
+      "initialHeight": {"label": "初始高度", "tempEditable": true},
+      "durationMs": {"label": "升降时长（毫秒）", "tempEditable": true}
+    }}}}
+  }
+}

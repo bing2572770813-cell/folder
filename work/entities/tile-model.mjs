@@ -5,6 +5,15 @@ export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black']
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
 export const TERRAIN_TYPES=['campfire','ice','fire','eruption','key'];
+function normalizeLift(value){
+ if(value===undefined)return undefined;
+ if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('升降配置无效');
+ const keys=['minHeight','maxHeight','initialHeight','durationMs'];
+ if(keys.some(key=>typeof value[key]!=='number'||!Number.isFinite(value[key])))throw new Error('升降配置无效');
+ if(value.minHeight<.01||value.maxHeight>16||value.minHeight>value.maxHeight)throw new Error('升降高度范围无效');
+ if(value.initialHeight<value.minHeight||value.initialHeight>value.maxHeight||value.durationMs<=0)throw new Error('升降初始高度或时长无效');
+ return Object.fromEntries(keys.map(key=>[key,value[key]]));
+}
 function copyTerrainConfig(value,depth=0) {
   if(depth>16)throw new Error('机制参数嵌套过深');
   if(value===null||typeof value==='string'||typeof value==='boolean')return value;
@@ -51,7 +60,8 @@ export function normalizeTile(tile) {
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
   const propertyExtras={...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
-  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  const lift=normalizeLift(tile.lift);
+  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(lift?{lift}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||(!data.tile&&!data.components))throw new Error('实体需要 version:1、id、name 和 tile 或 components');

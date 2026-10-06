@@ -53,6 +53,14 @@ export function defaultComponents():ComponentRegistry {
     for(const [key,min,max] of [['height',.01,16],['thickness',.001,16],['gradualRate',0,100]] as const){const value=config[key];if(value!==undefined&&(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max))throw new Error('Invalid surface '+key);}
     if(config.color!==undefined&&!['white','red','yellow','blue','green','purple','black'].includes(String(config.color)))throw new Error('Invalid surface color');
   }});
+  registry.register('lift',{validate:config=>{
+    const values=['minHeight','maxHeight','initialHeight','durationMs'];
+    for(const key of values){const value=config[key];if(typeof value!=='number'||!Number.isFinite(value))throw new Error('Invalid lift '+key);}
+    const min=Number(config.minHeight),max=Number(config.maxHeight),initial=Number(config.initialHeight),duration=Number(config.durationMs);
+    if(min<.01||max>16||min>max)throw new Error('Invalid lift height range');
+    if(initial<min||initial>max)throw new Error('Invalid lift initialHeight');
+    if(duration<=0)throw new Error('Invalid lift durationMs');
+  }});
   registry.register('fold',{validate:config=>{if(config.directions!==undefined&&(!Array.isArray(config.directions)||config.directions.some(value=>!['h','v','d1','d2'].includes(String(value)))))throw new Error('Invalid fold directions');}});
   registry.register('tag',{});
   registry.register('collision',{validate:config=>{if(config.blocked!==undefined&&typeof config.blocked!=='boolean')throw new Error('Invalid collision blocked');},canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});

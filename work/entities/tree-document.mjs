@@ -17,6 +17,7 @@ function mergedTags(nodes){
 }
 function tileOf(node){
   const tile={...copy(node.configuration??{}),...copy(node.components.surface??{}),prefabId:node.configuration?.prefabId??node.prefabId,tags:copy(node.tags)};
+  if(node.components.lift)tile.lift=copy(node.components.lift);
   delete tile.regionTag;
   tile.blocked=node.components.collision?.blocked??false;
   delete tile.terrain;delete tile.terrainConfig;delete tile.keyName;
@@ -29,6 +30,7 @@ function configure(node,tile,folds,previous){
   node.configuration=configuration;node.tags=copy(tile.tags??{});
   // Preserve absent native defaults when only unrelated legacy fields changed.
   for(const field of ['height','thickness','gradualRate','color','edgeColor'])if(!equal(previous[field],tile[field])){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
+  if(!equal(previous.lift,tile.lift)){if(tile.lift)node.components.lift=copy(tile.lift);else delete node.components.lift;}
   if(!equal(previous.blocked,tile.blocked))node.components.collision={...node.components.collision,blocked:tile.blocked};
   const represented=terrainIds.find(id=>node.components[id]);if(represented&&represented!==tile.terrain)delete node.components[represented];
   if(tile.terrain&&(!equal(previous.terrain,tile.terrain)||!equal(previous.terrainConfig,tile.terrainConfig)||!equal(previous.keyName,tile.keyName)))node.components[tile.terrain]={...copy(tile.terrainConfig??{}),...(tile.terrain==='key'?{name:tile.keyName}:{} )};

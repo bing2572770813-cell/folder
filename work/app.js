@@ -13,14 +13,14 @@ import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {inspectionCells,batchProperties} from './editor/batch-inspection.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
-import {mountEditorTabs} from './ui/editor-tabs.mjs';
 import {inspectCell} from './entities/cell-entity.mjs';
 import {EventBus} from './core/event-bus.mjs';
 import {normalizeTagPrefab,assertTagAttachment,entityPropertySchema} from './tags/tag-model.mjs';
 import {assertHiddenContentUnchanged} from './editor/visibility-policy.mjs';
 import {projectProperties,serializeMapConfiguration,updateProperty,mergeSerializableProperties,debugChanges} from './core/property-model.mjs';
 import {DebugState} from './editor/debug-state.mjs';
-import {renderPropertyInspector} from './ui/property-inspector.mjs';
+import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderMechanismText} from './ui/react/catalogs.jsx';
+import {renderPropertyInspector,clearPropertyInspector} from './ui/property-inspector.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -35,7 +35,9 @@ for (const node of document.querySelectorAll('[data-lucide]')) {
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
 const $ = id => document.getElementById(id);
-const editorTabs = mountEditorTabs($('editPanel'),{onActivate:name=>{if(name==='inspect'){setTool('select');scheduleInspection();}}});
+const onEditorTab=event=>{if(event.detail==='inspect'){setTool('select');scheduleInspection();}};
+document.addEventListener('fold:editor-tab',onEditorTab);
+const editorTabs={dispose:()=>document.removeEventListener('fold:editor-tab',onEditorTab)};
 const GAME_ONLY = Boolean(window.__FOLD_FIELD_GAME_ONLY__);
 if (GAME_ONLY) document.body.classList.add('game-only');
 const COLORS = { white: '#f4f5ed', red: '#e97c73', yellow: '#e9cf72', blue: '#7ebed3', green: '#91bd83', purple: '#b6a0d0', black: '#303a38' };
@@ -277,7 +279,7 @@ function editAt(r,c){
   buildPaper();persist();updateUI();
 }
 
-function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;$('propertyInspector').replaceChildren();$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';$('mechanismDescriptions').textContent='选择实体以查看机制说明';}
+function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;clearPropertyInspector($('propertyInspector'));$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';renderMechanismText($('mechanismDescriptions'),['选择实体以查看机制说明']);}
 function scheduleInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
 function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
 function inspectAtCell(r,c){selectedCells=[{r,c}];editRect=cellBounds(selectedCells);drawEditSelection();inspectSelection();}
@@ -290,8 +292,7 @@ function inspectSelection(){
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
   const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。'};
-  const mechanismPanel=$('mechanismDescriptions');mechanismPanel.replaceChildren();
-  for(const type of new Set(cells.map(p=>map.tiles[p.r][p.c]?.terrain??'none'))){const text=document.createElement('p');text.textContent=descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type);mechanismPanel.append(text);}
+  renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>map.tiles[p.r][p.c]?.terrain??'none'))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
   inspectedCell=cells[0];
   const {values,schema,mixed}=batchProperties(entries);
   $('inspectedEntity').textContent=cells.length===1?coord(cells[0].r,cells[0].c)+' · '+(map.tiles[cells[0].r][cells[0].c]?(prefabs.find(p=>p.id===entityType(map.tiles[cells[0].r][cells[0].c]))?.name||'实体方块'):'虚空'):'批量检视 · '+selectedCells.length+' 个选中格 / '+cells.length+' 个实体占用格';
@@ -460,7 +461,7 @@ function setupPrefabs(){
     const summary=$('prefabSummary'),name=document.createElement('span');name.textContent=prefab?.name||'无可用实体';summary.replaceChildren();
     if(prefab){const img=document.createElement('img');img.src=prefabPreview(prefab);img.alt='';summary.append(img);}
     summary.append(name);
-    for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';document.querySelectorAll('[data-prefab]').forEach(b=>{const active=b.dataset.prefab===selectedPrefabId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+    for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';renderEntityGrid($('prefabGrid'),prefabs.map(p=>({...p,preview:prefabPreview(p)})),selectedPrefabId,id=>{selectedPrefabId=id;$('prefabType').value=id;applyPrefabBrush();setTool('place');});
     if(prefab){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.height;$('blockHeight').value=brushHeight;$('blockThickness').value=tileThickness(prefab.tile);$('blockGradualRate').value=tileGradualRate(prefab.tile);}
     document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
     $('colorName').textContent=colored?COLOR_NAMES[color]:'';$('colorType').textContent=prefab?.tile.blocked?'阻挡实体':'可通行实体';
@@ -470,7 +471,7 @@ function setupPrefabs(){
     for(const prefab of prefabs)select.add(new Option(prefab.name,prefab.id));
     if(!prefabs.some(p=>p.id===selectedPrefabId))selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??null;
     if(!prefabs.length)select.add(new Option('无可用实体',''));
-    select.value=selectedPrefabId||'';$('prefabGrid').replaceChildren();for(const prefab of prefabs){const b=document.createElement('button'),img=document.createElement('img');b.className='prefab-preview';b.dataset.prefab=prefab.id;b.dataset.name=prefab.name;b.title=prefab.name;b.setAttribute('aria-label',prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;b.append(img);b.onclick=()=>{selectedPrefabId=prefab.id;select.value=prefab.id;applyPrefabBrush();setTool('place');};$('prefabGrid').append(b);}applyPrefabBrush();renderEntityVisibility();
+    select.value=selectedPrefabId||'';applyPrefabBrush();renderEntityVisibility();
   }
   async function refresh(){
     if(loading||document.hidden||GAME_ONLY||!/^https?:$/.test(location.protocol))return;
@@ -508,10 +509,11 @@ function rebuildFoldAxes(){
 function updateFoldAxes(){}
 
 function renderRegionControls(){
- const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));keyList.replaceChildren();for(const key of legalKeyNames(map)){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=key;input.checked=chosenKeys.has(key);input.setAttribute('aria-label','所需钥匙 '+key);label.append(input,document.createTextNode(key));keyList.append(label);}if(!keyList.children.length)keyList.textContent='地图上没有可收集的钥匙';
+ const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));renderNameChecklist(keyList,legalKeyNames(map),chosenKeys,'所需钥匙 ',null,'地图上没有可收集的钥匙');
  const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of regionNames(map))regionChoice.add(new Option(name,name));if(regionNames(map).includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;
- const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;container.replaceChildren();$('exitRegion').replaceChildren();
- for(const name of names){$('exitRegion').add(new Option(name,name));const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=!hiddenRegions.has(name);input.setAttribute('aria-label','显示区域 '+name);input.onchange=()=>{if(input.checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();};label.append(input,document.createTextNode(name));container.append(label);}
+ const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;$('exitRegion').replaceChildren();
+ for(const name of names)$('exitRegion').add(new Option(name,name));
+ renderNameChecklist(container,names,new Set(names.filter(name=>!hiddenRegions.has(name))),'显示区域 ',(name,checked)=>{if(checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();});
  if(names.includes(current))$('exitRegion').value=current;
 }
 $('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};
@@ -544,7 +546,7 @@ $('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$
 
 $('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};
 
-function renderEntityVisibility(){const container=$('entityVisibility');container.replaceChildren();for(const prefab of entityChoices(prefabs,map)){const label=document.createElement('label'),input=document.createElement('input'),img=document.createElement('img');label.className='prefab-preview';label.title=prefab.name;label.dataset.name=prefab.name;input.type='checkbox';input.checked=!hiddenEntities.has(prefab.id);input.setAttribute('aria-label','显示实体 '+prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;input.onchange=()=>{if(input.checked)hiddenEntities.delete(prefab.id);else hiddenEntities.add(prefab.id);refreshEntityVisibility();};label.append(input,img);container.append(label);}}
+function renderEntityVisibility(){renderEntityChecklist($('entityVisibility'),entityChoices(prefabs,map).map(p=>({...p,preview:prefabPreview(p)})),hiddenEntities,(id,checked)=>{if(checked)hiddenEntities.delete(id);else hiddenEntities.add(id);refreshEntityVisibility();});}
 function refreshEntityVisibility(){selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();syncState();}
 $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility();};
 $('hideAllEntities').onclick=()=>{for(const prefab of entityChoices(prefabs,map))hiddenEntities.add(prefab.id);refreshEntityVisibility();};

@@ -15,7 +15,7 @@ assert.equal(context.validateMap({...map,name:'  自定义地图  '}).name,'自�
 assert.deepEqual(JSON.parse(JSON.stringify(context.validateMap(JSON.parse(JSON.stringify(valid))))),JSON.parse(JSON.stringify(valid)));
 assert.throws(()=>context.validateMap({...map,width:129}));
 map.tiles[0][0]=null;assert.throws(()=>context.validateMap(map));assert.equal(context.validateMap(map,true).tiles[0][0],null);
-const html=fs.readFileSync(new URL('./editor.html',import.meta.url),'utf8');
+const html=fs.readFileSync(new URL('../outputs/index.html',import.meta.url),'utf8');
 const idList=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);const ids=new Set(idList);assert.equal(ids.size,idList.length,'DOM IDs must be unique');
 for(const match of source.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has(match[1]),'Missing DOM node '+match[1]);
 assert.ok(!/折纸测试|对称绘制|moveRegion|fillRegion|transformRegion|previewFolds|testPlay/.test(source+html));

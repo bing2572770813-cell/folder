@@ -149,7 +149,7 @@ work/
   tests/         # 模块与迁移回归
 ```
 
-已确认继续原生 HTML/JavaScript。四个 Tab 已由 work/ui/editor-tabs.mjs 组织，采用现有控件节点与状态；未引入 React/Vue。
+用户最新要求覆盖原生 UI 的早期决定：采用 React + Mantine，四个 Tab 与编辑器结构组件化，保留 JavaScript/Three.js、地图机制和固定 ID 适配。实现位于 work/ui/react，入口 work/react-entry.jsx。
 
 可扩展模块随实现提供 README.md 与适用的 AGENTS.md，说明职责、数据类型、注册方法、扩展步骤、禁止事项、测试入口。沿用仓库 AGENTS.md 命名，不建立职责重复的 agent.md。
 
@@ -201,9 +201,11 @@ work/
 - D10：保留已实现纸张平滑连接、物理厚度与过渡比例。
 - D11：框选工具点击虚空清空选区，检视工具点击虚空检视；自动保存及独立游戏导出沿用地图 JSON 序列化范围。
 - D12：采用受控脚本 ID + 参数/状态 JSON；BaseEntity 使用实体 prefab ID 列表。现有实体按现有覆盖规则迁移，不引入新的叠层策略。
-- D13：继续原生 JavaScript/HTML，实现模块化与四个 Tab，保留现有参数编辑和撤销流程。
+- D13：早期采用原生 JavaScript/HTML；已由 D16 的 React 迁移决定覆盖，参数编辑和撤销流程继续保留。
 - D14：现有配置字段默认 readable/serializable/tempEditable 为 true，内部身份只读；嵌套字段权限不超过父级。
 - D15：非序列化调试状态在导入/新建、进出游玩及重启时重置，与地图配置历史隔离；可序列化配置保持编辑撤销。
+
+- D16：用户明确要求 React 框架、完整组件库支持和既有前端结构迁移；采用 Mantine，保留数据/玩家/渲染逻辑，组件库通过构建内嵌进独立 HTML。
 
 ### 待确认
 
@@ -222,6 +224,6 @@ Q1（实例修改保存）、Q2（MonoBehaviour 含义）及地图导出的结�
 
 现有实体使用受控 replace-cell 行为，保持覆盖规则。BaseEntity 缺省兼容旧实体允许规则，显式空列表拒绝放置；多格实体逐占用格校验，失败时整次拒绝。标签权限与实体权限取交集，父级禁止不能被子级重新开放。三种保存入口统一投影可序列化配置，虚空折线也遵守标签权限；非序列化调试覆盖独立于地图撤销，按 D15 重置。
 
-构建及全部 20 个测试套件通过；浏览器验证四 Tab、键盘导航、虚空检视、属性修改与撤销、地图命名保存和独立游戏启动。纸张平滑连接、厚度与过渡比例保持。截图见 outputs/editor-tabs-verification.png、outputs/void-inspector-verification.png、outputs/property-inspector-verification.png。
+构建及全部 22 个测试套件通过；浏览器验证四 Tab、键盘导航、虚空检视、属性修改与撤销、地图命名保存和独立游戏启动。纸张平滑连接、厚度与过渡比例保持。截图见 outputs/editor-tabs-verification.png、outputs/void-inspector-verification.png、outputs/property-inspector-verification.png。
 
 后续扩展边界：Q4 新叠层机制仍须事先确认；新行为脚本和新标签类型须注册并提供相应适配。通用非序列化调试覆盖当前由 Inspector 展示，新增行为消费这些值须显式接入调试接口。app.js 仍承担场景和 DOM 适配，并非全部渲染逻辑均已拆分。尚未验收窄屏、200% 缩放及屏幕阅读器；GAME_ONLY 起点钥匙等既有缺口仍单独跟踪。不能据此宣称所有未来扩展已经实现。

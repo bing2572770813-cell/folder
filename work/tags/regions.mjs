@@ -22,7 +22,7 @@ export function validateRegions(map){
  const names=new Set(regionNames(map)),counts=new Map(),keys=new Set(legalKeyNames(map));
  for(const p of entries){const name=regionOf(p.tile);counts.set(name,(counts.get(name)??0)+1);if(spawn.some(s=>regionOf(s.tile)===name))errors.push('区域入口不能与玩家起点共存于区域：'+name);}
  for(const [name,count] of counts)if(count>1)errors.push('区域只能有一个入口：'+name);
- for(const p of taggedCells(map,'exitTo')){const target=p.tile.tags.exitTo;for(const key of p.tile.tags.requiredKeys??[])if(!keys.has(key))errors.push('出口所需钥匙不存在或不可收集：'+key);if(!names.has(target))errors.push('跳转区域不存在：'+target);else if(counts.get(target)!==1)errors.push('跳转区域需要唯一入口：'+target);}
+ for(const p of taggedCells(map,'exitTo')){const target=p.tile.tags.exitTo;for(const key of p.tile.tags.requiredKeys??[])if(!keys.has(key))errors.push('出口所需钥匙不存在或不可收集：'+key);if(!names.has(target))errors.push('跳转区域不存在：'+target);}
  return [...new Set(errors)];
 }
 export function assignRegion(map,cells,name,existing=false){

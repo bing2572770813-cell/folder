@@ -23,3 +23,5 @@
 旧 tile 的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和序列化权限过滤仍需完成，暂不用于生产保存。
 
 `importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 基础配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。当前 version:2 是内部迁移合同，未切换编辑器导入/导出 UI；生产输出的 serializable 权限过滤尚未接入。
+
+区域归属已由用户明确为方格属性。`TreeMap.cellTags["r,c"].regionTag` 保存该格区域；同格实体共享区域，移动 Transform 不移动方格区域。旧 tile 转换时从实体配置移出 regionTag，保存在 cellTags，实体 tags 只保留实体附着标记。

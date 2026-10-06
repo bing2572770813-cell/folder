@@ -2,7 +2,7 @@ import {TransformManager,type TransformNode} from './transform-manager.js';
 import {EntityWorld} from './entity-world.js';
 import {jsonObject,type EntityNode,type JsonObject} from './entity-model.js';
 
-export interface TreeMap {version:2;width:number;height:number;entities:EntityNode[];transforms:TransformNode[];legacyMetadata:JsonObject}
+export interface TreeMap {version:2;width:number;height:number;entities:EntityNode[];transforms:TransformNode[];cellTags:Record<string,JsonObject>;legacyMetadata:JsonObject}
 interface LegacyTile {
   prefabId?:string;instance?:{id:string};height?:number;thickness?:number;gradualRate?:number;color?:string;edgeColor?:string;
   blocked?:boolean;terrain?:string;terrainConfig?:JsonObject;keyName?:string;regionTag?:string;tags?:JsonObject;folds?:string[];fold?:string|null;
@@ -13,6 +13,7 @@ interface LegacyMap {width:number;height:number;tiles:(LegacyTile|null)[][];fold
 export function legacyMapToTree(map:LegacyMap):TreeMap {
   if(!Array.isArray(map.tiles)||map.tiles.length!==map.height||map.tiles.some(row=>row.length!==map.width))throw new Error('Invalid legacy grid');
   const entities:EntityNode[]=[];const transforms:TransformNode[]=[];
+  const cellTags:Record<string,JsonObject>={};
   const roots=new Map<string,{id:string;r:number;c:number}>();
   const footprint={width:1,height:1,occupied:[true]};
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
@@ -28,7 +29,9 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     else if(tile.terrain==='key')components.key={...tile.terrainConfig,name:tile.keyName??'钥匙'};
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};
-    entities.push({id,prefabId:tile.prefabId??'paper_ai',transformId,components,tags:{...tile.tags,region:tile.regionTag??'默认区域'},static:{},configuration:jsonObject(tile)});
+    cellTags[r+','+c]={regionTag:tile.regionTag??'默认区域'};
+    const {regionTag:ignoredRegion,...configuration}=tile;
+    entities.push({id,prefabId:tile.prefabId??'paper_ai',transformId,components,tags:{...tile.tags},static:{},configuration:jsonObject(configuration)});
   }
   const virtual=new Map<string,EntityNode>();
   for(const fold of map.foldCells??[]){
@@ -42,7 +45,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     node.components.fold.directions=[...new Set([...(node.components.fold.directions as string[]),fold.type])];
   }
   const {tiles:ignoredTiles,foldCells:ignoredFolds,...metadata}=map;
-  const tree:TreeMap={version:2,width:map.width,height:map.height,entities,transforms,legacyMetadata:jsonObject(metadata)};
+  const tree:TreeMap={version:2,width:map.width,height:map.height,entities,transforms,cellTags,legacyMetadata:jsonObject(metadata)};
   loadTree(tree);return tree;
 }
 export function loadTree(tree:TreeMap):EntityWorld {

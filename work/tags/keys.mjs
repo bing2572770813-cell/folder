@@ -1,6 +1,6 @@
 import {blocked} from '../entities/tile-model.mjs';
 export const keyNameOf=tile=>tile?.keyName?.trim()||'钥匙';
-export function legalKeyNames(map){return [...new Set(map.tiles.flat().filter(t=>t?.terrain==='key'&&!blocked(t)).map(keyNameOf))].sort();}
+export function legalKeyNames(map,world){if(world){const names=new Set();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const nodes=world.at(r,c);if(!nodes.some(n=>Object.hasOwn(n.components,'surface'))||nodes.some(n=>n.static.walkable===false||n.components.collision?.blocked||Object.hasOwn(n.components,'campfire')))continue;for(const node of nodes)if(Object.hasOwn(node.components,'key')&&(!Array.isArray(node.static.events)||node.static.events.includes('enter')))names.add(String(node.components.key.name??'钥匙').trim());}return [...names].sort();}return [...new Set(map.tiles.flat().filter(t=>t?.terrain==='key'&&!blocked(t)).map(keyNameOf))].sort();}
 
 export function renameKeyCells(map,cells,name,isHidden=()=>false){
  name=name.trim();if(!name||name.length>80)throw new Error('钥匙名须为 1–80 字');

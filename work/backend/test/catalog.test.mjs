@@ -61,3 +61,7 @@ test('disk catalog resolves inheritance before normalization and isolates broken
     const reread=await readCatalog(root);assert.equal(reread.prefabs.find(p=>p.id==='child_ai').tile.color,'white');
   }finally{await fs.rm(root,{recursive:true,force:true});}
 });
+
+test('native disk prefabs inherit component and child defaults without fabricating a tile',async()=>{
+ const root=await fixture();try{await savePrefab(root,{version:1,id:'native_ai',name:'原生',components:{key:{name:'铜'}},children:[{prefabId:'paper_ai',local:{r:0,c:1,dir:0}}]});await savePrefab(root,{version:1,id:'native_child_ai',name:'继承',extends:'native_ai',components:{fire:{damage:2}}});const catalog=await readCatalog(root),child=catalog.prefabs.find(p=>p.id==='native_child_ai');assert.equal(child.tile,undefined);assert.deepEqual(child.components,{key:{name:'铜'},fire:{damage:2}});assert.equal(child.children[0].prefabId,'paper_ai');assert.equal(JSON.parse(await fs.readFile(path.join(root,'entity','native_ai.json'),'utf8')).tile,undefined);}finally{await fs.rm(root,{recursive:true,force:true});}
+ });

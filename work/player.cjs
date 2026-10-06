@@ -24,8 +24,8 @@ function validateForPlay() {const map=env.getMap();
   if(world()){
     const componentErrors=[];for(const node of world().serialize())try{env.componentRegistry.validate(node);}catch(error){componentErrors.push(error.message);}if(componentErrors.length)return {valid:false,errors:[...regionErrors,...componentErrors]};
     regionErrors=regionErrors.filter(error=>!error.startsWith('出口所需钥匙不存在或不可收集：'));
-    const keys=new Set();
-    for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
+    const keys=new Set(env.legalKeyNames?.(map,world())??[]);
+    if(!env.legalKeyNames)for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
       const nodes=world().at(r,c);
       if(!nodes.some(node=>Object.hasOwn(node.components,'surface'))||nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked||Object.hasOwn(node.components,'campfire')))continue;
       for(const node of nodes)if(Object.hasOwn(node.components,'key')&&(!Array.isArray(node.static.events)||node.static.events.includes('enter')))keys.add(String(node.components.key.name??'钥匙').trim());

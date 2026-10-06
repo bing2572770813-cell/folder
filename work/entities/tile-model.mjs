@@ -54,10 +54,10 @@ export function normalizeTile(tile) {
   return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
-  if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');
+  if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||(!data.tile&&!data.components))throw new Error('实体需要 version:1、id、name 和 tile 或 components');
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
-  const propertySchema=normalizePropertySchema(data.propertySchema??data.tile.propertySchema??{});
+  const propertySchema=normalizePropertySchema(data.propertySchema??data.tile?.propertySchema??{});
   const extras={};
   if(data.children!==undefined){const children=copyJson(data.children);if(!Array.isArray(children)||children.some(child=>!child||typeof child!=='object'||Array.isArray(child)))throw new Error('children 须为子实体列表');extras.children=children;}
   for(const key of ['components','static','tags'])if(data[key]!==undefined){
@@ -66,7 +66,7 @@ export function normalizePrefab(data) {
     extras[key]=value;
   }
   if(extras.tags?.regionTag!==undefined)throw new Error('区域标签只能属于地图格');
-  return {...extras,version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})};
+  return {...extras,version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),...(data.tile?{tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})}:{})};
 }
 export function columnLabel(c) {
   let label='';for(let n=c+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;

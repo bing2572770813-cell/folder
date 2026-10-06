@@ -72,3 +72,12 @@ test('legacy height and fixed cell region edits preserve additional mixed compon
  const snapshot=new TreeDocument(legacy()).serialize();snapshot.entities[0].components={...snapshot.entities[0].components,ice:{},fire:{damage:3},key:{name:'铜'}};const doc=new TreeDocument(snapshot);
  for(const edit of [tile=>tile.height=.4,tile=>tile.regionTag='B']){const next=doc.view();edit(next.tiles[1][1]);doc.applyLegacy(next);const node=doc.world.serialize()[0];assert.deepEqual(node.components.fire,{damage:3});assert.deepEqual(node.components.key,{name:'铜'});assert.deepEqual(node.components.ice,{});}
  });
+
+test('moved spawn and overlay spawn tags update compatibility and saved spawn coordinates',async()=>{
+ const {moveNode}=await import('data:text/javascript;base64,'+Buffer.from((await build({entryPoints:[fileURLToPath(new URL('../../entities/tree-commands.mjs',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false})).outputFiles[0].text).toString('base64'));
+ const source=new TreeDocument(legacy()).serialize();source.entities[0].tags.spawn=true;const doc=new TreeDocument(source),moved=moveNode(doc,source.entities[0].id,{r:2,c:2,dir:0});assert.deepEqual(moved.view().spawn,{r:2,c:2,dir:0});assert.deepEqual(moved.serialize().legacyMetadata.spawn,{r:2,c:2,dir:0});assert.equal(new TreeDocument(moved.serialize()).view().spawn.r,2);
+ });
+
+test('collectible key selector includes overlay and mixed nodes and respects every blocker',async()=>{
+ const {legalKeyNames}=await import('../../tags/keys.mjs');const snapshot=new TreeDocument(legacy()).serialize(),overlay={...structuredClone(snapshot.entities[0]),id:'key-overlay',components:{key:{name:'铜'}},tags:{}};snapshot.entities[0].tags={spawn:true};snapshot.entities[0].components.fire={};snapshot.entities[0].components.key={name:'银'};snapshot.entities.push(overlay);let doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),['铜','银'].sort());snapshot.entities[1].static.walkable=false;doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),[]);
+ });

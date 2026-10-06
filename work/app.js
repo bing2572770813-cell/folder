@@ -302,12 +302,16 @@ function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame
 function scheduleInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
 function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
 function inspectAtCell(r,c){setSelectedCells([{r,c}]);drawEditSelection();inspectSelection();}
+function inspectedPropertySchema(r,c,tile){
+  const node=documentModel.primaryAt(r,c);
+  return node?nodeSchema(node):entityPropertySchema(tile,tagCatalog);
+}
 function inspectSelection(){
   const cells=inspectionCells(map,selectedCells);if(!cells.length){clearInspection();return;}
   const entries=cells.map(({r,c})=>{
     const entity=inspectCell(map,r,c,cellHidden);
     const values=entity.properties??{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds};
-    const schema=entity.properties?entityPropertySchema(entity.properties,tagCatalog):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
+    const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
   const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。'};
@@ -332,7 +336,7 @@ function applyInspectedProperty(path,value,scope='entity'){
   for(const {r,c} of targets){
     if(cellHidden(r,c))throw new Error('隐藏实体禁止编辑');
   const tile=candidate.tiles[r]?.[c];if(!tile)throw new Error('虚空实体属性只读');
-  const schema=entityPropertySchema(tile,tagCatalog),key=inspectionKey(r,c,tile),source=debugOverrides.values(key,tile,schema);
+  const schema=inspectedPropertySchema(r,c,tile),key=inspectionKey(r,c,tile),source=debugOverrides.values(key,tile,schema);
   const edited=updateProperty(source,schema,path,value),merged=mergeSerializableProperties(tile,edited,schema);
   if((merged.tags?.spawn||merged.tags?.entry)&&(blocked(merged)||merged.terrain==='campfire'))throw new Error('起点或入口不能设为不可通行');
   if(JSON.stringify(merged)!==JSON.stringify(tile)){

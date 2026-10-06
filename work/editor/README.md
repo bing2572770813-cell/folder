@@ -13,3 +13,5 @@
 visibility-policy.mjs 检查隐藏折线/标签是否被粘贴等批量结果改写；实体删除将折线转为虚空但位置/方向不变时仍允许。标签工具与折线工具还执行独立可见性和 BaseEntity 校验。
 
 debug-state.mjs 将非序列化字段修改保存在独立覆盖表，不进入地图配置或编辑历史。键包含坐标、prefab ID 与实例 ID；导入/新建、进出游玩和重启时清空。可序列化字段通过地图事务写入，保持原编辑撤销。当前通用调试覆盖呈现在 Inspector，扩展行为要通过此覆盖接口读取调试参数，不能直接污染定义。
+
+旧 Inspector 与树节点 JSON 表单共用 primary node.configuration 的有效权限；原生 components 与兼容属性的限制取交集。批量属性的 readable/tempEditable 对每个目标均须满足，事务在全部目标校验通过后提交，拒绝不得增加历史。

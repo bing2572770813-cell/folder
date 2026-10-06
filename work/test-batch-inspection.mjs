@@ -20,7 +20,7 @@ const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const body=source.slice(source.indexOf('function applyInspectedProperty('),source.indexOf("document.querySelectorAll('.rotate-left')"));
 function transactionFixture(readonly){
  const baseline={height:1,width:2,tiles:[[{height:.1},{height:.2,...(readonly?{propertySchema:{height:{tempEditable:false}}}:{})}]]};let records=0;
- const context={map:structuredClone(baseline),selectedCells:[{r:0,c:0},{r:0,c:1}],P:{mode:'edit'},clone:structuredClone,inspectionCells,cellHidden:()=>false,entityPropertySchema:t=>t.propertySchema??{},inspectionKey:(r,c)=>r+','+c,debugOverrides:{values:(k,t)=>t,set:()=>{}},updateProperty,mergeSerializableProperties,debugChanges,blocked:()=>false,normalizeTile:t=>t,assertHiddenContentUnchanged:()=>{},tagCatalog:[],visibility:{},validateMap:t=>t,record:()=>records++,controller:{resetPosition:()=>{}},buildPaper:()=>{},persist:()=>{},$:()=>({textContent:''}),updateUI:()=>{},scheduleInspection:()=>{}};
+ const context={map:structuredClone(baseline),selectedCells:[{r:0,c:0},{r:0,c:1}],P:{mode:'edit'},clone:structuredClone,inspectionCells,cellHidden:()=>false,entityPropertySchema:t=>t.propertySchema??{},inspectedPropertySchema:(r,c,t)=>t.propertySchema??{},inspectionKey:(r,c)=>r+','+c,debugOverrides:{values:(k,t)=>t,set:()=>{}},updateProperty,mergeSerializableProperties,debugChanges,blocked:()=>false,normalizeTile:t=>t,assertHiddenContentUnchanged:()=>{},tagCatalog:[],visibility:{},validateMap:t=>t,record:()=>records++,controller:{resetPosition:()=>{}},buildPaper:()=>{},persist:()=>{},$:()=>({textContent:''}),updateUI:()=>{},scheduleInspection:()=>{}};
  context.applyMap=(next,saveHistory)=>{if(saveHistory)context.record();context.map=next;};
  runInNewContext(body,context);return {context,baseline,records:()=>records};
 }
@@ -30,3 +30,15 @@ console.log('PASS: production batch adapter rejects a later readonly target with
 const local=transactionFixture(false);local.context.directSelectedCells=[{r:0,c:0}];local.context.map.tiles[0].forEach(t=>t.folds=[]);local.context.assertTagAttachment=()=>{};
 local.context.applyInspectedProperty(['folds'],['h'],'cell');assert.deepEqual(local.context.map.tiles[0][0].folds,['h']);assert.deepEqual(local.context.map.tiles[0][1].folds,[]);assert.equal(local.records(),1);
 console.log('PASS: per-cell tags/folds use direct cells while whole-instance attributes retain batch semantics.');
+
+// Canonical component restrictions must govern the legacy Inspector transaction.
+const {nodePermissions}=await import('./entities/node-permissions.mjs');
+const {entityPropertySchema}=await import('./tags/tag-model.mjs');
+const lockedNode={id:'locked',configuration:{propertySchema:{components:{children:{surface:{children:{height:{tempEditable:false,readable:false}}}}}}}};
+const canonical=transactionFixture(false);
+canonical.context.documentModel={primaryAt:(r,c)=>c===1?lockedNode:{id:'open',configuration:{}}};
+canonical.context.nodeSchema=node=>nodePermissions(node,entityPropertySchema(node.configuration,[]));
+canonical.context.inspectedPropertySchema=(r,c,tile)=>canonical.context.nodeSchema(canonical.context.documentModel.primaryAt(r,c));
+assert.throws(()=>canonical.context.applyInspectedProperty(['height'],.8),/不可编辑/);
+assert.deepEqual(canonical.context.map,canonical.baseline);assert.equal(canonical.records(),0);
+console.log('PASS: canonical native restrictions reject legacy batch edits atomically.');

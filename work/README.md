@@ -9,6 +9,8 @@ npm --prefix work run build
 npm --prefix work start
 ```
 
+后端服务已使用 Fastify + TypeScript 实现，源代码位于 `work/backend/src`。`work/server.cjs` 保留为兼容启动入口；修改后端 TypeScript 后可先运行 `npm --prefix work run backend:build`。浏览器端玩家状态机仍集中在 `work/player.cjs`。
+
 打开 http://127.0.0.1:4173 。修改服务代码后需要重启服务。`outputs/index.html` 是编辑器，`outputs/game.html` 是内置示范关的独立游戏。
 
 ## 交互

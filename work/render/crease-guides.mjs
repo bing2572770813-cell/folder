@@ -1,5 +1,5 @@
 import { tileHeight, tileGradualRate } from '../entities/tile-model.mjs';
-import { foldStrokes } from '../tags/fold-geometry.mjs';
+import { foldStrokes, foldDistance } from '../tags/fold-geometry.mjs';
 import { isPaper, paperSurface } from './paper-surface.mjs';
 
 const EPSILON = 1e-9;
@@ -39,17 +39,25 @@ function segmentInCell(a, b, r, c) {
     if (Math.abs(delta) < EPSILON) {
       if (a[axis] < center - .5 || a[axis] > center + .5) return null;
     } else {
-      const bounds = [(center - .5 - a[axis]) / delta, (center + .5 - a[axis]) / delta].sort((x, y) => x - y);
-      from = Math.max(from, bounds[0]); to = Math.min(to, bounds[1]);
+      const bounds = [
+        (center - .5 - a[axis]) / delta,
+        (center + .5 - a[axis]) / delta,
+      ].sort((x, y) => x - y);
+      from = Math.max(from, bounds[0]);
+      to = Math.min(to, bounds[1]);
     }
   }
-  return to - from > EPSILON ? [interpolate(a, b, from), interpolate(a, b, to)] : null;
+  return to - from > EPSILON
+    ? [interpolate(a, b, from), interpolate(a, b, to)]
+    : null;
 }
 
 // Creased tiles refine the 5x5 transition grid into a uniform 33x33 one;
 // the parameter grid lines differ, so sampling must follow the same layout.
 const gridLines = (size, steps) =>
-  size === steps.length ? steps : Array.from({ length: size }, (_, i) => i / (size - 1) - .5);
+  size === steps.length
+    ? steps
+    : Array.from({ length: size }, (_, i) => i / (size - 1) - .5);
 const indexInLines = (lines, value) => {
   let index = 0;
   while (index < lines.length - 2 && value > lines[index + 1] + EPSILON) index++;
@@ -57,22 +65,22 @@ const indexInLines = (lines, value) => {
 };
 
 /**
- * Dash/dot crease hints that hug the physical groove: paper cells sample the
- * deformed surface, void cells fall back to a flat plane just above the table.
- * Render data only; fold placement and range are unchanged.
+ * Sampler over the shared paper surface: paper cells ride the deformed groove,
+ * every other cell falls back to a flat plane just above the tabletop.
+ * Render data only; fold placement and range stay untouched.
  */
-export function creaseGuides(map, groups, {
+function createSampler(map, {
   hidden = () => false,
   lift = .002,
   flatLift = .018,
-  dotRadius = .035 / 3,
-  showFolds = true,
   voidPlane = () => 0,
+  showFolds = true,
 } = {}) {
-  const positions = [], lineCells = [], dots = [], cache = new Map();
-  const width = map.width ?? map.tiles[0]?.length ?? 0, height = map.height ?? map.tiles.length;
-  const offset = [-(width - 1) / 2, 0, -(height - 1) / 2];
-  const foldCells = new Map();
+  const width = map.width ?? map.tiles[0]?.length ?? 0,
+    height = map.height ?? map.tiles.length,
+    offset = [-(width - 1) / 2, 0, -(height - 1) / 2],
+    cache = new Map(),
+    foldCells = new Map();
   for (const marker of map.foldCells ?? []) {
     const key = marker.r + ',' + marker.c;
     if (!foldCells.has(key)) foldCells.set(key, []);
@@ -89,7 +97,12 @@ export function creaseGuides(map, groups, {
     const size = surface ? Math.sqrt(surface.points.length) : 0;
     const inner = .5 / (1 + tileGradualRate(tile));
     const steps = [-.5, -inner, 0, inner, .5];
-    const value = { surface, size, lines: gridLines(size, steps), height: tile ? tileHeight(tile) : 0 };
+    const value = {
+      surface,
+      size,
+      lines: gridLines(size, steps),
+      height: tile ? tileHeight(tile) : 0,
+    };
     cache.set(key, value);
     return value;
   }
@@ -98,41 +111,98 @@ export function creaseGuides(map, groups, {
     const { surface, size, lines, height: top } = cellSurface(r, c);
     if (!surface)
       return {
-        position: [point[0] + c + offset[0], (voidPlane(r, c) ?? 0) + flatLift, point[1] + r + offset[2]],
+        position: [
+          point[0] + c + offset[0],
+          (voidPlane(r, c) ?? 0) + flatLift,
+          point[1] + r + offset[2],
+      ],
         normal: [0, 1, 0],
       };
-    const x = indexInLines(lines, point[0]), z = indexInLines(lines, point[1]);
-    const tx = (point[0] - lines[x]) / (lines[x + 1] - lines[x]);
-    const tz = (point[1] - lines[z]) / (lines[z + 1] - lines[z]);
-    const a = z * size + x, b = a + 1, d = a + size, e = d + 1;
+    const x = indexInLines(lines, point[0]),
+      z = indexInLines(lines, point[1]);
+    const tx = (point[0] - lines[x]) / (lines[x + 1] - lines[x]),
+      tz = (point[1] - lines[z]) / (lines[z + 1] - lines[z]);
+    const a = z * size + x,
+      b = a + 1,
+      d = a + size,
+      e = d + 1;
     const indices = tx + tz <= 1 ? [a, d, b] : [b, d, e];
-    const weights = tx + tz <= 1 ? [1 - tx - tz, tz, tx] : [1 - tz, 1 - tx, tx + tz - 1];
-    const blend = values => [0, 1, 2].map(axis => indices.reduce((sum, index, i) => sum + values[index][axis] * weights[i], 0));
+    const weights =
+      tx + tz <= 1 ? [1 - tx - tz, tz, tx] : [1 - tz, 1 - tx, tx + tz - 1];
+    const blend = values =>
+      [0, 1, 2].map(axis =>
+        indices.reduce((sum, index, i) => sum + values[index][axis] * weights[i], 0),
+      );
     const normal = normalize(blend(surface.normals));
-    const position = blend(surface.points).map((value, axis) => value + normal[axis] * lift + offset[axis]);
-    position[0] += c; position[2] += r;
+    const position = blend(surface.points).map(
+      (value, axis) => value + normal[axis] * lift + offset[axis],
+    );
+    position[0] += c;
+    position[2] += r;
     return { position, normal };
   }
 
-  function addLine(a, b, r, c) {
-    const localA = [a[0] - c, a[1] - r], localB = [b[0] - c, b[1] - r];
-    const { surface, size } = cellSurface(r, c), breaks = [0, 1];
-    if (surface) {
-      // Every grid edge and the anti-diagonal of each mesh square is a break.
-      // Splitting exactly at its triangle boundaries keeps strokes on slopes.
-      const count = size - 1;
-      for (const values of [[localA[0], localB[0], -.5, .5], [localA[1], localB[1], -.5, .5], [localA[0] + localA[1], localB[0] + localB[1], -1, 1]]) {
-        const [from, to, min, max] = values;
-        if (Math.abs(to - from) < EPSILON) continue;
-        for (let value = min; value <= max + EPSILON; value += 1 / count) {
-          const t = (value - from) / (to - from);
-          if (t > EPSILON && t < 1 - EPSILON) breaks.push(t);
-        }
+  return { width, height, offset, cache, cellSurface, sample };
+}
+
+/** Parameters where a stroke crosses mesh triangle boundaries inside one cell. */
+function strokeBreaks(a, b, r, c, cellSurface) {
+  const { surface, size } = cellSurface(r, c),
+    breaks = [0, 1];
+  if (surface) {
+    const count = size - 1,
+      axes = [
+        [a[0], b[0], -.5, .5],
+        [a[1], b[1], -.5, .5],
+        [a[0] + a[1], b[0] + b[1], -1, 1],
+      ];
+    for (const [from, to, min, max] of axes) {
+      if (Math.abs(to - from) < EPSILON) continue;
+      for (let value = min; value <= max + EPSILON; value += 1 / count) {
+        const t = (value - from) / (to - from);
+        if (t > EPSILON && t < 1 - EPSILON) breaks.push(t);
       }
     }
-    const sorted = breaks.sort((x, y) => x - y).filter((value, i, all) => i === 0 || value - all[i - 1] > EPSILON);
-    for (let i = 1; i < sorted.length; i++) {
-      positions.push(...sample(r, c, interpolate(localA, localB, sorted[i - 1])).position, ...sample(r, c, interpolate(localA, localB, sorted[i])).position);
+  }
+  return breaks
+    .sort((x, y) => x - y)
+    .filter((value, i, all) => i === 0 || value - all[i - 1] > EPSILON);
+}
+
+/**
+ * Dash/dot crease hints that hug the physical groove: paper cells sample the
+ * deformed surface, void cells fall back to a flat plane just above the table.
+ * A selected crease is handed over to creaseSelection, so its dashes are left
+ * out here and only the highlight is drawn.
+ * Render data only; fold placement and range are unchanged.
+ */
+export function creaseGuides(map, groups, {
+  hidden = () => false,
+  lift = .002,
+  flatLift = .018,
+  dotRadius = .035 / 3,
+  showFolds = true,
+  voidPlane = () => 0,
+  selected = null,
+} = {}) {
+  const { width, height, cellSurface, sample } = createSampler(map, {
+    hidden,
+    lift,
+    flatLift,
+    voidPlane,
+    showFolds,
+  });
+  const positions = [], lineCells = [], dots = [];
+
+  function addLine(a, b, r, c) {
+    const localA = [a[0] - c, a[1] - r],
+      localB = [b[0] - c, b[1] - r],
+      breaks = strokeBreaks(localA, localB, r, c, cellSurface);
+    for (let i = 1; i < breaks.length; i++) {
+      positions.push(
+        ...sample(r, c, interpolate(localA, localB, breaks[i - 1])).position,
+        ...sample(r, c, interpolate(localA, localB, breaks[i])).position,
+      );
       lineCells.push({ r, c });
     }
   }
@@ -140,17 +210,26 @@ export function creaseGuides(map, groups, {
   function addDot(center) {
     const polygon = Array.from({ length: 24 }, (_, i) => {
       const angle = (i * Math.PI) / 12;
-      return [center[0] + Math.cos(angle) * dotRadius, center[1] + Math.sin(angle) * dotRadius];
+      return [
+        center[0] + Math.cos(angle) * dotRadius,
+        center[1] + Math.sin(angle) * dotRadius,
+      ];
     });
-    const { r0, r1, c0, c1 } = cellBounds(polygon, width, height);
-    for (let r = r0; r <= r1; r++)
-      for (let c = c0; c <= c1; c++) {
+    const box = cellBounds(polygon, width, height);
+    for (let r = box.r0; r <= box.r1; r++)
+      for (let c = box.c0; c <= box.c1; c++) {
         if (hidden(r, c)) continue;
-        let part = polygon.map(point => [point[0] - c, point[1] - r]);
-        for (const distance of [(p) => p[0] + .5, (p) => .5 - p[0], (p) => p[1] + .5, (p) => .5 - p[1]])
+        let part = polygon.map((point) => [point[0] - c, point[1] - r]);
+        for (const distance of [
+          (p) => p[0] + .5,
+          (p) => .5 - p[0],
+          (p) => p[1] + .5,
+          (p) => .5 - p[1],
+        ])
           part = clipPolygon(part, distance);
         if (part.length < 3) continue;
-        const { surface, size, lines } = cellSurface(r, c), triangles = [];
+        const { surface, size, lines } = cellSurface(r, c),
+          triangles = [];
         function append(vertices) {
           for (let i = 1; i < vertices.length - 1; i++)
             // Counterclockwise parameter X/Z is clockwise when viewed from +Y.
@@ -159,9 +238,12 @@ export function creaseGuides(map, groups, {
         }
         if (!surface) append(part);
         else {
-          const xs = part.map((p) => p[0]), zs = part.map((p) => p[1]);
-          const x0 = indexInLines(lines, Math.min(...xs)), x1 = indexInLines(lines, Math.max(...xs));
-          const z0 = indexInLines(lines, Math.min(...zs)), z1 = indexInLines(lines, Math.max(...zs));
+          const xs = part.map((p) => p[0]),
+            zs = part.map((p) => p[1]);
+          const x0 = indexInLines(lines, Math.min(...xs)),
+          x1 = indexInLines(lines, Math.max(...xs));
+          const z0 = indexInLines(lines, Math.min(...zs)),
+          z1 = indexInLines(lines, Math.max(...zs));
           for (let z = z0; z <= z1 + 1; z++)
             for (let x = x0; x <= x1 + 1; x++) {
               const diagonal = (p) =>
@@ -185,25 +267,168 @@ export function creaseGuides(map, groups, {
             Math.max(-.5, Math.min(.5, center[0] - c)),
             Math.max(-.5, Math.min(.5, center[1] - r)),
           ];
-          dots.push({ ...sample(r, c, localCenter), positions: triangles, cell: { r, c } });
+          dots.push({
+            ...sample(r, c, localCenter),
+            positions: triangles,
+            cell: { r, c },
+          });
         }
       }
   }
 
-  for (const group of groups)
+  for (const group of groups) {
+    // The selected crease is drawn by creaseSelection, so skip its dashes.
+    if (selected && axisKey(group) === axisKey(selected)) continue;
     for (const [from, to] of foldStrokes(group)) {
-      const a = [from.c, from.r], b = [to.c, to.r];
+      const a = [from.c, from.r],
+        b = [to.c, to.r];
       if (Math.hypot(b[0] - a[0], b[1] - a[1]) < .04) {
         addDot(interpolate(a, b, .5));
-        continue;
-      }
-      const { r0, r1, c0, c1 } = cellBounds([a, b], width, height);
-      for (let r = r0; r <= r1; r++)
-        for (let c = c0; c <= c1; c++) {
-          if (hidden(r, c)) continue;
-          const segment = segmentInCell(a, b, r, c);
-          if (segment) addLine(...segment, r, c);
-        }
+      continue;
     }
+    const box = cellBounds([a, b], width, height);
+    for (let r = box.r0; r <= box.r1; r++)
+      for (let c = box.c0; c <= box.c1; c++) {
+        if (hidden(r, c)) continue;
+        const segment = segmentInCell(a, b, r, c);
+        if (segment) addLine(segment[0], segment[1], r, c);
+      }
+    }
+  }
   return { positions, lineCells, dots, dotRadius };
+}
+
+/**
+ * Dash/dot crease hints that hug the physical groove: paper cells sample the
+ * deformed surface, void cells fall back to a flat plane just above the table.
+ * The selected crease is left to creaseSelection, which draws it as one
+ * continuous thick stroke instead of a dash/dot run.
+ *
+ * Render data only; fold placement and range stay unchanged.
+ */
+/**
+ * Bounding box of the tiles one fold group reaches. Reach is a Chebyshev ball
+ * around the group centre; for even-length groups the in-range set is the
+ * intersection of the two central cells' balls. The result is always
+ * rectangular, and it is trimmed to tiles that exist and are currently shown.
+ */
+function reachBounds(map, rows, cols, group, hidden) {
+  const cells = group.cells ?? [],
+    radius = group.radius ?? 0,
+    middle = Math.floor(cells.length / 2),
+    mids =
+      cells.length % 2 ? [cells[middle]] : [cells[middle - 1], cells[middle]];
+  let r0 = -Infinity,
+    r1 = Infinity,
+    c0 = -Infinity,
+    c1 = Infinity;
+  for (const p of mids) {
+    r0 = Math.max(r0, p.r - radius);
+    r1 = Math.min(r1, p.r + radius);
+    c0 = Math.max(c0, p.c - radius);
+    c1 = Math.min(c1, p.c + radius);
+  }
+  r0 = Math.max(0, Math.round(r0));
+  r1 = Math.min(rows - 1, Math.round(r1));
+  c0 = Math.max(0, Math.round(c0));
+  c1 = Math.min(cols - 1, Math.round(c1));
+  let top = Infinity,
+    bottom = -Infinity,
+    left = Infinity,
+    right = -Infinity;
+  for (let r = r0; r <= r1; r++)
+    for (let c = c0; c <= c1; c++) {
+      if (!map.tiles[r]?.[c] || hidden(r, c)) continue;
+      if (foldDistance(group, { r, c }) > radius) continue;
+      top = Math.min(top, r);
+      bottom = Math.max(bottom, r);
+      left = Math.min(left, c);
+      right = Math.max(right, c);
+    }
+  return bottom < top ? null : { r0: top, r1: bottom, c0: left, c1: right };
+}
+
+/**
+ * Highlight for the crease that is currently selected: one continuous thick
+ * stroke spanning the whole line, plus a thick outline around the tiles the
+ * fold reaches. Sampling matches the dash/dot hints, so the highlight rides
+ * the groove and folds together with the paper.
+ *
+ * Render data only; fold placement and range stay unchanged.
+ */
+export function creaseSelection(map, group, {
+  hidden = () => false,
+  lift = .004,
+  flatLift = .024,
+  voidPlane = () => 0,
+  showFolds = true,
+  width = .085,
+  reach = .055,
+} = {}) {
+  const { width: cols, height: rows, cellSurface, sample } = createSampler(map, {
+    hidden,
+    lift,
+    flatLift,
+    voidPlane,
+    showFolds,
+  });
+  const positions = [],
+    cells = [];
+
+  function emit(r, c, corners) {
+    const p = corners.map((point) => sample(r, c, point).position);
+    for (const [a, b, d] of [
+      [p[0], p[1], p[2]],
+      [p[0], p[2], p[3]],
+    ]) {
+      positions.push(...a, ...b, ...d);
+      cells.push({ r, c });
+    }
+  }
+
+  // Widen a straight stroke into a ribbon of quads and split it at every mesh
+  // triangle edge, so the band hugs slopes instead of cutting through them.
+  function stroke(a, b, half) {
+    const box = cellBounds([a, b], cols, rows);
+    for (let r = box.r0; r <= box.r1; r++)
+      for (let c = box.c0; c <= box.c1; c++) {
+        if (hidden(r, c)) continue;
+        const piece = segmentInCell(a, b, r, c);
+        if (!piece) continue;
+        const localA = [piece[0][0] - c, piece[0][1] - r],
+          localB = [piece[1][0] - c, piece[1][1] - r],
+          breaks = strokeBreaks(localA, localB, r, c, cellSurface);
+        for (let i = 1; i < breaks.length; i++) {
+          const p0 = interpolate(localA, localB, breaks[i - 1]),
+            p1 = interpolate(localA, localB, breaks[i]);
+          const dx = p1[0] - p0[0],
+          dz = p1[1] - p0[1],
+          length = Math.hypot(dx, dz);
+          if (length < EPSILON) continue;
+          const nx = (-dz / length) * half,
+            nz = (dx / length) * half;
+          emit(r, c, [
+            [p0[0] + nx, p0[1] + nz],
+            [p1[0] + nx, p1[1] + nz],
+            [p1[0] - nx, p1[1] - nz],
+            [p0[0] - nx, p0[1] - nz],
+          ]);
+        }
+      }
+  }
+
+  if (!group?.cells?.length) return { positions, cells };
+  stroke([group.from.c, group.from.r], [group.to.c, group.to.r], width / 2);
+  const box = reachBounds(map, rows, cols, group, hidden);
+  if (box) {
+    const corners = [
+      [box.c0 - .5, box.r0 - .5],
+      [box.c1 + .5, box.r0 - .5],
+      [box.c1 + .5, box.r1 + .5],
+      [box.c0 - .5, box.r1 + .5],
+    ];
+    for (let i = 0; i < corners.length; i++)
+      stroke(corners[i], corners[(i + 1) % corners.length], reach / 2);
+  }
+  return { positions, cells };
 }

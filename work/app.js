@@ -4,14 +4,14 @@ import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-c
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor} from './render/fold-motion.mjs';
 import {createTableScene} from './render/table-scene.mjs';
-import {creaseGuides} from './render/crease-guides.mjs';
+import {creaseGuides,creaseSelection} from './render/crease-guides.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
 import playerRuntime from './player.cjs';
 import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, tileThickness, tileGradualRate, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './entities/tile-model.mjs';
-import { uniqueFoldAxes, foldGroupAt, inFoldRange } from './tags/fold-geometry.mjs';
+import { uniqueFoldAxes, foldGroupAt, inFoldRange, axisKey } from './tags/fold-geometry.mjs';
 import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
 import {footprint,placeEntity,removeEntity} from './entities/placement-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
@@ -145,10 +145,12 @@ const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new TH
 const gridMaterial=new THREE.LineBasicMaterial({color:'#b9bdbb',transparent:true,opacity:.8});
 const creaseDashMaterial=new THREE.LineBasicMaterial({color:'#48664d',toneMapped:false});
 const creaseDotMaterial=new THREE.MeshBasicMaterial({color:'#48664d',toneMapped:false});
+const creaseSelectionMaterial=new THREE.MeshBasicMaterial({color:'#2477e8',toneMapped:false,depthTest:false});
 const sharedGeometries=new Set([tileGeo,markerGeo]);
-const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial]);
-let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group(), foldAxisLayer=new THREE.Group(), creaseGuideLayer=new THREE.Group();
-paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer,creaseGuideLayer);
+const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial,creaseSelectionMaterial]);
+let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group(), foldAxisLayer=new THREE.Group(), creaseGuideLayer=new THREE.Group(), foldSelectionLayer=new THREE.Group();
+let foldSelectionSignature='';
+paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer);
 let foldAxes=[],axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
 
@@ -172,7 +174,7 @@ const playerGroup=new THREE.Group(),activeTokenHost=new THREE.Group();let active
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
-const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,gridLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldAxisLayer,creaseGuideLayer,spawnMarkerGroup],playerGroup,wx,wz});
+const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,gridLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,spawnMarkerGroup],playerGroup,wx,wz});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 function renderPlayer() {const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.y=-P.player.dir*Math.PI/4;}
 
@@ -223,7 +225,7 @@ function buildPaper() {
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;entityEdgeLayer.add(outline);}
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r),y=voidY(.002);edges.push(x-.5,y,z-.5,x+.5,y,z-.5,x+.5,y,z-.5,x+.5,y,z+.5,x+.5,y,z+.5,x-.5,y,z+.5,x-.5,y,z+.5,x-.5,y,z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
-  rebuildFoldAxes();layoutScenery();buildCreaseGuides();
+  rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
   for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
   renderRegionControls();renderEntityVisibility();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
@@ -239,7 +241,7 @@ function addAxisLabels(maxHeight){
 }
 function applyVisibility(){
   const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
-  terrainLayer.visible=true;tableScenery.group.visible=showTable;creaseGuideLayer.visible=showCreaseDashes&&foldLayer.visible;
+  terrainLayer.visible=true;tableScenery.group.visible=showTable;creaseGuideLayer.visible=showCreaseDashes&&foldLayer.visible;foldSelectionLayer.visible=foldLayer.visible&&P.mode==='play'&&!!P.chosenFold&&!P.foldMotion;
 }
 for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;if(key==='folds')buildPaper();else applyVisibility();syncState();};
 
@@ -443,6 +445,8 @@ function updateUI(){
   $('undoBtn').disabled=!currentHistory().length||P.moving;$('restartBtn').disabled=!playing||P.moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=P.moving);$('teleportBtn').disabled=P.moving||!P.chosenFold||!foldTarget(P.chosenFold).valid;
   $('redoBtn').disabled=P.mode!=='edit'||!redoHistory.length||P.moving;drawEditSelection();
   scheduleInspection();
+  const foldSignature=P.mode==='play'&&P.chosenFold?P.chosenFold.type+':'+P.chosenFold.r+','+P.chosenFold.c:'';
+  if(foldSignature!==foldSelectionSignature){foldSelectionSignature=foldSignature;buildCreaseGuides();buildFoldSelection();}
   syncState();
 }
 
@@ -566,7 +570,7 @@ function rebuildFoldAxes(){
 // Dash/dot hints ride the crease surface and fold together with the paper.
 function buildCreaseGuides(){
  disposableClear(creaseGuideLayer);
- const guides=creaseGuides(map,foldAxes,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,voidPlane:(r,c)=>voidPlaneTop(r,c)});
+ const guides=creaseGuides(map,foldAxes,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,voidPlane:(r,c)=>voidPlaneTop(r,c),selected:selectedFold()});
  if(guides.positions.length){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));
@@ -580,6 +584,24 @@ function buildCreaseGuides(){
   const mesh=new THREE.Mesh(geometry,creaseDotMaterial);
   mesh.userData.triangleCells=cells;mesh.renderOrder=8;creaseGuideLayer.add(mesh);
  }
+}
+// The selected crease line becomes one continuous thick blue stroke and its
+// reach is outlined; both ride the paper so they fold with the flap.
+function selectedFold(){return P.mode==='play'&&P.chosenFold&&P.chosenFold.type?{r:P.chosenFold.r,c:P.chosenFold.c,type:P.chosenFold.type}:null;}
+function buildFoldSelection(){
+ disposableClear(foldSelectionLayer);
+ foldSelectionLayer.visible=false;
+ const chosen=selectedFold();
+ if(!chosen)return;
+ const group=foldGroupAt(foldAxes,chosen.r,chosen.c,chosen.type);
+ if(!group)return;
+ const guides=creaseSelection(map,group,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,voidPlane:(r,c)=>voidPlaneTop(r,c)});
+ if(!guides.positions.length)return;
+ const geometry=new THREE.BufferGeometry();
+ geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));
+ const mesh=new THREE.Mesh(geometry,creaseSelectionMaterial);
+ mesh.userData.triangleCells=guides.cells;mesh.renderOrder=9;foldSelectionLayer.add(mesh);
+ foldSelectionLayer.visible=foldLayer.visible;
 }
 function updateFoldAxes(){}
 

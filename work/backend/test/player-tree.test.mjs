@@ -16,19 +16,19 @@ function fixture(extra=[]){
  for(let r=0;r<3;r++)for(let c=0;c<4;c++)add(`surface-${r}-${c}`,r,c,{surface:{}});
  for(const node of extra)add(...node);
  const state=player.createPlayerState(map.spawn),group=new THREE.Group(),ring={},elements=new Map(),noop=()=>{};
- const registry=defaultComponents();let controller;
+ const registry=defaultComponents();let controller;let rebuilds=0;
  const env={state,THREE,getEntityWorld:()=>world,componentRegistry:registry,getMap:()=>map,
   $:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);},
   blocked:tile=>!!tile.blocked,inside:(r,c)=>r>=0&&r<3&&c>=0&&c<4,walkable:()=>true,isHidden:()=>false,
   canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains:()=>[],validateRegions:()=>[],
   taggedCells:(_map,tag)=>map.tiles.flatMap((row,r)=>row.flatMap((tile,c)=>tile.tags[tag]?[{r,c,tile}]:[])),regionOf:tile=>tile.regionTag,
   foldsAt:()=>[],inFoldRange:()=>true,foldGroupAt:noop,getFoldAxes:()=>[],coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},
-  clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer:noop,
+  clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:()=>rebuilds++,renderPlayer:noop,
   disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c,wz:r=>r,tileTop:()=>0,
   getSelectionRing:()=>ring,getPlayerGroup:()=>group,getEffectLayer:()=>group,invalidateAxes:noop};
  controller=player.createPlayerController(env);controller.setMode('play');
  const move=(r,c)=>{controller.selectPlayer();controller.movePlayer(r,c);controller.tick(performance.now()+1000);};
- return {map,state,controller,move,add,registry,env,get world(){return world;},replaceWorld:()=>{const snapshot=world.snapshotRuntime();world=new EntityWorld(transforms,world.serialize());world.restoreRuntime(snapshot);}};
+ return {map,state,controller,move,add,registry,env,get rebuilds(){return rebuilds;},get world(){return world;},replaceWorld:()=>{const snapshot=world.snapshotRuntime();world=new EntityWorld(transforms,world.serialize());world.restoreRuntime(snapshot);}};
 }
 
 test('stacked fire and named keys apply once, undo restores runtime, restart isolates nodes',()=>{
@@ -148,4 +148,16 @@ test('region arrival commits destination effects once and counts only the origin
  f.move(1,1);assert.deepEqual(f.state.player,{r:2,c:3,dir:2});assert.equal(f.state.steps,1);
  assert.equal(f.state.terrainState.actions,1);assert.equal(f.state.terrainState.overheat,1);
  assert.deepEqual(f.state.terrainState.collectedKeys,['铜']);assert.deepEqual(f.world.runtime('destination-key','key'),{collected:true});
+});
+
+
+test('lift frame updates keep selection and never rebuild the scene or repeat entry effects',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,durationMs:1000}}]]);
+ const rebuilds=f.rebuilds;let refreshes=0;f.env.refreshLiftSurfaces=()=>refreshes++;
+ f.controller.selectPlayer();const before=f.controller.snapshot();
+ const base=f.world.runtime('lift','lift').lastTime;
+ for(let i=1;i<=100;i++)f.controller.tick(base+i*10);
+ assert.ok(refreshes>0);assert.equal(f.rebuilds,rebuilds);assert.ok(f.state.legalMoves.length>0);
+ assert.equal(f.state.steps,before.steps);assert.equal(f.state.terrainState.actions,before.terrainState.actions);
+ assert.equal(f.map.tiles[1][1].height,1);
 });

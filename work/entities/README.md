@@ -13,3 +13,5 @@ behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对�
 节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。
 
 node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。
+
+升降纸张的时间推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度；升降纸面作为厚度不变的独立平台，不与相邻纸面形成渐变坡面。视口每帧更新已有实例和边线、地形/升降标记的位置，不重建地图或清除玩家选择。移动动画端点也读取平台当前高度。

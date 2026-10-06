@@ -17,7 +17,7 @@ function mergedTags(nodes){
 }
 function tileOf(node){
   const tile={...copy(node.configuration??{}),...copy(node.components.surface??{}),prefabId:node.configuration?.prefabId??node.prefabId,tags:copy(node.tags)};
-  if(node.components.lift)tile.lift=copy(node.components.lift);
+  if(node.components.lift){tile.lift=copy(node.components.lift);tile.height=node.components.lift.initialHeight;}
   delete tile.regionTag;
   tile.blocked=node.components.collision?.blocked??false;
   delete tile.terrain;delete tile.terrainConfig;delete tile.keyName;

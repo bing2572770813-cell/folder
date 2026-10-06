@@ -27,3 +27,16 @@ test('fixed lift stays fixed',()=>{
  state=advanceLift(state,fixed,10000,false);
  assert.deepEqual(state,{height:.4,direction:0,occupied:false,lastTime:10000});
 });
+
+test('continuous frames reach both endpoints independently of frame size',()=>{
+ const run=step=>{let s=advanceLift(initialLiftState(config),config,0,false);for(let t=step;t<=1000;t+=step)s=advanceLift(s,config,t,false);return s;};
+ assert.ok(Math.abs(run(10).height-1)<1e-9);
+ let s=run(10);for(let t=1010;t<=2000;t+=10)s=advanceLift(s,config,t,false);
+ assert.ok(Math.abs(s.height-.1)<1e-9);
+});
+test('occupancy clamps at the minimum even after many durations',()=>{
+ let s=advanceLift(initialLiftState({...config,initialHeight:.55}),config,0,true);
+ assert.equal(s.direction,-1);
+ s=advanceLift(s,config,10500,true);assert.equal(s.height,.1);assert.equal(s.direction,-1);
+ s=advanceLift(s,config,11000,false);assert.ok(s.height>.1);
+});

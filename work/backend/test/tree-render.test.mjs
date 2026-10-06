@@ -40,3 +40,14 @@ test('surface map preserves neighbors and follows transform changes without cach
  const cell=moved.surfaceCells.find(cell=>cell.nodeId==='b');assert.deepEqual([cell.r,cell.c],[2,2]);assert.equal(cell.tile.regionTag,'默认区域');
  assert.equal(mapForSurface(document,'b').tiles[2][2].height,.3);
 });
+
+test('lift rendering shares initial and runtime height with markers without changing configuration',()=>{
+ const {document,add}=fixture();add('lift',{surface:{height:.09,thickness:.09},lift:{minHeight:.09,maxHeight:1.4,initialHeight:1.4,durationMs:1000}});
+ const before=document.world.serialize();let projection=renderTreeCells(document);
+ assert.equal(projection.surfaceCells.find(cell=>cell.nodeId==='lift').tile.height,1.4);
+ document.world.setRuntime('lift','lift',{height:.6,direction:-1});
+ projection=renderTreeCells(document,{runtime:true});
+ assert.equal(projection.surfaceCells.find(cell=>cell.nodeId==='lift').tile.height,.6);
+ assert.equal(projection.tagCells.find(cell=>cell.nodeId==='lift').surfaceTop,.6);
+ assert.deepEqual(document.world.serialize(),before);
+});

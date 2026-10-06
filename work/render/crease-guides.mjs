@@ -367,6 +367,7 @@ export function creaseSelection(map, group, {
   showFolds = true,
   width = .085,
   reach = .055,
+  creaseDepth = DEFAULT_CREASE_DEPTH,
 } = {}) {
   const { width: cols, height: rows, cellSurface, sample } = createSampler(map, {
     hidden,

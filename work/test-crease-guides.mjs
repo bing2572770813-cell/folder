@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { creaseGuides } from './render/crease-guides.mjs';
+import { creaseGuides, creaseSelection } from './render/crease-guides.mjs';
+import { DEFAULT_CREASE_DEPTH } from './render/paper-surface.mjs';
 import { uniqueFoldAxes } from './tags/fold-geometry.mjs';
 import { normalizeTile } from './tile-model.mjs';
 
@@ -76,6 +77,30 @@ for (const type of ['h', 'v', 'd1', 'd2']) {
     assert.ok(dot.positions.every(Number.isFinite));
     assert.ok(dot.position[1] < HEIGHT - 0.02, 'dot sits at the bottom of the crease');
   }
+  // Clicking a crease and starting a fold both render this highlight. Exercise
+  // the default as well as the depth supplied by the physics panel.
+  const selection = creaseSelection(map, groups[0]);
+  assert.ok(selection.positions.length, type + ' must emit a selected highlight');
+  assert.equal(selection.cells.length, selection.positions.length / 9);
+  assert.ok(selection.positions.every(Number.isFinite));
+  assert.deepEqual(selection, creaseSelection(map, groups[0], {
+    creaseDepth: DEFAULT_CREASE_DEPTH,
+  }), 'selection uses the same default crease depth as the paper surface');
+  let previousBottom = -Infinity;
+  for (const creaseDepth of [0, .25, DEFAULT_CREASE_DEPTH, 1]) {
+    const highlight = creaseSelection(map, groups[0], { creaseDepth });
+    assert.ok(highlight.positions.every(Number.isFinite));
+    const heights = highlight.positions.filter((_, i) => {
+      const cell = highlight.cells[Math.floor(i / 9)];
+      return i % 3 === 1 && map.tiles[cell.r][cell.c].folds.includes(type);
+    });
+    const bottom = Math.min(...heights);
+    assert.ok(bottom > previousBottom, type + ' highlight follows the configured groove depth');
+    previousBottom = bottom;
+    if (creaseDepth === 1)
+      assert.ok(heights.every(y => Math.abs(y - (HEIGHT + .004)) < 1e-9),
+        'a flat paper surface has a flat selection highlight');
+  }
   // Void creases: no groove to hug, so the hint rides the supplied plane.
   const hollowMap = fixture(type, { hollow: true });
   const hollowGuides = creaseGuides(hollowMap, uniqueFoldAxes(hollowMap), {
@@ -87,4 +112,8 @@ for (const type of ['h', 'v', 'd1', 'd2']) {
 }
 assert.equal(creaseGuides(fixture(), uniqueFoldAxes(fixture()), { hidden: () => true }).positions.length, 0);
 assert.equal(creaseGuides(fixture(), [], {}).positions.length, 0);
-console.log('PASS: dash/dot crease hints hug the groove on paper, ride the void plane elsewhere and respect visibility.');
+assert.deepEqual(creaseSelection(fixture(), null), { positions: [], cells: [] });
+assert.deepEqual(creaseSelection(fixture(), uniqueFoldAxes(fixture())[0], {
+  hidden: () => true,
+}), { positions: [], cells: [] });
+console.log('PASS: crease hints and selection highlights follow groove depth in all four directions and respect visibility.');

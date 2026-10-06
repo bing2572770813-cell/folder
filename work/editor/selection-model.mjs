@@ -1,4 +1,3 @@
-import {assertEntityRegions} from '../tags/regions.mjs';
 export const copy = value => JSON.parse(JSON.stringify(value));
 export const contains = (rect, p) => !!rect && !!p && p.r >= rect.r && p.r < rect.r + rect.h && p.c >= rect.c && p.c < rect.c + rect.w;
 export function rectangle(a,b) { return {r:Math.min(a.r,b.r),c:Math.min(a.c,b.c),h:Math.abs(a.r-b.r)+1,w:Math.abs(a.c-b.c)+1}; }
@@ -19,10 +18,11 @@ export function pasteRegion(map,tiles,r,c,isHidden=()=>false) {
     if(!affects(dr,dc))return;
     const value=copy(tile),old=next.tiles[r+dr][c+dc];
     if(value?.tags){delete value.tags.spawn;delete value.tags.entry;}
-    if(value&&old?.tags){value.tags={...value.tags,...old.tags};if(old.tags.spawn||old.tags.entry)value.regionTag=old.regionTag;}
+    if(value){delete value.regionTag;if(old?.regionTag!==undefined)value.regionTag=old.regionTag;}
+    if(value&&old?.tags){value.tags={...value.tags,...old.tags};}
     if(value?.instance){const source=value.instance;if(!instances.has(source.id))instances.set(source.id,globalThis.crypto.randomUUID());value.instance={...source,id:instances.get(source.id),anchorR:r+source.anchorR-(tiles.origin?.r??0),anchorC:c+source.anchorC-(tiles.origin?.c??0)};}
     next.tiles[r+dr][c+dc]=value;
-  }));assertEntityRegions(next);return {map:next,rect};
+  }));return {map:next,rect};
 }
 export function unionCells(base,rect,isVisible=()=>true){const cells=new Map(base.map(p=>[p.r+','+p.c,p]));for(let r=rect.r;r<rect.r+rect.h;r++)for(let c=rect.c;c<rect.c+rect.w;c++)if(isVisible(r,c))cells.set(r+','+c,{r,c});return [...cells.values()];}
 export function cellBounds(cells){if(!cells.length)return null;const rs=cells.map(p=>p.r),cs=cells.map(p=>p.c);return {r:Math.min(...rs),c:Math.min(...cs),h:Math.max(...rs)-Math.min(...rs)+1,w:Math.max(...cs)-Math.min(...cs)+1};}

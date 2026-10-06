@@ -11,8 +11,7 @@ export function placeEntity(map,prefab,tile,r,c,isHidden=()=>false){
  for(const p of cells){const old=map.tiles[p.r][p.c],base=old?entityType(old):'void_ai';if(bases&&!bases.includes(base))throw new Error('实体不允许放置在 '+base+' 上');const result=behavior.placement({baseEntity:old?JSON.parse(JSON.stringify(old)):null,r:p.r,c:p.c});if(result.operation!=='replace')throw new Error('尚未启用该实体叠层策略');}
  if(cells.some(p=>(map.tiles[p.r][p.c]?.tags?.spawn||map.tiles[p.r][p.c]?.tags?.entry)&&(blocked(tile)||tile.terrain==='campfire')))throw new Error('不能用不可通行实体覆盖玩家起点或区域入口');
  const next=JSON.parse(JSON.stringify(map)),id=globalThis.crypto.randomUUID();
- const regionTag=regionOf(map.tiles[cells[0].r][cells[0].c]);
- for(const p of cells){const old=next.tiles[p.r][p.c],folds=foldsAt(next,p.r,p.c);next.tiles[p.r][p.c]={...JSON.parse(JSON.stringify(tile)),regionTag,tags:{...old?.tags},folds,fold:folds[0]??null,instance:{id,anchorR:r,anchorC:c,width:prefab.size.width,height:prefab.size.height}};next.foldCells=(next.foldCells??[]).filter(mark=>mark.r!==p.r||mark.c!==p.c);}
+ for(const p of cells){const old=next.tiles[p.r][p.c],folds=foldsAt(next,p.r,p.c);next.tiles[p.r][p.c]={...JSON.parse(JSON.stringify(tile)),regionTag:regionOf(old),tags:{...old?.tags},folds,fold:folds[0]??null,instance:{id,anchorR:r,anchorC:c,width:prefab.size.width,height:prefab.size.height}};next.foldCells=(next.foldCells??[]).filter(mark=>mark.r!==p.r||mark.c!==p.c);}
  const conflicts=validateRegions(next).filter(e=>e.startsWith('区域入口不能')||e.startsWith('区域只能'));if(conflicts.length)throw new Error(conflicts.join('；'));
  return {map:next,cells};
 }

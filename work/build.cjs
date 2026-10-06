@@ -29,6 +29,7 @@ async function build() {
   const markup = ssr.exports.renderEditorMarkup();
   const result = await esbuild.build({
     ...shared,
+    plugins: [require("./build-support.cjs").workspaceFiles(root)],
     entryPoints: [path.join(root, "react-entry.jsx")],
     platform: "browser",
     format: "iife",

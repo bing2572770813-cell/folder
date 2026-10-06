@@ -4,8 +4,12 @@
 
 cell-entity.mjs 将现有地图格读取为独立检视对象。VoidEntity 完全透明、blocked、placeable=false，具有坐标和虚空折线标记；toJSON 返回 null，兼容 version:1 的空格表示，折线仍由 map.foldCells 保存。
 
-inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回，不能通过检视对象反向修改地图。行为注册、BaseEntity 和 tag prefab 将作为后续模块实现，当前适配不引入新叠层规则。
+inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回，不能通过检视对象反向修改地图。TreeDocument 保留唯一 canonical EntityWorld，旧格子仅为独立投影视图。tree-commands 提供受保护节点移动、重挂载、删除、组件配置和显式叠加；tree-clipboard 保存完整子树与稀疏占格，粘贴生成独立 ID，区域始终取目标格且不复制唯一起点/入口。行为与组件均通过受控注册表验证。
 
 验证：node work/test-cell-entity.mjs。玩家状态机仍位于 work/player.cjs。
 
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。
+
+节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。
+
+node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。

@@ -210,6 +210,7 @@ export const PlayPanel = React.memo(function PlayPanel() {
                     <kbd>{"F"}</kbd>
                   </UiButton>
                 </div>
+                <UiButton id="interactBtn" type="button">与当前格实体交互</UiButton>
                 <div className="play-hints" id="playHints">
                   {
                     "点击玩家显示八方向可移动方块；点击折纸线高亮目标，再次点击目标方块传送；也可按 F 或按钮。"

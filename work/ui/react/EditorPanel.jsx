@@ -4,6 +4,7 @@ import { MapEditorPanel } from "./MapEditorPanel.jsx";
 import { InspectorPanel } from "./InspectorPanel.jsx";
 import { MapProperties } from "./MapProperties.jsx";
 import { LayerVisibility } from "./LayerVisibility.jsx";
+import { activateBoundaryTab } from "./TabbedSections.jsx";
 const panels = [
   ["map", "地图编辑", "tabMap", "panelMap", MapEditorPanel],
   ["inspect", "检视", "tabInspect", "panelInspect", InspectorPanel],
@@ -23,7 +24,7 @@ export const EditorPanel = React.memo(function EditorPanel() {
           )
         }
       >
-        <Tabs.List className="editor-tabs" aria-label="编辑器工具面板">
+        <Tabs.List className="editor-tabs" aria-label="编辑器工具面板" onKeyDownCapture={activateBoundaryTab}>
           {panels.map(([name, label, tabId]) => (
             <Tabs.Tab
               key={name}

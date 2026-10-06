@@ -1,22 +1,5 @@
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-const {readCatalog}=require('./prefab-catalog.cjs');
-const root = path.resolve(__dirname, '../outputs');
-const port = Number(process.env.FOLD_PORT || 4173);
-const server = http.createServer(async (req,res) => {
-  if(req.url==='/api/prefabs'){
-    res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');
-    try{
-      if(req.method==='GET'){res.end(JSON.stringify(await readCatalog()));return;}
-      res.writeHead(405);res.end(JSON.stringify({error:'方法无效'}));return;
-    }catch(error){res.writeHead(400);res.end(JSON.stringify({error:error.message}));return;}
-  }
-
-  const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-  const target = path.resolve(root, '.' + (pathname==='/'?'/index.html':pathname));
-  if (!target.startsWith(root+path.sep)) { res.writeHead(403);res.end();return; }
-  fs.readFile(target,(err,data) => { if(err){res.writeHead(404);res.end('Not found');return;}res.setHeader('Content-Type',target.endsWith('.html')?'text/html; charset=utf-8':'application/octet-stream');res.setHeader('Cache-Control','no-store');res.end(data); });
+const {startServer} = require('./backend/dist/server.js');
+startServer().catch(error => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
 });
-server.on('error',error=>{console.error(error.message);process.exit(1);});
-server.listen(port,'127.0.0.1',()=>console.log('FOLD FIELD ready at http://127.0.0.1:'+port));

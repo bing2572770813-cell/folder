@@ -1,5 +1,6 @@
 import React from "react";
 import { UiButton, UiDisclosure, UiSection } from "./controls.jsx";
+import { TreeInspector } from "./TreeInspector.jsx";
 
 export const InspectorPanel = React.memo(function InspectorPanel() {
   return (
@@ -22,6 +23,7 @@ export const InspectorPanel = React.memo(function InspectorPanel() {
           </pre>
         </UiDisclosure>
       </UiSection>
+      <TreeInspector />
       <UiSection className="section">
         <h2 className="section-label">{"方块机制"}</h2>
         <div

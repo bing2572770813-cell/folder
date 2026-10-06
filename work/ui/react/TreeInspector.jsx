@@ -13,6 +13,7 @@ function renderInto(container, content) {
 export function renderTreeNodes(container, nodes, onSelect) {
   renderInto(container, <MantineProvider>{nodes.map(node => (
     <UiButton key={node.id} type="button" title={node.id} data-node-id={node.id}
+      className="entity-context-row" style={{ marginLeft: `${Math.min(node.depth ?? 0, 8) * 12}px` }}
       disabled={node.disabled} aria-pressed={node.selected} onClick={() => onSelect(node.id)}>
       {node.label}
     </UiButton>
@@ -27,7 +28,7 @@ export function renderTreeParents(container, nodes) {
 // Fields stay mounted and uncontrolled so the scene adapter retains event targets.
 export const TreeInspector = React.memo(function TreeInspector() {
   return <UiSection className="section">
-    <h2 className="section-label">实体树与同格节点</h2>
+    <h2 className="section-label">当前实体与关联节点</h2>
     <div id="treeNodes" className="studio-fields" role="group" aria-label="实体节点" />
     <div id="treeFields" className="studio-fields" hidden>
       <p id="nodeIdentity" className="studio-readout" />

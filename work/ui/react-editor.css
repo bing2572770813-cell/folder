@@ -132,6 +132,8 @@ details[open] > .icon-select-summary::before {
   min-height: 40px;
 }
 .play-panel .editor-tabs { margin-bottom: 16px; }
+.entity-context-row { min-width: 0; overflow-wrap: anywhere; text-align: left; padding: 6px; border-left: 2px solid var(--line); }
+.entity-context-row[aria-pressed="true"] { border-left-color: var(--green); background: #edf3ee; }
 .player-properties .studio-fields { display: grid; gap: 10px; padding: 10px 0; }
 .player-properties label { display: grid; gap: 5px; }
 .player-height-limits { border: 1px solid #dce3d9; border-radius: 5px; padding: 10px; display: grid; gap: 10px; min-width: 0; }

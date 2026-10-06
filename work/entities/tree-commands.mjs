@@ -6,7 +6,7 @@ import {projectProperties,updateProperty,mergeSerializableProperties} from '../c
 
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
-function fork(document){
+export function forkTreeDocument(document){
   const candidate=new TreeDocument(document.serialize());candidate.world.restoreRuntime(document.world.snapshotRuntime());
   const owners=new Set(document.world.serialize().map(node=>'entity:'+node.id));
   for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);
@@ -18,7 +18,7 @@ function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   for(const node of world.serialize())if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
-function validate(candidate){const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of candidate.world.at(r,c))for(const [key,value] of Object.entries(node.tags)){if(key!=='requiredKeys'&&Object.hasOwn(tags,key)&&JSON.stringify(tags[key])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+key);tags[key]=value;}if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');return candidate;}
+export function validateTreeDocument(candidate){const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of candidate.world.at(r,c))for(const [key,value] of Object.entries(node.tags)){if(key!=='requiredKeys'&&Object.hasOwn(tags,key)&&JSON.stringify(tags[key])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+key);tags[key]=value;}if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');for(const key of spawns)if(entries.has(candidate.cellTags[key]?.regionTag??'默认区域'))throw new Error('同一区域不能同时包含玩家起点与区域入口');return candidate;}
 export function configureNode(document,id,components,tags,isHidden=()=>false,nodeHidden=()=>false,schema){
  const original=document.world.get(id);check(document.world,[original.transformId],isHidden,nodeHidden);
  if(schema){
@@ -26,23 +26,23 @@ export function configureNode(document,id,components,tags,isHidden=()=>false,nod
   const preserve=(raw,shown,edited)=>{if(!raw||typeof raw!=='object'||Array.isArray(raw))return edited;const next=copy(edited??{});for(const key of Object.keys(raw)){if(!Object.hasOwn(shown??{},key))next[key]=copy(raw[key]);else if(raw[key]&&typeof raw[key]==='object'&&!Array.isArray(raw[key])&&Object.hasOwn(next,key))next[key]=preserve(raw[key],shown[key],next[key]);}return next;};
   let edited=updateProperty(before,schema,['components'],preserve(before.components,readable.components,components));edited=updateProperty(edited,schema,['tags'],preserve(before.tags,readable.tags,tags));const stable=mergeSerializableProperties(before,edited,schema);components=stable.components;tags=stable.tags;
  }
- const snapshot=document.serialize(),node=snapshot.entities.find(item=>item.id===id);node.components=copy(components);node.tags=copy(tags);const candidate=new TreeDocument(snapshot);const runtime=document.world.snapshotRuntime();for(const key of Object.keys(runtime[id]??{}))if(!Object.hasOwn(components,key))delete runtime[id][key];candidate.world.restoreRuntime(runtime);const owners=new Set(document.world.serialize().map(item=>'entity:'+item.id));for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);return validate(candidate);
+ const snapshot=document.serialize(),node=snapshot.entities.find(item=>item.id===id);node.components=copy(components);node.tags=copy(tags);const candidate=new TreeDocument(snapshot);const runtime=document.world.snapshotRuntime();for(const key of Object.keys(runtime[id]??{}))if(!Object.hasOwn(components,key))delete runtime[id][key];candidate.world.restoreRuntime(runtime);const owners=new Set(document.world.serialize().map(item=>'entity:'+item.id));for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);return validateTreeDocument(candidate);
 }
 export function moveNode(document,id,local,isHidden=()=>false,nodeHidden=()=>false){
   const transform=document.world.get(id).transformId,ids=subtree(document.world,transform);check(document.world,ids,isHidden,nodeHidden);
-  const candidate=fork(document);candidate.world.transforms.setLocal(transform,local);check(candidate.world,ids,isHidden,nodeHidden);return validate(candidate);
+  const candidate=forkTreeDocument(document);candidate.world.transforms.setLocal(transform,local);check(candidate.world,ids,isHidden,nodeHidden);return validateTreeDocument(candidate);
 }
 export function reparentNode(document,id,parentId,preserveWorld=true,isHidden=()=>false,nodeHidden=()=>false){
   const transform=document.world.get(id).transformId,parent=parentId===null?null:document.world.get(parentId).transformId,ids=subtree(document.world,transform);check(document.world,ids,isHidden,nodeHidden);if(parent)check(document.world,[parent],isHidden,nodeHidden);
-  const candidate=fork(document);candidate.world.transforms.setParent(transform,parent,preserveWorld);check(candidate.world,ids,isHidden,nodeHidden);return validate(candidate);
+  const candidate=forkTreeDocument(document);candidate.world.transforms.setParent(transform,parent,preserveWorld);check(candidate.world,ids,isHidden,nodeHidden);return validateTreeDocument(candidate);
 }
 export function deleteNode(document,id,isHidden=()=>false,nodeHidden=()=>false){
   const node=document.world.get(id);check(document.world,[node.transformId],isHidden,nodeHidden);document.world.transforms.assertRemovable(node.transformId,['entity:'+id]);
-  const candidate=fork(document);candidate.world.remove(id,true);return validate(candidate);
+  const candidate=forkTreeDocument(document);candidate.world.remove(id,true);return validateTreeDocument(candidate);
 }
 export function placeTreePrefab(document,prefab,tile,r,c,options={}){
   if(options.stack!==true)throw new Error('树实体放置需要显式启用叠层');
-  const candidate=fork(document),registry=defaultComponents(),resolve=options.resolve;
+  const candidate=forkTreeDocument(document),registry=defaultComponents(),resolve=options.resolve;
   const resolveRecord=(record,seen=new Set())=>{
     if(seen.has(record.id))throw new Error('Prefab inheritance cycle');seen.add(record.id);
     if(!record.extends)return copy(record);if(!resolve)throw new Error('Prefab inheritance requires catalog resolver');
@@ -72,5 +72,5 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     }
     return node.id;
   }
-  instantiate(prefab,tile,{r,c,dir:0});return validate(candidate);
+  instantiate(prefab,tile,{r,c,dir:0});return validateTreeDocument(candidate);
 }

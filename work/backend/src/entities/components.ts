@@ -49,8 +49,13 @@ export class ComponentRegistry {
 
 export function defaultComponents():ComponentRegistry {
   const registry=new ComponentRegistry();
-  for(const id of ['surface','fold','tag'])registry.register(id,{});
-  registry.register('collision',{canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});
+  registry.register('surface',{validate:config=>{
+    for(const [key,min,max] of [['height',.01,16],['thickness',.001,16],['gradualRate',0,100]] as const){const value=config[key];if(value!==undefined&&(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max))throw new Error('Invalid surface '+key);}
+    if(config.color!==undefined&&!['white','red','yellow','blue','green','purple','black'].includes(String(config.color)))throw new Error('Invalid surface color');
+  }});
+  registry.register('fold',{validate:config=>{if(config.directions!==undefined&&(!Array.isArray(config.directions)||config.directions.some(value=>!['h','v','d1','d2'].includes(String(value)))))throw new Error('Invalid fold directions');}});
+  registry.register('tag',{});
+  registry.register('collision',{validate:config=>{if(config.blocked!==undefined&&typeof config.blocked!=='boolean')throw new Error('Invalid collision blocked');},canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{

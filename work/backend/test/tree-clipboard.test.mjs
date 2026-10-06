@@ -11,3 +11,10 @@ test('full tree clipboard preserves stacks, sparse children, independent IDs and
  const ids=new Set(doc.world.serialize().map(node=>node.id));for(const node of pasted.world.at(3,3))assert.ok(!ids.has(node.id));assert.notEqual(pasted.view().tiles[3][3].instance.id,'group');
  assert.throws(()=>copyTree(doc,[{r:1,c:1}],{isHidden:(r,c)=>r===2&&c===2}),/隐藏/);const before=doc.serialize();assert.throws(()=>pasteTree(doc,clip,5,5),/bounds/);assert.deepEqual(doc.serialize(),before);
 });
+
+test('surface-free scalar conflicts and hidden destinations reject paste atomically',()=>{
+ const tree={version:2,width:6,height:6,entities:[{id:'a',prefabId:'tag',transformId:'ta',components:{tag:{}},static:{},tags:{exitTo:'A'}},{id:'b',prefabId:'tag',transformId:'tb',components:{tag:{}},static:{},tags:{exitTo:'B'}}],transforms:[{id:'ta',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}},{id:'tb',parentId:null,local:{r:2,c:2,dir:0},footprint:{width:1,height:1,occupied:[true]}}],cellTags:{},legacyMetadata:{spawn:{r:0,c:0,dir:0}}};
+ tree.entities.push({id:'ground',prefabId:'paper_ai',transformId:'ground-t',components:{surface:{}},static:{},tags:{spawn:true}});tree.transforms.push({id:'ground-t',parentId:null,local:{r:0,c:0,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ const doc=new TreeDocument(tree),clip=copyTree(doc,[{r:2,c:2}]),before=doc.serialize();assert.throws(()=>pasteTree(doc,clip,1,1),/Conflicting/);assert.deepEqual(doc.serialize(),before);assert.throws(()=>pasteTree(doc,clip,3,3,{isHidden:()=>true}),/隐藏/);
+ doc.world.setRuntime('a','tag',{seen:true});doc.world.transforms.retain('ta','external');const pasted=pasteTree(doc,clip,3,3);assert.deepEqual(pasted.world.runtime('a','tag'),{seen:true});assert.ok(pasted.world.transforms.referenceOwners('ta').includes('external'));
+ });

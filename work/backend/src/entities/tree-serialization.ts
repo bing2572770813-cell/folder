@@ -76,6 +76,14 @@ export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTa
     }
     const tags=project({tags:node.tags}).tags;
     node.tags=tags===undefined?{}:jsonObject(tags);
+    const components=project({components:node.components}).components;
+    node.components=components===undefined?{}:jsonObject(components) as Record<string,JsonObject>;
+    if(node.configuration){
+      for(const field of ['height','thickness','gradualRate','color','edgeColor'])if(Object.hasOwn(node.configuration,field)&&!Object.hasOwn(node.components.surface??{},field))delete node.configuration[field];
+      if(node.configuration.blocked!==undefined&&!Object.hasOwn(node.components.collision??{},'blocked'))delete node.configuration.blocked;
+      if(typeof terrain==='string'&&node.configuration.terrainConfig!==undefined){const values=project({components:{[terrain]:node.configuration.terrainConfig}}).components;node.configuration.terrainConfig=values===undefined?{}:jsonObject(jsonObject(values)[terrain]??{});}
+      if(terrain==='key'&&node.configuration.keyName!==undefined&&!Object.hasOwn(node.components.key??{},'name'))delete node.configuration.keyName;
+    }
     return node;
   });
   const serializedCellTags=structuredClone(cellTags);

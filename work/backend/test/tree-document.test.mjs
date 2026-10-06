@@ -67,3 +67,8 @@ test('transparent and key-only nodes do not fabricate ground; conflicting tags r
   tree.entities[0].static={render:false};assert.equal(new TreeDocument(tree).view().tiles[1][1].color,'white');
   tree.entities[0].tags.exitTo='A';tree.entities.push({...structuredClone(tree.entities[0]),id:'other',tags:{exitTo:'B'}});assert.throws(()=>new TreeDocument(tree),/Conflicting/);
 });
+
+test('legacy height and fixed cell region edits preserve additional mixed components',()=>{
+ const snapshot=new TreeDocument(legacy()).serialize();snapshot.entities[0].components={...snapshot.entities[0].components,ice:{},fire:{damage:3},key:{name:'铜'}};const doc=new TreeDocument(snapshot);
+ for(const edit of [tile=>tile.height=.4,tile=>tile.regionTag='B']){const next=doc.view();edit(next.tiles[1][1]);doc.applyLegacy(next);const node=doc.world.serialize()[0];assert.deepEqual(node.components.fire,{damage:3});assert.deepEqual(node.components.key,{name:'铜'});assert.deepEqual(node.components.ice,{});}
+ });

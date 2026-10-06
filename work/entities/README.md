@@ -11,3 +11,5 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。
 
 节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。
+
+node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。

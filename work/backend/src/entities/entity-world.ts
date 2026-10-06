@@ -15,6 +15,8 @@ export class EntityWorld {
     this.transforms.get(node.transformId);
     const components:Record<string,JsonObject>={};
     for(const [id,config] of Object.entries(jsonObject(node.components)))components[id]=jsonObject(config);
+    for(const flag of ['render','transparent','walkable','placeable'])if(node.static?.[flag]!==undefined&&typeof node.static[flag]!=='boolean')throw new Error('Invalid static '+flag);
+    if(node.static?.events!==undefined&&(!Array.isArray(node.static.events)||node.static.events.some(event=>!['enter','leave','interact'].includes(String(event)))))throw new Error('Invalid static events');
     return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:jsonObject(node.tags),static:freezeJson(jsonObject(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
   }
   get(id:string):EntityNode {

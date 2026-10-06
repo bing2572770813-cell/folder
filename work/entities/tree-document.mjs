@@ -30,7 +30,7 @@ function configure(node,tile,folds){
   node.components.surface={...node.components.surface,height:tile.height,thickness:tile.thickness,gradualRate:tile.gradualRate};
   for(const field of ['color','edgeColor']){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
   node.components.collision={...node.components.collision,blocked:tile.blocked};
-  for(const id of terrainIds)delete node.components[id];
+  const represented=terrainIds.find(id=>node.components[id]);if(represented&&represented!==tile.terrain)delete node.components[represented];
   if(tile.terrain)node.components[tile.terrain]={...copy(tile.terrainConfig??{}),...(tile.terrain==='key'?{name:tile.keyName}:{} )};
   if(folds.length)node.components.fold={...node.components.fold,directions:copy(folds)};else delete node.components.fold;
 }

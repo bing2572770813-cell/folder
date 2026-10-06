@@ -41,3 +41,14 @@ test('hidden cells and protected references reject operations atomically',()=>{
   assert.throws(()=>placeTreePrefab(doc,prefab,{},3,3),/显式/);
   assert.throws(()=>placeTreePrefab(doc,{...prefab,behavior:{scriptId:'arbitrary-code'}},{},3,3,{stack:true}),/未注册/);
 });
+
+test('entry relocation and scalar conflict reparent reject without changing the source',()=>{
+ const source=document().serialize();source.cellTags['2,2']={regionTag:'B'};source.cellTags['3,3']={regionTag:'C'};source.cellTags['2,3']={regionTag:'B'};
+ let doc=placeTreePrefab(new TreeDocument(source),{id:'entry',components:{tag:{}},tags:{entry:true}},{},2,2,{stack:true});doc=placeTreePrefab(doc,{id:'entry2',components:{tag:{}},tags:{entry:true}},{},3,3,{stack:true});const node=doc.world.at(3,3)[0],before=doc.serialize();assert.throws(()=>moveNode(doc,node.id,{r:2,c:3,dir:0}),/入口/);assert.deepEqual(doc.serialize(),before);
+ doc=placeTreePrefab(document(),{id:'exitA',components:{tag:{}},tags:{exitTo:'A'}},{},2,2,{stack:true});doc=placeTreePrefab(doc,{id:'exitB',components:{tag:{}},tags:{exitTo:'B'}},{},3,3,{stack:true});const a=doc.world.at(2,2)[0],b=doc.world.at(3,3)[0],snapshot=doc.serialize();assert.throws(()=>reparentNode(moveNode(doc,b.id,{r:0,c:0,dir:0}),b.id,a.id,false),/Conflicting/);assert.deepEqual(doc.serialize(),snapshot);
+ });
+ test('invalid static and component JSON edits are atomic',()=>{
+ const doc=placeTreePrefab(document(),prefab,{},2,2,{stack:true}),node=doc.world.at(2,2)[0],before=doc.serialize();
+ for(const components of [{surface:{height:-1}},{collision:{blocked:'yes'}},{fire:{damage:-1}},{unknown:{}}]){assert.throws(()=>configureNode(doc,node.id,components,node.tags));assert.deepEqual(doc.serialize(),before);}
+ assert.throws(()=>placeTreePrefab(doc,{id:'invalid',components:{key:{}},static:{walkable:'yes'}},{},3,3,{stack:true}));assert.deepEqual(doc.serialize(),before);
+ });

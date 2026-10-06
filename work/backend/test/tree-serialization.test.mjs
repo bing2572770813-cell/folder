@@ -129,3 +129,14 @@ test('cell permission projection filters regions independently and preserves raw
   assert.deepEqual(serializeTreeMap(imported.world,imported.metadata,imported.cellTags).cellTags,before);
   assert.deepEqual(importTreeMap(saved).cellTags,saved.cellTags);
 });
+
+ test('canonical permission contracts also filter duplicate legacy configuration',async()=>{
+ const {nodePermissions}=await import('../../entities/node-permissions.mjs');const data=source();data.tiles[0][0]={prefabId:'fire_ai',height:.2,terrain:'fire',terrainConfig:{damage:3},propertySchema:{components:{children:{surface:{children:{height:{serializable:false}}},fire:{children:{damage:{serializable:false}}}}}}};
+ const imported=importTreeMap(data),saved=serializeTreeMap(imported.world,imported.metadata,imported.cellTags,{projectProperties,schemaFor:n=>nodePermissions(n,n.configuration?.propertySchema)});
+ const node=saved.entities[0];assert.equal(node.components.surface.height,undefined);assert.equal(node.configuration.height,undefined);assert.equal(node.components.fire.damage,undefined);assert.equal(node.configuration.terrainConfig.damage,undefined);
+ });
+ test('permission bridge applies legacy readonly and canonical unreadable in both directions',async()=>{
+ const {nodePermissions}=await import('../../entities/node-permissions.mjs');const {updateProperty}=await import('../../core/property-model.mjs');
+ const node={components:{surface:{height:.2}},configuration:{height:.2},tags:{}};const schema=nodePermissions(node,{height:{tempEditable:false},components:{children:{surface:{children:{height:{readable:false}}}}}});
+ assert.equal(projectProperties(node,schema,'readable').components.surface.height,undefined);assert.throws(()=>updateProperty(node,schema,['components'],{surface:{height:.4}}),/不可编辑/);assert.throws(()=>updateProperty({height:.2},schema,['height'],.4),/不可编辑/);
+ });

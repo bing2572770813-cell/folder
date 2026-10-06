@@ -6,7 +6,7 @@
 
 - `config.ts`：从环境变量和目录根生成配置。
 - `app.ts`：组装 Fastify 与路由，可通过 `inject` 测试，不监听端口。
-- `server.ts`：监听端口及进程启动。
+- `server.ts`：`startServer` 监听端口并返回可关闭的服务；`runServer` 作为两个可执行入口共用的启动函数，打印地址并注册退出信号。
 - `routes/`：HTTP 协议适配，不负责 prefab 规范化或继承。
 - `resources/catalog.ts`：磁盘目录读取、继承解析、逐文件错误隔离与禁止覆盖的写入。
 - `resources/static-files.ts`：静态文件读取。路由负责 URL、根目录范围及 MIME；应用可注入读取器验证不同 IO 结果。
@@ -29,3 +29,5 @@ npm --prefix work start
 目录整体读取失败返回 JSON 500；单个定义损坏仍返回 200，并放入 `errors`。目录接口不支持的请求方法返回 405 和 `Allow: GET`。静态文件不存在或目标为目录返回 404，非法 URL 编码返回 400，超出根目录返回 403，其他文件读取故障返回 JSON 500。
 
 `work/server.cjs`、`work/prefab-catalog.cjs` 和写入 CLI 是兼容入口，内部转发到编译后的 TypeScript 模块。修改 `src/` 后需要重新运行 `backend:build`。
+
+`createApp` 与 `startServer` 不修改进程信号监听器。可执行入口通过 `runServer` 安装 `SIGINT`/`SIGTERM` 处理，重复信号只关闭一次；显式关闭服务或关闭失败时移除监听器。关闭失败报告错误并设置非零退出码。

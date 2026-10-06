@@ -96,3 +96,12 @@ assert.doesNotThrow(()=>projectedCellSchema(primary,[{...secondary,components:{f
 const hiddenConfiguration=ownerDocument({...structuredClone(secondary),configuration:{custom:1,propertySchema:{custom:{readable:false}}}});
 const hiddenCandidate={world:{get:id=>{const value=hiddenConfiguration.world.get(id);if(id==='z-tag')value.configuration.custom=2;return value;}}};
 assert.throws(()=>assertNodePropertyChanges(hiddenConfiguration,hiddenCandidate,schemaFor),/不可编辑/);
+
+const minimalSource=uniqueSaved;minimalSource.entities=[{...structuredClone(primary),components:{surface:{}},configuration:{propertySchema:{components:{children:{surface:{children:{height:{tempEditable:false}}}}}}}}];minimalSource.transforms=minimalSource.transforms.filter(transform=>transform.id==='surface-t');
+const minimalDoc=new TreeDocument(minimalSource),minimalRegion=minimalDoc.view();minimalRegion.tiles[0][0].regionTag='B';
+const minimalCandidate=forkTreeDocument(minimalDoc);minimalCandidate.applyLegacy(minimalRegion);
+assert.doesNotThrow(()=>assertNodePropertyChanges(minimalDoc,minimalCandidate,schemaFor),'fixed region edits must not materialize locked native surface defaults');
+assert.deepEqual(minimalCandidate.world.get('a-surface').components,{surface:{}});
+const actualHeight=minimalDoc.view();actualHeight.tiles[0][0].height=.8;const actualHeightCandidate=forkTreeDocument(minimalDoc);actualHeightCandidate.applyLegacy(actualHeight);
+assert.throws(()=>assertNodePropertyChanges(minimalDoc,actualHeightCandidate,schemaFor),/不可编辑/,'an actual height change still obeys the lock');
+console.log('PASS: region-only edits preserve sparse native components while actual readonly height changes are rejected.');

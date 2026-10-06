@@ -24,15 +24,15 @@ function tileOf(node){
   tile.folds=copy(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
   return normalizeTile(tile);
 }
-function configure(node,tile,folds){
+function configure(node,tile,folds,previous){
   const {regionTag,...configuration}=copy(tile);
   node.configuration=configuration;node.tags=copy(tile.tags??{});
-  node.components.surface={...node.components.surface,height:tile.height,thickness:tile.thickness,gradualRate:tile.gradualRate};
-  for(const field of ['color','edgeColor']){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
-  node.components.collision={...node.components.collision,blocked:tile.blocked};
+  // Preserve absent native defaults when only unrelated legacy fields changed.
+  for(const field of ['height','thickness','gradualRate','color','edgeColor'])if(!equal(previous[field],tile[field])){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
+  if(!equal(previous.blocked,tile.blocked))node.components.collision={...node.components.collision,blocked:tile.blocked};
   const represented=terrainIds.find(id=>node.components[id]);if(represented&&represented!==tile.terrain)delete node.components[represented];
-  if(tile.terrain)node.components[tile.terrain]={...copy(tile.terrainConfig??{}),...(tile.terrain==='key'?{name:tile.keyName}:{} )};
-  if(folds.length)node.components.fold={...node.components.fold,directions:copy(folds)};else delete node.components.fold;
+  if(tile.terrain&&(!equal(previous.terrain,tile.terrain)||!equal(previous.terrainConfig,tile.terrainConfig)||!equal(previous.keyName,tile.keyName)))node.components[tile.terrain]={...copy(tile.terrainConfig??{}),...(tile.terrain==='key'?{name:tile.keyName}:{} )};
+  if(!equal(node.components.fold?.directions??[],folds)){if(folds.length)node.components.fold={...node.components.fold,directions:copy(folds)};else delete node.components.fold;}
 }
 
 /** Canonical tree storage with detached compatibility projections for legacy tools. */
@@ -88,7 +88,7 @@ export class TreeDocument {
               else updated.set(owner.id,edited);
             }
           }
-          configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds);updated.set(node.id,node);
+          configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds,old);updated.set(node.id,node);
         }
         else {
           const seed={version:1,width:next.width,height:next.height,tiles:Array.from({length:next.height},()=>Array(next.width).fill(null)),foldCells:[]};seed.tiles[r][c]=tile;

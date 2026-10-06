@@ -12,3 +12,5 @@ tag/ 已包含区域、折线、玩家起点、区域入口和区域出口五类
 
 entity/player_ai.json 为自动生成的可操控玩家定义，受控行为 ID 为 player-controller。behavior.parameters.moveHeight 定义默认最大上移/下降；behavior.state 定义初始过热、冰冻、机制行动次数与已收集钥匙；tile.color 定义 token 颜色。player.cjs 实例化独立状态并在进出游玩/重启时重新读取当前目录定义。手动放置 Player prefab 仅生成普通静态 token，不获得控制权；旧 player_token_ai 继续兼容。
 behavior.parameters.foldDrop.vertical 和 horizontal 定义折纸落点默认阈值（世界 Y 竖直距离、XZ 水平距离），默认分别为 1 和 0.35；必须大于 0 且不超过 16。前端调试只改变运行实例，重启恢复 prefab 默认值。
+
+实体 tile 可选 `collision` 布尔值，缺省 true，表示拥有碰撞箱并阻挡折叠动画；关闭后折叠可穿过该实体，虚空永不拥有碰撞箱。

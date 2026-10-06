@@ -1,6 +1,6 @@
 import { tileHeight, tileGradualRate } from '../entities/tile-model.mjs';
-import { foldStrokes, foldDistance } from '../tags/fold-geometry.mjs';
-import { isPaper, paperSurface } from './paper-surface.mjs';
+import { foldStrokes, foldDistance, axisKey } from '../tags/fold-geometry.mjs';
+import { isPaper, paperSurface, DEFAULT_CREASE_DEPTH } from './paper-surface.mjs';
 
 const EPSILON = 1e-9;
 const normalize = values => {
@@ -75,6 +75,7 @@ function createSampler(map, {
   flatLift = .018,
   voidPlane = () => 0,
   showFolds = true,
+  creaseDepth = DEFAULT_CREASE_DEPTH,
 } = {}) {
   const width = map.width ?? map.tiles[0]?.length ?? 0,
     height = map.height ?? map.tiles.length,
@@ -92,7 +93,7 @@ function createSampler(map, {
     if (cache.has(key)) return cache.get(key);
     const tile = map.tiles[r]?.[c];
     const surface = isPaper(tile)
-      ? paperSurface({ ...map, foldCells: foldCells.get(key) ?? [] }, r, c, hidden, showFolds)
+      ? paperSurface({ ...map, foldCells: foldCells.get(key) ?? [] }, r, c, hidden, showFolds, creaseDepth)
       : null;
     const size = surface ? Math.sqrt(surface.points.length) : 0;
     const inner = .5 / (1 + tileGradualRate(tile));
@@ -184,6 +185,7 @@ export function creaseGuides(map, groups, {
   showFolds = true,
   voidPlane = () => 0,
   selected = null,
+  creaseDepth = DEFAULT_CREASE_DEPTH,
 } = {}) {
   const { width, height, cellSurface, sample } = createSampler(map, {
     hidden,
@@ -191,6 +193,7 @@ export function creaseGuides(map, groups, {
     flatLift,
     voidPlane,
     showFolds,
+    creaseDepth,
   });
   const positions = [], lineCells = [], dots = [];
 
@@ -371,6 +374,7 @@ export function creaseSelection(map, group, {
     flatLift,
     voidPlane,
     showFolds,
+    creaseDepth,
   });
   const positions = [],
     cells = [];

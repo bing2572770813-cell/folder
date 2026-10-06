@@ -13,3 +13,5 @@
 验证：`npm --prefix work run backend:test`。后续仍需实体、组件、prefab 继承、地图转换、浏览器适配和 player.cjs 交互接入。
 
 `PrefabRegistry` 已提供 JSON 模板继承：递归对象合并、数组替换、缺失父模板和循环拒绝。`instantiate` 从调用方接收实体 ID 与 Transform ID，生成独立配置快照并深冻结静态标记；实例运行时状态不写入 prefab 或实体配置。此模块暂未接入磁盘目录或编辑器，组合子模板和字段编辑权限仍需后续接入。
+
+`EntityWorld` 管理实体身份、标签配置与隔离的组件运行时状态。空间查询委托 TransformManager；实体注册会 retain Transform 引用，实体移除会 release。删除实体及其 Transform 时若空间删除失败会恢复引用，实体配置不变。序列化不含运行时状态。

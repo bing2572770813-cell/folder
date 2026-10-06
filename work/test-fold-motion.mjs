@@ -7,7 +7,7 @@ import {blocked,foldsAt} from './entities/tile-model.mjs';
 import {validateRegions,taggedCells,regionOf} from './tags/regions.mjs';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction,validateTerrains} from './entities/mechanism-rules.mjs';
 
-function fixture(type='h',project=null){
+function fixture(type='h',project=null,foldLimit=null){
  const map={width:7,height:7,spawn:{r:2,c:3,dir:0},tiles:Array.from({length:7},()=>Array.from({length:7},()=>({prefabId:'paper_ai',height:.09,thickness:.025,color:'white',folds:[],tags:{},regionTag:'A'}))),foldCells:[],maxSteps:0,bestSteps:null,exit:null};
  if(type==='v')map.spawn={r:3,c:2,dir:0};
  for(let i=0;i<7;i++){const r=type==='h'?3:i,c=type==='v'?3:type==='d1'?i:type==='d2'?6-i:i;map.tiles[r][c].folds=[type];}
@@ -19,9 +19,9 @@ function fixture(type='h',project=null){
  const P=runtime.createPlayerState(map.spawn),inside=(r,c)=>r>=0&&c>=0&&r<7&&c<7,noop=()=>{};
  const renderPlayer=()=>{player.position.set(P.player.c-3,.108,P.player.r-3);player.rotation.set(0,-P.player.dir*Math.PI/4,0);};
  let controller;
- const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>player,getSelectionRing:()=>ring,getEffectLayer:()=>paper,getFoldHinge:g=>hingeFor(map,g,c=>c-3,r=>r-3),foldView:view,invalidateAxes:noop,...(project?{project}:{}),isHidden:()=>false,blocked,inside,walkable:(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c]),canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c-3,wz:r=>r-3,tileTop:(r,c)=>map.tiles[r]?.[c]?.height??0};
+ const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>player,getSelectionRing:()=>ring,getEffectLayer:()=>paper,getFoldHinge:g=>hingeFor(map,g,c=>c-3,r=>r-3),foldView:view,invalidateAxes:noop,...(project?{project}:{}),...(foldLimit?{foldLimit}:{}),isHidden:()=>false,blocked,inside,walkable:(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c]),canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c-3,wz:r=>r-3,tileTop:(r,c)=>map.tiles[r]?.[c]?.height??0};
  controller=runtime.createPlayerController(env);controller.setMode('play');renderPlayer();controller.selectFold(3,3,type);
- return {P,map,controller,view,layer,player,mesh};
+ return {P,map,controller,view,layer,player,mesh,nodes};
 }
 for(const type of ['h','v','d1','d2']){
  const f=fixture(type),before=JSON.stringify(f.map),source={...f.P.player};
@@ -86,3 +86,29 @@ for(const type of ['h','v','d1','d2']){
  f.controller.cancelFoldMotion();
 }
 console.log('PASS: four physical fold axes, mixed crease halves, player attachment, aligned drop, rebound, stale gates, undo, immutable maps and perpendicular drag gestures.');
+
+// env.foldLimit integration: the collision cap reaches the controller and
+// clamps the gesture, so an obstructed fold reports the block and never drops.
+
+// env.foldLimit integration: the collision cap reaches the controller and
+// clamps the gesture, so an obstructed fold reports the block and never drops.
+const capped=fixture('h',isoView,()=>.3),cappedSource={...capped.P.player};
+capped.controller.selectFold(3,3,'h');
+assert.equal(capped.controller.beginFoldDrag(cappedSource.r,cappedSource.c,300,300),true);
+assert.equal(capped.P.foldMotion.limit,.3,'collision limit is stored on the motion');
+assert.equal(capped.P.foldMotion.blocked,false,'starting a drag is not yet blocked');
+const [cx,cy]=gestureOf(capped.P.foldMotion.hinge,[cappedSource.c-3,.09,cappedSource.r-3]);
+assert.equal(capped.controller.updateFoldDrag(300+cx*239,300+cy*239,240),false,'a clamped fold never reports ready');
+assert.ok(Math.abs(capped.P.foldMotion.angle-.3)<1e-9,'full drag is clamped to the collision limit');
+assert.equal(capped.P.foldMotion.blocked,true,'a clamped fold reports the block');
+assert.equal(capped.nodes.get('foldDetail').textContent,'折叠被碰撞箱阻挡');
+assert.equal(capped.controller.endFoldDrag(),false,'a blocked fold never drops');
+assert.equal(capped.P.steps,0);assert.deepEqual(capped.P.player,cappedSource);
+capped.controller.cancelFoldMotion();
+const open=fixture('h',isoView,()=>undefined),openSource={...open.P.player};
+open.controller.selectFold(3,3,'h');
+assert.equal(open.controller.beginFoldDrag(openSource.r,openSource.c,300,300),true);
+assert.equal(open.P.foldMotion.limit,Math.PI,'no collider means a full fold');
+const [ox,oy]=gestureOf(open.P.foldMotion.hinge,[openSource.c-3,.09,openSource.r-3]);
+assert.equal(open.controller.updateFoldDrag(300+ox*240,300+oy*240,240),true,'an unobstructed fold still reaches the target');
+console.log('PASS: collision limits reach the controller, clamp the gesture and report the block.');

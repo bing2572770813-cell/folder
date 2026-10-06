@@ -335,7 +335,7 @@ function cancelFoldMotion() {
     P.foldMotion = null;
     renderPlayer();
   }
-function beginFoldDrag(r, c, startY) {
+function beginFoldDrag(r, c, startX, startY) {
     if (
       P.mode !== "play" ||
       P.moving ||
@@ -407,13 +407,26 @@ function beginFoldDrag(r, c, startY) {
     P.legalMoves = [];
     P.legalFoldMoves = [];
     env.getSelectionRing().visible = false;
+    // Collision boxes cap the flap before it can push through them.
+    const limit = env.foldLimit?.(
+        { cells, creaseCells, center: group.center, radius: group.radius },
+        hinge,
+    );
     env.foldView.begin(cells, hinge, creaseCells);
     P.foldMotion = {
       axis,
       cells,
       creaseCells,
       hinge,
+      startX,
       startY,
+      gesture: foldGesture(hinge, [
+          wx(P.player.c),
+          tileTop(P.player.r, P.player.c),
+          wz(P.player.r),
+      ]),
+      limit: clampFoldAngle(limit),
+      blocked: false,
       angle: 0,
       sign: playerSide,
       phase: "drag",
@@ -424,16 +437,53 @@ function beginFoldDrag(r, c, startY) {
     updateUI();
     return true;
   }
-function updateFoldDrag(clientY, dragSpan = 240) {
+// Undefined limits mean "nothing in the way", i.e. a full 180 degree fold.
+function clampFoldAngle(value) {
+    return Number.isFinite(value) ? Math.max(0, Math.min(Math.PI, value)) : Math.PI;
+}
+// A fold only reads the part of the drag that is perpendicular to the crease.
+// The perpendicular is the screen image of the direction the paper itself
+// travels while lifting, so one upward-looking gesture works for every axis.
+function foldGesture(hinge, grip) {
+    if (!env.project || !env.THREE || !hinge || !grip) return { x: 0, y: -1 };
+    const THREE = env.THREE,
+        origin = new THREE.Vector3().fromArray(hinge.origin),
+        axis = new THREE.Vector3().fromArray(hinge.direction).normalize(),
+        lever = new THREE.Vector3().fromArray(grip).sub(origin),
+        // Positive angle lifts the flap, matching the render transform sign.
+        shifted = lever
+            .clone()
+            .applyAxisAngle(axis, 0.05 * (hinge.side ?? 1))
+            .add(origin),
+        from = env.project(origin.x, origin.y, origin.z),
+        to = env.project(shifted.x, shifted.y, shifted.z),
+        x = to[0] - from[0],
+        y = to[1] - from[1],
+        length = Math.hypot(x, y);
+    if (!(length > 1e-9)) return { x: 0, y: -1 };
+    return { x: x / length, y: y / length };
+}
+function updateFoldDrag(clientX, clientY, dragSpan = 240) {
     const motion = P.foldMotion;
     if (!motion || motion.phase !== "drag") return false;
-    motion.angle = Math.max(
-      0,
-      Math.min(
-        Math.PI,
-        ((motion.startY - clientY) / Math.max(1, dragSpan)) * Math.PI,
-      ),
+    const gesture = motion.gesture ?? { x: 0, y: -1 };
+    return refreshFoldDrag(
+        motion,
+        dragSpan,
+        (clientX - (motion.startX ?? 0)) * gesture.x +
+            (clientY - (motion.startY ?? 0)) * gesture.y,
     );
+}
+// Applies one perpendicular gesture displacement, caps it with the collision
+// limit, and refreshes the preview. Release replays the same math.
+function refreshFoldDrag(motion, dragSpan, along) {
+    const desired = Math.max(
+        0,
+        Math.min(Math.PI, (along / Math.max(1, dragSpan)) * Math.PI),
+    );
+    // Collision boxes cap the gesture, so the flap never pushes through them.
+    motion.angle = Math.min(desired, clampFoldAngle(motion.limit));
+    motion.blocked = desired - motion.angle > 1e-6;
     // For this axis convention, positive angle lifts the positive side.
     env.foldView.setAngle(motion.angle * motion.sign);
     const target = foldTarget(motion.axis),
@@ -458,7 +508,9 @@ function updateFoldDrag(clientY, dragSpan = 240) {
     }
     $("foldDetail").textContent = ready
       ? "松开掉落到 " + coord(target.r, target.c)
-      : `折叠 ${Math.round((motion.angle * 180) / Math.PI)}° · ${target.valid ? "尚未对齐目标" : target.reason}`;
+      : motion.blocked
+        ? "折叠被碰撞箱阻挡"
+        : `折叠 ${Math.round((motion.angle * 180) / Math.PI)}° · ${target.valid ? "尚未对齐目标" : target.reason}`;
     $("teleportBtn").disabled = true;
     env.syncFoldState?.();
     return ready;
@@ -467,7 +519,7 @@ function endFoldDrag(cancelled = false) {
     const motion = P.foldMotion;
     if (!motion || motion.phase !== "drag") return false;
     // Recheck gates and spatial alignment at release, never trust a stale highlight.
-    updateFoldDrag(motion.startY - (motion.angle / Math.PI) * 240, 240);
+    refreshFoldDrag(motion, 240, (motion.angle / Math.PI) * 240);
     if (!cancelled && motion.ready) {
       const target = foldTarget(motion.axis),
         from = new THREE.Vector3().fromArray(motion.worldPosition),

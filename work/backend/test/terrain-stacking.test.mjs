@@ -167,3 +167,11 @@ test('rename stacked keys and exit references atomically, preserving remaining n
  const remaining=renameTreeKeys(new TreeDocument(input),[{r:1,c:1}],'银');assert.deepEqual(remaining.world.get('paper').tags.requiredKeys,['铜','银']);
  assert.deepEqual(doc.serialize(),before);
 });
+
+test('lift placement uses edited initial height instead of duplicate prefab defaults',()=>{
+ const doc=new TreeDocument(fixture()),lift={minHeight:.09,maxHeight:1,initialHeight:.09,turnsPerLeg:3};
+ const prefab={id:'lift_paper_ai',tile:{color:'white',lift},components:{lift},size:{width:1,height:1},occupied:[true]};
+ const placed=placeTreePrefab(doc,prefab,{color:'white',height:.6,lift:{...lift,initialHeight:.6}},3,3,{stack:true});
+ assert.equal(placed.view().tiles[3][3].height,.6);
+ assert.equal(placed.world.at(3,3)[0].components.lift.initialHeight,.6);
+});

@@ -86,7 +86,7 @@ export const BlockEntityTools = React.memo(function BlockEntityTools() {
           <h3 className="section-label">{"轮廓参数"}</h3>
           <div className="studio-fields">
             <label>
-              {"方块高度"}
+              <span id="blockHeightLabel">方块高度</span>
               <UiInput
                 id="blockHeight"
                 type="number"

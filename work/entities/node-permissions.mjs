@@ -13,5 +13,11 @@ export function nodePermissions(node,legacy={}){
  for(const key of ['minHeight','maxHeight','initialHeight','turnsPerLeg'])schema[key]=intersect(schema[key],effective('lift',key));
  schema.blocked=intersect(schema.blocked,effective('collision','blocked'));schema.folds=intersect(schema.folds,effective('fold','directions'));
  if(terrain)schema.terrainConfig=intersect(schema.terrainConfig,effective(terrain));if(terrain==='key')schema.keyName=intersect(schema.keyName,effective('key','name'));
+ if(node.components?.lift){
+  for(const key of ['height','gradualRate']){
+   field('surface',key,{readable:false,tempEditable:false});
+   schema[key]=intersect(schema[key],{readable:false,tempEditable:false});
+  }
+ }
  return schema;
 }

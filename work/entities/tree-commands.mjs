@@ -102,6 +102,7 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     const seed={version:1,width:candidate.world.transforms.width,height:candidate.world.transforms.height,tiles:Array.from({length:candidate.world.transforms.height},()=>Array(candidate.world.transforms.width).fill(null))};seed.tiles[0][0]=normalized;
     const node=importTreeMap(seed).world.serialize()[0],uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
     node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id,...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})};delete node.configuration.regionTag;registry.validate(node);
+    if(record.tile?.lift&&normalized.lift)node.components.lift=copy(normalized.lift);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});
     // Legacy terrain/item prefabs include a paper surface; stacking reuses the destination paper.

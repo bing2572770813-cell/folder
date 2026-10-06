@@ -40,6 +40,13 @@ export function validateEntityTags(value:unknown):JsonObject {
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(key=>typeof key!=='string'||!key.trim()||key.length>80)))throw new Error('所需钥匙必须是名称列表');
   return tags;
 }
+/** Catalog and world boundaries share the same static field contract. */
+export function validateStaticFields(value:unknown):JsonObject {
+  const statics=jsonObject(value);
+  for(const flag of ['render','transparent','walkable','placeable'])if(statics[flag]!==undefined&&typeof statics[flag]!=='boolean')throw new Error('Invalid static '+flag);
+  if(statics.events!==undefined&&(!Array.isArray(statics.events)||statics.events.some(event=>!['enter','leave','interact'].includes(String(event)))))throw new Error('Invalid static events');
+  return statics;
+}
 export function freezeJson<T extends JsonValue>(value:T):T {
   if(value&&typeof value==='object'){for(const item of Object.values(value))freezeJson(item);Object.freeze(value);}
   return value;

@@ -28,6 +28,8 @@
 
 旧工具在无表面格删除部分折线方向时，更新每个 fold 拥有者，保留各自剩余方向、身份和其他组件；新增方向由首个拥有者接收。
 
+磁盘目录读取与保存使用 EntityWorld 相同的 static 字段校验，并校验继承后的实际字段：render/transparent/walkable/placeable 必须为布尔值，events 为 enter/leave/interact 数组。非法文件按来源路径报告错误，保存失败不会写入文件；未知 static 字段继续保留。
+
 旧 tile 的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和 serializable 权限过滤已接入生产保存，legacy/canonical 重复字段双向桥接并同时过滤。
 
 `importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {jsonObject,type JsonObject} from '../entities/entity-model.js';
+import {jsonObject,validateStaticFields,type JsonObject} from '../entities/entity-model.js';
 import {resolvePrefabRecord} from '../entities/prefab-definition.js';
 import {defaultComponents} from '../entities/components.js';
 
@@ -75,7 +75,7 @@ export async function readCatalog(folder: string): Promise<CatalogResult> {
       const resolved=resolvePrefabRecord(id,definitions);
       const components:Record<string,JsonObject>={};
       for(const [key,config] of Object.entries(jsonObject(resolved.components??{})))components[key]=jsonObject(config);
-      defaultComponents().validate({id,prefabId:id,transformId:id,components,tags:{},static:{}});
+      defaultComponents().validate({id,prefabId:id,transformId:id,components,tags:{},static:validateStaticFields(resolved.static??{})});
       prefabs.push(tile.normalizePrefab(resolved));
     }catch(error){errors.push({file:definitionFiles.get(id)!,message:errorMessage(error)});}
   }
@@ -105,7 +105,7 @@ export async function savePrefab(folder: string, data: unknown): Promise<unknown
   const resolved=resolvePrefabRecord(raw.id,definitions);
   const components:Record<string,JsonObject>={};
   for(const [key,config] of Object.entries(jsonObject(resolved.components??{})))components[key]=jsonObject(config);
-  defaultComponents().validate({id:raw.id,prefabId:raw.id,transformId:raw.id,components,tags:{},static:{}});
+  defaultComponents().validate({id:raw.id,prefabId:raw.id,transformId:raw.id,components,tags:{},static:validateStaticFields(resolved.static??{})});
   const prefab = tile.normalizePrefab(resolved);
   if (current.prefabs.some(value => (value as {id: string}).id === prefab.id)) throw new Error('实体 ID 已存在，请使用新 ID');
   const target = path.join(folder, 'entity');

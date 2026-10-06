@@ -9,8 +9,8 @@
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "npm run backend:build && node server.cjs",
-    "build": "node build.cjs",
-    "test": "node test-runner.cjs"
+    "build": "npm run backend:build && node build.cjs",
+    "test": "npm run backend:build && node test-runner.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

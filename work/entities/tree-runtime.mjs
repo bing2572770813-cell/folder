@@ -5,4 +5,4 @@ export {validateEntityTags} from '../backend/src/entities/entity-model.ts';
 export {PrefabRegistry} from '../backend/src/entities/prefab-definition.ts';
 export {ComponentRegistry,defaultComponents} from '../backend/src/entities/components.ts';
 export {importTreeMap,serializeTreeMap} from '../backend/src/entities/tree-serialization.ts';
-export {validateTerrainChildren,canAttachTerrain} from '../backend/src/entities/terrain-children.ts';
+export {validateTerrainStacking} from '../backend/src/entities/terrain-stacking.ts';

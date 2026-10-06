@@ -1,7 +1,7 @@
 import {EntityWorld} from './entity-world.js';
 import {jsonObject,type JsonObject} from './entity-model.js';
 import {legacyMapToTree,loadTree,type TreeMap} from './legacy-map.js';
-import {validateTerrainChildren} from './terrain-children.js';
+import {validateTerrainStacking} from './terrain-stacking.js';
 
 export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Record<string,JsonObject>}
 
@@ -40,7 +40,7 @@ export interface TreeSerializationOptions {
 }
 
 export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTags:Record<string,JsonObject>={},options:TreeSerializationOptions={}):TreeMap {
-  validateTerrainChildren(world);
+  validateTerrainStacking(world);
   const entities=world.serialize().map(node=>{
     const configuration=node.configuration;
     if(!options.projectProperties)return node;

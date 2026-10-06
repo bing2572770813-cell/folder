@@ -96,6 +96,13 @@ test('moved spawn and overlay spawn tags update compatibility and saved spawn co
  const source=new TreeDocument(legacy()).serialize();source.entities[0].tags.spawn=true;const doc=new TreeDocument(source),moved=moveNode(doc,source.entities[0].id,{r:2,c:2,dir:0});assert.deepEqual(moved.view().spawn,{r:2,c:2,dir:0});assert.deepEqual(moved.serialize().legacyMetadata.spawn,{r:2,c:2,dir:0});assert.equal(new TreeDocument(moved.serialize()).view().spawn.r,2);
  });
 
-test('collectible key selector includes overlay and mixed nodes and respects every blocker',async()=>{
- const {legalKeyNames}=await import('../../tags/keys.mjs');const snapshot=new TreeDocument(legacy()).serialize(),overlay={...structuredClone(snapshot.entities[0]),id:'key-overlay',components:{key:{name:'铜'}},tags:{}};snapshot.entities[0].tags={spawn:true};snapshot.entities[0].components.fire={};snapshot.entities[0].components.key={name:'银'};snapshot.entities.push(overlay);let doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),['铜','银'].sort());snapshot.entities[1].static.walkable=false;doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),[]);
+test('collectible key selector includes overlays and mixed nodes on separate paper tiles and respects every blocker',async()=>{
+ const {legalKeyNames}=await import('../../tags/keys.mjs');
+ const snapshot=new TreeDocument(legacy()).serialize(),base=snapshot.entities[0];
+ const overlay={...structuredClone(base),id:'key-overlay',transformId:'key-tile',components:{key:{name:'铜'}},tags:{}};
+ base.tags={spawn:true};base.components.fire={};base.components.key={name:'银'};
+ snapshot.entities.push(overlay,{...structuredClone(base),id:'key-ground',transformId:'key-tile',components:{surface:{}},tags:{}});
+ snapshot.transforms.push({id:'key-tile',parentId:null,local:{r:2,c:2,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ let doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),['铜','银'].sort());
+ base.static={...base.static,walkable:false};overlay.static={...overlay.static,walkable:false};doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),[]);
  });

@@ -1,12 +1,19 @@
 {
   "dependencies": {
     "esbuild": "^0.25.10",
+    "fastify": "^5.12.5",
     "lucide": "^0.468.0",
     "three": "^0.180.0"
   },
   "scripts": {
+    "backend:build": "tsc -p backend/tsconfig.json",
+    "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "node server.cjs",
     "build": "node build.cjs",
     "test": "node test-runner.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
   }
 }

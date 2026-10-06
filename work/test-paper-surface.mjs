@@ -8,3 +8,14 @@ assert.equal(paperSurface({tiles:[[{...tile(4),gradualRate:0},tile(1)]]},0,0),nu
 const {normalizeTile,tileThickness,tileGradualRate}=await import('./tile-model.mjs');assert.equal(tileThickness(normalizeTile(tile(2))),2);assert.equal(tileGradualRate(normalizeTile(tile(2))),2/3);assert.equal(normalizeTile({...tile(2),thickness:3,gradualRate:2}).thickness,3);for(const value of [-1,NaN,Infinity,17])assert.throws(()=>normalizeTile({...tile(1),thickness:value}));for(const value of [-1,NaN,Infinity,101])assert.throws(()=>normalizeTile({...tile(1),gradualRate:value}));assert.deepEqual(normalizeTile(JSON.parse(JSON.stringify(normalizeTile({...tile(2),thickness:.1,gradualRate:1})))),normalizeTile({...tile(2),thickness:.1,gradualRate:1}));console.log('PASS: normal extrusion without world-height clipping, rate geometry, zero transition, property validation and JSON roundtrip.');
 
 const meshEdges=new Map();for(let i=0;i<thinSurface.positions.length;i+=9){const vertices=[0,3,6].map(offset=>JSON.stringify(thinSurface.positions.slice(i+offset,i+offset+3)));for(let j=0;j<3;j++){const key=[vertices[j],vertices[(j+1)%3]].sort().join('|');meshEdges.set(key,(meshEdges.get(key)||0)+1);}}assert.ok([...meshEdges.values()].every(count=>count===2));console.log('PASS: physical paper shell is watertight; every mesh edge has two faces.');
+
+for(const type of ['h','v','d1','d2']){
+ const folded=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:[type]}]]},0,0);
+ assert.ok(Math.abs(folded.points[544][1]-.965)<1e-10);
+ for(let i=0;i<folded.points.length;i++)assert.ok(Math.abs(Math.hypot(...folded.points[i].map((v,j)=>v-folded.bottomPoints[i][j]))-.1)<1e-10);
+ assert.ok(folded.positions.every(Number.isFinite));
+ assert.equal(paperSurface({tiles:[[{...tile(1),folds:[type]}]]},0,0,()=>false,false),null);
+}
+const crossing=paperSurface({tiles:[[{...tile(1),folds:['h','v','d1','d2']}]]},0,0);
+assert.ok(Math.abs(crossing.points[544][1]-.965)<1e-10);
+console.log('PASS: four crease directions, non-additive intersections, normal thickness and visibility.');

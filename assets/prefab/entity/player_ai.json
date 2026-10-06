@@ -6,7 +6,10 @@
   "occupied": [true],
   "behavior": {
     "scriptId": "player-controller",
-    "parameters": { "moveHeight": { "maxUp": 1, "maxDown": 1 } },
+    "parameters": {
+      "moveHeight": { "maxUp": 1, "maxDown": 1 },
+      "foldDrop": { "vertical": 1, "horizontal": 0.35 }
+    },
     "state": { "overheat": 0, "frozen": false, "actions": 0, "collectedKeys": [] }
   },
   "tile": {

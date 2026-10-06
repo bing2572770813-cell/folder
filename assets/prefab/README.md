@@ -11,3 +11,4 @@ tag/ 已包含区域、折线、玩家起点、区域入口和区域出口五类
 程序写入标签使用 node work/write-tag-prefab.cjs，不能覆盖已有 ID。标签实例继续保存到旧地图字段，通用属性权限仍待接入。
 
 entity/player_ai.json 为自动生成的可操控玩家定义，受控行为 ID 为 player-controller。behavior.parameters.moveHeight 定义默认最大上移/下降；behavior.state 定义初始过热、冰冻、机制行动次数与已收集钥匙；tile.color 定义 token 颜色。player.cjs 实例化独立状态并在进出游玩/重启时重新读取当前目录定义。手动放置 Player prefab 仅生成普通静态 token，不获得控制权；旧 player_token_ai 继续兼容。
+behavior.parameters.foldDrop.vertical 和 horizontal 定义折纸落点默认阈值（世界 Y 竖直距离、XZ 水平距离），默认分别为 1 和 0.35；必须大于 0 且不超过 16。前端调试只改变运行实例，重启恢复 prefab 默认值。

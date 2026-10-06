@@ -1,5 +1,6 @@
 import {validateMap as normalizeMap} from './core/map-model.mjs';
 import {paperSurface} from './render/paper-surface.mjs';
+import {squareViewSpan,followTarget} from './render/follow-camera.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -113,6 +114,8 @@ controls.enableRotate=false; controls.enableDamping=true; controls.dampingFactor
 controls.minZoom=.3; controls.maxZoom=64; controls.mouseButtons={LEFT:null,MIDDLE:null,RIGHT:THREE.MOUSE.PAN};
 controls.touches={ONE:null,TWO:THREE.TOUCH.DOLLY_PAN};
 let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
+let cameraMode='edit',editorCameraSnapshot=null;
+const cameraFollowTarget=new THREE.Vector3();
 const paper=new THREE.Group(); scene.add(paper);
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
 const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(-9,18,8); sunlight.castShadow=true;
@@ -217,6 +220,13 @@ function applyVisibility(){
 for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;applyVisibility();syncState();};
 
 function fitCamera(resetZoom=true) {
+  if(P.mode==='play'){
+    playerGroup.getWorldPosition(cameraFollowTarget);
+    cameraOffset.set(view==='top'?0:12,view==='top'?24:17.04,view==='top'?.001:15);
+    followTarget(camera,controls,cameraFollowTarget,cameraOffset);
+    const rect=viewport.getBoundingClientRect();baseSpan=squareViewSpan(camera,cameraFollowTarget,9,rect.width/Math.max(1,rect.height));
+    if(resetZoom)camera.zoom=1;resize();return;
+  }
   controls.target.set(0,0,0);const distance=Math.max(24,Math.max(map.width,map.height)*2);cameraOffset.set(view==='top'?0:distance*.5,view==='top'?distance:distance*.71,view==='top'?.001:distance*.625);camera.position.copy(cameraOffset);camera.lookAt(controls.target);camera.updateMatrixWorld(true);
   const rect=viewport.getBoundingClientRect(),aspect=Math.max(.1,rect.width/rect.height);
   const corners=[];for(const x of [-map.width/2-.7,map.width/2+.7])for(const z of [-map.height/2-.7,map.height/2+.7])corners.push(new THREE.Vector3(x,0,z).applyMatrix4(camera.matrixWorldInverse));
@@ -224,6 +234,17 @@ function fitCamera(resetZoom=true) {
   baseSpan=Math.max(ey/.7,ex/(aspect*.79));if(resetZoom)camera.zoom=1;resize();controls.update();
 }
 function resize(){const {width:w,height:h}=viewport.getBoundingClientRect();renderer.setSize(w,h,false);const aspect=w/Math.max(1,h);camera.left=-baseSpan*aspect;camera.right=baseSpan*aspect;camera.top=baseSpan;camera.bottom=-baseSpan;camera.updateProjectionMatrix();}
+function updateCameraMode(){
+  if(cameraMode===P.mode)return;
+  cameraMode=P.mode;
+  if(P.mode==='play'){
+    editorCameraSnapshot={position:camera.position.clone(),target:controls.target.clone(),zoom:camera.zoom,span:baseSpan,view};
+    controls.enablePan=false;const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;fitCamera();
+  }else{
+    controls.enablePan=true;
+    if(editorCameraSnapshot){const saved=editorCameraSnapshot;changeView(saved.view);camera.position.copy(saved.position);controls.target.copy(saved.target);camera.zoom=saved.zoom;baseSpan=saved.span;resize();controls.update();editorCameraSnapshot=null;}else fitCamera();
+  }
+}
 new ResizeObserver(()=>{fitCamera(false);}).observe(viewport);
 function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'],['topView','top']]){$(id).classList.toggle('active',view===value);$(id).setAttribute('aria-pressed',String(view===value));}document.querySelector('.viewport-corner span').textContent=view==='top'?'TOP VIEW':'ISOMETRIC';fitCamera();}
 $('fixedView').onclick=()=>changeView('fixed');$('topView').onclick=()=>changeView('top');$('fitView').onclick=()=>fitCamera();
@@ -375,6 +396,7 @@ $('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegio
 function pasteAt(r,c){try{if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);assertHiddenContentUnchanged(map,result.map,visibility);record();map=result.map;editRect=result.rect;setSelectedCells(unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x)));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
 function updateUI(){
+  updateCameraMode();
   if(document.activeElement!==$('mapName'))$('mapName').value=map.name;
   $('sceneMapName').textContent=map.name;document.title=map.name+' · FOLD FIELD';
   applyVisibility();const playing=P.mode==='play';$('playHints').textContent=P.freeTeleport?'测试传送已开启：点击任意可通行实体即可传送；目标区域会自动显示。':P.foldHints?'点击玩家显示行走与所有合法折纸传送落点；点击高亮方块即可移动。':'点击玩家显示行走范围；点击折纸线仍会高亮传送落点，也可按 F 传送。';$('freeTeleportToggle').setAttribute('aria-pressed',String(P.freeTeleport));$('freeTeleportToggle').querySelector('span').textContent=P.freeTeleport?'开启':'关闭';$('foldHintsToggle').setAttribute('aria-pressed',String(P.foldHints));$('foldHintsToggle').querySelector('span').textContent=P.foldHints?'开启':'关闭';$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩编辑':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
@@ -459,11 +481,12 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 let renderedFrames=0;
 function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
 function screenPoints(){
-  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??o.userData.surfaceCells?.length??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeToken.children[0].geometry.type,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??o.userData.surfaceCells?.length??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeTokenHost.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play',defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
 }
 function tick(now){requestAnimationFrame(tick);controls.update();updateFoldAxes();
   controller.tick(now);
+  if(P.mode==='play'){playerGroup.getWorldPosition(cameraFollowTarget);followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}
 }
 resetRegions();setupPrefabs();setTool(tool);buildPaper();fitCamera();if(P.mode==='play')checkRunEnd();requestAnimationFrame(tick);

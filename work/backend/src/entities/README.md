@@ -2,6 +2,8 @@
 
 产品范围依据 `docs/entity-transform-tree-product-design.md`。纯模型已接入生产编辑器、玩家、渲染和保存边界；实际 FR 证据见产品进度表。
 
+带 surface 组件的纸张实体最多有一个直接 terrain 子实体，允许没有。terrain 根据 campfire、ice、fire、eruption、key 组件识别，每个子实体计一次；同 Transform 下多个 terrain 实体分别计数。数量依据 Transform 父子关系，与空间重叠无关，普通子实体不计数。导入、导出、组合 prefab 放置、重挂载、组件编辑与粘贴共用校验；违规操作拒绝且保留源文档，父实体选择器禁用已占用 terrain 位置的候选。旧实体自身的内联地形组件保留兼容。
+
 `TransformManager` 是空间引用的唯一管理入口。`create`、`setLocal`、`setParent` 在候选状态校验全部父引用、循环和实际占格，成功后提交并通知；失败不修改状态或索引。读取返回独立副本。`at` 返回同一世界格全部 Transform ID，不增加 layer 或 CellStack。
 
 `retain`/`release` 记录实体等外部引用；默认删除拒绝有子节点或外部引用的 Transform。`serialize` 仅输出 ID、parentId、local 和 footprint，临时格索引、监听器和引用表不持久化。加载实体时应重新注册外部引用。

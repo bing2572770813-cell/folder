@@ -25,7 +25,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     const surface:JsonObject={height:tile.height??.09,thickness:tile.thickness??tile.height??.09,gradualRate:tile.gradualRate??2/3};
     if(tile.color!==undefined)surface.color=tile.color;if(tile.edgeColor!==undefined)surface.edgeColor=tile.edgeColor;
     const components:Record<string,JsonObject>={surface,collision:{blocked:tile.blocked??tile.color==='black'}};
-    if(tile.terrain==='fire')components.fire={...tile.terrainConfig,damage:1};
+    if(tile.terrain==='fire')components.fire={...tile.terrainConfig,damage:tile.terrainConfig?.damage??1};
     else if(tile.terrain==='key')components.key={...tile.terrainConfig,name:tile.keyName??'钥匙'};
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};

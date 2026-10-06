@@ -22,6 +22,8 @@
 
 `ComponentRegistry` 注册受控组件处理器，分发 enter/leave/interact。事件先检查全部组件和进入限制，再返回独立的 actor/runtime/messages 结果；不在处理器中计步、切换区域或提交玩家状态。static.events 限制效果订阅，不禁用碰撞预检；static.walkable=false 阻止进入。
 
+旧地图火焰导入保留显式配置的 damage（含 0），仅缺省时使用 1。
+
 旧 tile 的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和 serializable 权限过滤已接入生产保存，legacy/canonical 重复字段双向桥接并同时过滤。
 
 `importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。

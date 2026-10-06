@@ -22,7 +22,7 @@ function interact(){if(!world()||P.mode!=='play'||P.moving||P.levelWon||P.stepLi
 function validateForPlay() {const map=env.getMap();
   let regionErrors=validateRegions(map);
   if(world()){
-    for(const node of world().serialize())try{env.componentRegistry.validate(node);}catch(error){regionErrors.push(error.message);}
+    const componentErrors=[];for(const node of world().serialize())try{env.componentRegistry.validate(node);}catch(error){componentErrors.push(error.message);}if(componentErrors.length)return {valid:false,errors:[...regionErrors,...componentErrors]};
     regionErrors=regionErrors.filter(error=>!error.startsWith('出口所需钥匙不存在或不可收集：'));
     const keys=new Set();
     for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){

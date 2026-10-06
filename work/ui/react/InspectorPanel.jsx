@@ -5,6 +5,7 @@ import { TreeInspector } from "./TreeInspector.jsx";
 export const InspectorPanel = React.memo(function InspectorPanel() {
   return (
     <>
+      <TreeInspector />
       <UiSection className="section">
         <h2 className="section-label">{"当前选区"}</h2>
         <p id="inspectedEntity" className="studio-readout" role="status">
@@ -23,7 +24,6 @@ export const InspectorPanel = React.memo(function InspectorPanel() {
           </pre>
         </UiDisclosure>
       </UiSection>
-      <TreeInspector />
       <UiSection className="section">
         <h2 className="section-label">{"方块机制"}</h2>
         <div

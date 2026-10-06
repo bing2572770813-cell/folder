@@ -19,6 +19,19 @@ const esbuild = require("esbuild");
   module._compile(result.outputFiles[0].text, module.filename);
   const { parseHTML } = await import("linkedom");
   const { document } = parseHTML(module.exports.renderEditorMarkup());
+  assert.ok(document.querySelector('#nodeConfiguration'));
+  assert.equal(document.querySelector('#nodeLocalDir').tagName, 'SELECT');
+  assert.equal(document.querySelector('#nodeLocalDir').querySelectorAll('option').length, 8);
+  assert.ok(document.querySelector('#nodeComponents').closest('details'));
+  const nodeForm = parseHTML(module.exports.renderInspectorMarkup({
+    values: { components: { fire: { damage: 1 }, collision: { blocked: false } }, tags: { requiredKeys: ['铜'] } },
+    schema: { components: { children: { fire: { children: { damage: { tempEditable: false } } } } } },
+    mixed: new Set(), onChange: () => {}, onError: () => {}, options: { structured: true, expanded: true },
+  })).document;
+  assert.ok(nodeForm.querySelector('[aria-label="过热增量 (components.fire.damage)"]').hasAttribute('disabled'));
+  assert.equal(nodeForm.querySelector('[aria-label="阻挡 (components.collision.blocked)"]').getAttribute('type'), 'checkbox');
+  assert.ok(nodeForm.querySelector('[aria-label="所需钥匙 1"]'));
+  assert.equal(nodeForm.querySelector('textarea'), null);
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])

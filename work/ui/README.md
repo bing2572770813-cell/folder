@@ -16,6 +16,8 @@ React 创建界面结构并管理 Tab 与动态列表/Inspector 的状态。Thre
 
 ## 样式与构建
 
+实体检视位于检视面板顶部，仅显示当前节点的祖先、子树与点击格叠加实体。相对位置使用整数输入，朝向使用八方向选择；父实体候选排除自身、共享 Transform 的实体和后代，隐藏候选禁用。节点组件与标签复用带权限的属性表单，基础列表按条编辑，颜色使用选项菜单；复杂结构保留折叠的高级 JSON 编辑。表单与高级编辑共用原子校验、隐藏保护、撤销和临时属性处理；有子节点或外部引用时禁用删除。
+
 MantineProvider 的主题保留纸白/墨绿配色、字号及圆角。Mantine CSS 在现有界面 CSS 之前嵌入，react-editor.css 只处理适配。editor.html 是文档/CSS 外壳，布局唯一来源为 JSX。build.cjs 服务端生成静态预览结构，并将 React、组件库、Three.js、代码和 CSS 内嵌进 outputs/index.html/game.html；没有 CDN 或运行时 UI 构建服务。
 
 Node.js 仍只承担资源服务和构建。执行 npm --prefix work ci、npm --prefix work run build、npm --prefix work test。不要提交 node_modules 新依赖目录；package-lock.json 固定依赖。

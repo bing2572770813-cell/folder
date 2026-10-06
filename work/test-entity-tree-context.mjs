@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { entityTreeContext } from './ui/entity-tree-context.mjs';
+import { entityTreeContext, entityParentChoices } from './ui/entity-tree-context.mjs';
 import { TransformManager } from './backend/dist/entities/transform-manager.js';
 import { EntityWorld } from './backend/dist/entities/entity-world.js';
 
@@ -20,4 +20,6 @@ assert.deepEqual(rows.filter(row => row.colocated).map(row => row.id), ['child',
 assert.deepEqual(entityTreeContext(world, null, { r: 2, c: 3 }), []);
 assert.deepEqual(entityTreeContext(world, 'deleted', null), []);
 assert.deepEqual(entityTreeContext(world, 'overlay', null).map(row => row.id), ['overlay']);
+assert.deepEqual(entityParentChoices(world, 'child').map(node => node.id), ['sibling', 'parent', 'overlay', 'unrelated']);
+assert.deepEqual(entityParentChoices(world, 'parent').map(node => node.id), ['overlay', 'unrelated']);
 console.log('PASS entity inspector hierarchy and clicked context');

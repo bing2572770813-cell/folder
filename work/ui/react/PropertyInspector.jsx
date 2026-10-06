@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { UiInput, UiCheckbox, UiTextarea, UiDisclosure } from "./controls.jsx";
+import { UiInput, UiCheckbox, UiTextarea, UiDisclosure, UiButton, UiIcon, UiSelect } from "./controls.jsx";
+import { Plus, X } from "lucide";
 import {
   fieldPermissions,
   identityFields,
@@ -32,7 +33,52 @@ const names = {
   entry: "区域入口",
   properties: "扩展属性",
   propertySchema: "属性定义",
+  components: "组件",
+  surface: "表面",
+  collision: "碰撞",
+  fire: "火焰",
+  ice: "冰河",
+  campfire: "篝火",
+  eruption: "喷发",
+  key: "钥匙",
+  directions: "折线方向",
+  damage: "过热增量",
+  name: "名称",
+  tag: "标签组件",
 };
+function PrimitiveList({ value, path, access, definition, onChange, onError }) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState('');
+  const signature = JSON.stringify(value);
+  useEffect(() => { setDraft(value); setError(''); }, [signature]);
+  const items = fieldPermissions(definition.items ?? {}, access);
+  const editable = access.tempEditable && items.tempEditable && items.readable;
+  const title = definition.label || names[path.at(-1)] || path.at(-1);
+  function commit(next) {
+    try { onChange(path, next); setError(''); }
+    catch (e) { setError(e.message); onError(e); }
+  }
+  return <div className="inspector-list">
+    <span>{title}</span>
+    {items.readable && draft.map((item, index) => <div className="inspector-list-row" key={index}>
+      <UiInput aria-label={`${title} ${index + 1}`} value={String(item)} disabled={!editable}
+        type={typeof item === 'number' ? 'number' : 'text'}
+        onChange={e => setDraft(draft.map((entry, i) => i === index ? e.currentTarget.value : entry))}
+        onBlur={() => {
+          const next = draft.map((entry, i) => typeof (value[i] ?? value[0]) === 'number' ? Number(entry) : entry);
+          if (next.some((entry, i) => typeof (value[i] ?? value[0]) === 'number' && (draft[i] === '' || !Number.isFinite(entry)))) {
+            setError('请输入有效数字'); return;
+          }
+          if (JSON.stringify(next) !== signature) commit(next);
+        }} />
+      <UiButton type="button" className="compact-icon" aria-label={`移除${title} ${index + 1}`} title="移除" disabled={!editable}
+        onClick={() => { const next = value.filter((_, i) => i !== index); if(index >= value.length)setDraft(draft.filter((_, i) => i !== index));else commit(next); }}><UiIcon icon={X} /></UiButton>
+    </div>)}
+    <UiButton type="button" className="compact-icon" title={`添加${title}`} aria-label={`添加${title}`} disabled={!editable}
+      onClick={() => setDraft([...draft, value.length && typeof value[0] === 'number' ? 0 : ''])}><UiIcon icon={Plus} /></UiButton>
+    {error && <small role="alert">{error}</small>}
+  </div>;
+}
 const inputValue = (value) =>
   typeof value === "boolean"
     ? value
@@ -47,6 +93,7 @@ function PropertyField({
   mixed,
   onChange,
   onError,
+  options = {},
 }) {
   const [draft, setDraft] = useState(
     mixed && typeof value !== "boolean" ? "" : inputValue(value),
@@ -98,6 +145,10 @@ function PropertyField({
             commit(e.currentTarget.checked);
           }}
         />
+      ) : options.choices?.[path.join('.')] ? (
+        <UiSelect {...props} value={draft} onChange={e => { setDraft(e.currentTarget.value); commit(e.currentTarget.value); }}>
+          {options.choices[path.join('.')].map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+        </UiSelect>
       ) : Array.isArray(value) ? (
         <UiTextarea
           {...props}
@@ -143,6 +194,7 @@ function PropertyNode({
   mixed,
   onChange,
   onError,
+  options = {},
 }) {
   const access = fieldPermissions(
     definition,
@@ -152,7 +204,7 @@ function PropertyNode({
   if (!access.readable) return null;
   if (value && typeof value === "object" && !Array.isArray(value))
     return (
-      <UiDisclosure data-path={JSON.stringify(path)}>
+      <UiDisclosure data-path={JSON.stringify(path)} open={options.expanded ? true : undefined}>
         <summary>
           {definition.label || names[path.at(-1)] || path.at(-1)}
         </summary>
@@ -166,10 +218,13 @@ function PropertyNode({
             mixed={mixed}
             onChange={onChange}
             onError={onError}
+            options={options}
           />
         ))}
       </UiDisclosure>
     );
+  if (options.structured && Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number'))
+    return <PrimitiveList value={value} path={path} access={access} definition={definition} onChange={onChange} onError={onError} />;
   return (
     <PropertyField
       value={value}
@@ -179,6 +234,7 @@ function PropertyNode({
       mixed={mixed.has(JSON.stringify(path))}
       onChange={onChange}
       onError={onError}
+      options={options}
     />
   );
 }
@@ -188,6 +244,7 @@ export function PropertyInspector({
   onChange,
   onError,
   mixed,
+  options = {},
 }) {
   return (
     <>
@@ -201,6 +258,7 @@ export function PropertyInspector({
           mixed={mixed}
           onChange={onChange}
           onError={onError}
+          options={options}
         />
       ))}
     </>
@@ -213,6 +271,7 @@ export function renderPropertyInspector(
   onChange,
   onError = () => {},
   mixed = new Set(),
+  options = {},
 ) {
   const focused = container.contains(document.activeElement)
     ? document.activeElement.getAttribute("aria-label")
@@ -226,11 +285,13 @@ export function renderPropertyInspector(
     root.render(
       <MantineProvider theme={editorTheme} forceColorScheme="light">
         <PropertyInspector
+          key={options.identity}
           values={values}
           schema={schema}
           onChange={onChange}
           onError={onError}
           mixed={mixed}
+          options={options}
         />
       </MantineProvider>,
     ),

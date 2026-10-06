@@ -30,3 +30,14 @@ export function entityTreeContext(world, selectedId, point) {
   for (const transform of transforms) if (transform.parentId === null) visit(transform.id, 0);
   return rows;
 }
+
+export function entityParentChoices(world, selectedId) {
+  const node = world.get(selectedId);
+  const excluded = new Set();
+  const visit = id => {
+    excluded.add(id);
+    for (const child of world.transforms.childrenOf(id)) visit(child);
+  };
+  visit(node.transformId);
+  return world.serialize().filter(other => !excluded.has(other.transformId));
+}

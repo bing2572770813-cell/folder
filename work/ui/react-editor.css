@@ -134,6 +134,21 @@ details[open] > .icon-select-summary::before {
 .play-panel .editor-tabs { margin-bottom: 16px; }
 .entity-context-row { min-width: 0; overflow-wrap: anywhere; text-align: left; padding: 6px; border-left: 2px solid var(--line); }
 .entity-context-row[aria-pressed="true"] { border-left-color: var(--green); background: #edf3ee; }
+.entity-context-row { display: grid; gap: 3px; }
+.entity-context-row small { color: #68706a; overflow-wrap: anywhere; }
+.node-section { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.node-section summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.node-coordinate-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+#treeFields label { display: grid; gap: 5px; min-width: 0; }
+#treeFields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.node-command { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px; border: 1px solid var(--line); border-radius: 4px; white-space: normal; }
+.node-command:disabled { opacity: .45; cursor: not-allowed; }
+.node-danger { color: #a13c3c; }
+.compact-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border: 1px solid var(--line); border-radius: 4px; }
+.inspector-list { display: grid; gap: 6px; margin: 8px 0; }
+.inspector-list-row { display: grid; grid-template-columns: minmax(0,1fr) 28px; gap: 4px; align-items: center; }
+#nodeConfiguration details { padding: 6px 0; }
+#nodeConfiguration summary { font-weight: 600; cursor: pointer; margin-bottom: 6px; }
 .player-properties .studio-fields { display: grid; gap: 10px; padding: 10px 0; }
 .player-properties label { display: grid; gap: 5px; }
 .player-height-limits { border: 1px solid #dce3d9; border-radius: 5px; padding: 10px; display: grid; gap: 10px; min-width: 0; }

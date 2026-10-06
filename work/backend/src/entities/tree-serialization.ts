@@ -29,9 +29,53 @@ export function importTreeMap(input:unknown):ImportedTree {
   return {world,metadata:jsonObject(tree.legacyMetadata),cellTags};
 }
 
-export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTags:Record<string,JsonObject>={}):TreeMap {
+export interface TreeSerializationOptions {
+  /** Persistence boundaries supply core/property-model.mjs; omitted for complete editor snapshots. */
+  projectProperties?:(values:JsonObject,schema:JsonObject,flag:'serializable')=>JsonObject;
+  /** Resolve inherited/catalog permissions; defaults to the legacy configuration's propertySchema. */
+  schemaFor?:(node:ReturnType<EntityWorld['serialize']>[number])=>JsonObject;
+}
+
+export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTags:Record<string,JsonObject>={},options:TreeSerializationOptions={}):TreeMap {
+  const entities=world.serialize().map(node=>{
+    const configuration=node.configuration;
+    if(!options.projectProperties||!configuration)return node;
+    const schema=jsonObject(options.schemaFor?.(node)??configuration.propertySchema??{});
+    const project=(values:JsonObject)=>jsonObject(options.projectProperties!(values,schema,'serializable'));
+    node.configuration=project(configuration);
+    // These fields identify the legacy instance and its permission contract on import.
+    for(const key of ['prefabId','instance','kind','terrain','propertySchema'])if(Object.hasOwn(configuration,key))node.configuration[key]=configuration[key];
+    if(configuration.folds!==undefined){
+      if(node.configuration.folds===undefined)delete node.configuration.fold;
+      else if(Object.hasOwn(node.configuration,'fold'))node.configuration.fold=(node.configuration.folds as JsonObject['fold'][])[0]??null;
+    }
+    const surface=node.components.surface;
+    if(surface)node.components.surface=project(surface);
+    const collision=node.components.collision;
+    if(collision)node.components.collision=project(collision);
+    const terrain=configuration.terrain;
+    if(typeof terrain==='string'&&node.components[terrain]){
+      const component=node.components[terrain];
+      const projected=project({terrainConfig:component});
+      node.components[terrain]=projected.terrainConfig===undefined?{}:jsonObject(projected.terrainConfig);
+      if(terrain==='key'&&Object.hasOwn(component,'name')){
+        delete node.components.key.name;
+        const name=project({keyName:component.name}).keyName;
+        if(name!==undefined)node.components.key.name=name;
+      }
+    }
+    if(node.components.fold){
+      const directions=configuration.folds===undefined&&configuration.fold!==undefined
+        ?(node.components.fold.directions as JsonObject['fold'][]).filter(direction=>project({fold:direction}).fold!==undefined)
+        :project({folds:node.components.fold.directions}).folds;
+      node.components.fold=directions===undefined?{}:{directions};
+    }
+    const tags=project({tags:node.tags}).tags;
+    node.tags=tags===undefined?{}:jsonObject(tags);
+    return node;
+  });
   return {
     version:2,width:world.transforms.width,height:world.transforms.height,
-    entities:world.serialize(),transforms:world.transforms.serialize(),cellTags:structuredClone(cellTags),legacyMetadata:jsonObject(metadata),
+    entities,transforms:world.transforms.serialize(),cellTags:structuredClone(cellTags),legacyMetadata:jsonObject(metadata),
   };
 }

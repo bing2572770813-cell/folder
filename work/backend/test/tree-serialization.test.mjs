@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {importTreeMap,serializeTreeMap} from '../dist/entities/tree-serialization.js';
+import {projectProperties} from '../../core/property-model.mjs';
 
 const source=()=>({version:1,width:3,height:3,name:'旧地图',spawn:{r:0,c:0,dir:0},tiles:[[{prefabId:'paper_ai',height:.09,regionTag:'A',tags:{spawn:true},properties:{values:[1,2]}},null,null],[null,null,null],[null,null,null]],foldCells:[{r:2,c:2,type:'h'}]});
 test('old map import and tree save retain identities, local transforms and configuration',()=>{
@@ -33,4 +34,57 @@ test('region belongs to the cell and does not move with entity Transform',()=>{
   assert.equal(imported.world.at(1,1)[0].tags.region,undefined);
   const restored=importTreeMap(serializeTreeMap(imported.world,imported.metadata,imported.cellTags));
   assert.equal(restored.cellTags['1,1'].regionTag,'B');
+});
+
+test('permission projection removes legacy properties and their component/tag duplicates',()=>{
+  const map=source();
+  Object.assign(map.tiles[0][0],{
+    terrain:'fire',blocked:true,folds:['h'],fold:'h',
+    terrainConfig:{damage:8,secret:9,public:3},
+    tags:{spawn:true,secret:'hidden'},
+    properties:{values:[{public:1,secret:2}]},
+    propertySchema:{
+      height:{serializable:false},blocked:{serializable:false},folds:{serializable:false},
+      terrainConfig:{children:{damage:{serializable:false},secret:{serializable:false}}},
+      tags:{children:{secret:{serializable:false}}},
+      properties:{children:{values:{items:{children:{secret:{serializable:false}}}}}},
+    },
+  });
+  const imported=importTreeMap(map);
+  imported.world.setRuntime('entity-0-0','surface',{secret:'runtime'});
+  const before=imported.world.serialize();
+  const saved=serializeTreeMap(imported.world,imported.metadata,imported.cellTags,{projectProperties});
+  const node=saved.entities[0];
+  assert.equal(node.configuration.height,undefined);
+  assert.equal(node.components.surface.height,undefined);
+  assert.equal(node.components.collision.blocked,undefined);
+  assert.deepEqual(node.components.fire,{public:3});
+  assert.deepEqual(node.components.fold,{});
+  assert.equal(node.configuration.fold,undefined);
+  assert.deepEqual(node.tags,{spawn:true});
+  assert.deepEqual(node.configuration.properties,{values:[{public:1}]});
+  assert.equal(node.id,before[0].id);
+  assert.equal(node.prefabId,before[0].prefabId);
+  assert.equal(node.transformId,before[0].transformId);
+  assert.deepEqual(saved.transforms,imported.world.transforms.serialize());
+  assert.deepEqual(imported.world.serialize(),before);
+  assert.deepEqual(serializeTreeMap(imported.world).entities,before);
+  const restored=importTreeMap(JSON.parse(JSON.stringify(saved)));
+  assert.deepEqual(restored.world.serialize(),saved.entities);
+  assert.deepEqual(restored.world.runtime(node.id,'surface'),{});
+  assert.deepEqual(serializeTreeMap(restored.world).entities,saved.entities);
+});
+
+test('dynamic permission schema filters key name and terrain config without changing cell region',()=>{
+  const map=source();
+  Object.assign(map.tiles[0][0],{terrain:'key',keyName:'secret',terrainConfig:{nested:{secret:2,public:3}},fold:'v'});
+  const imported=importTreeMap(map);
+  const saved=serializeTreeMap(imported.world,imported.metadata,imported.cellTags,{
+    projectProperties,
+    schemaFor:()=>({keyName:{serializable:false},fold:{serializable:false},terrainConfig:{children:{nested:{children:{secret:{serializable:false}}}}}}),
+  });
+  assert.deepEqual(saved.entities[0].components.key,{nested:{public:3}});
+  assert.equal(saved.entities[0].configuration.keyName,undefined);
+  assert.deepEqual(saved.entities[0].components.fold,{directions:[]});
+  assert.deepEqual(saved.cellTags,imported.cellTags);
 });

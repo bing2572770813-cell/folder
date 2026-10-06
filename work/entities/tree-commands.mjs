@@ -2,6 +2,7 @@ import {TreeDocument} from './tree-document.mjs';
 import {importTreeMap,defaultComponents,validateTerrainStacking} from './tree-runtime.mjs';
 import {normalizeTile} from './tile-model.mjs';
 import {normalizeBaseEntity,createEntityBehavior} from './behaviors.mjs';
+import {placeEntity} from './placement-model.mjs';
 import {projectProperties,updateProperty,mergeSerializableProperties} from '../core/property-model.mjs';
 
 const copy=value=>structuredClone(value);
@@ -39,6 +40,30 @@ export function reparentNode(document,id,parentId,preserveWorld=true,isHidden=()
 export function deleteNode(document,id,isHidden=()=>false,nodeHidden=()=>false){
   const node=document.world.get(id);check(document.world,[node.transformId],isHidden,nodeHidden);document.world.transforms.assertRemovable(node.transformId,['entity:'+id]);
   const candidate=forkTreeDocument(document);candidate.world.remove(id,true);return validateTreeDocument(candidate);
+}
+/** Replacement changes the paper and its terrain, while collectible/tag overlays retain ownership. */
+export function replaceTreePrefab(document,prefab,tile,r,c,options={}){
+ const result=placeEntity(document.view(),prefab,tile,r,c,options.isHidden);
+ const cells=new Set(result.cells.map(cell=>cell.r+','+cell.c));
+ const targets=new Map(result.cells.flatMap(cell=>document.world.at(cell.r,cell.c)).map(node=>[node.id,node]));
+ if([...targets.values()].some(node=>options.nodeHidden?.(node)))throw new Error('不能覆盖隐藏实体');
+ const candidate=forkTreeDocument(document);
+ for(const node of targets.values()){
+  if(Object.hasOwn(node.components,'surface'))continue;
+  const terrains=['campfire','ice','fire','eruption'].filter(type=>Object.hasOwn(node.components,type));
+  if(!terrains.length)continue;
+  const occupied=candidate.world.transforms.worldCells(node.transformId);
+  if(occupied.some(cell=>!cells.has(cell.r+','+cell.c)))throw new Error('不能部分替换多格地形，请选择完整占格');
+  check(candidate.world,[node.transformId],options.isHidden,options.nodeHidden);
+  for(const type of terrains)delete node.components[type];
+  // Legacy terrain prefabs carry a default nonblocking collision alongside their marker.
+  if(terrains.includes(node.configuration?.terrain)&&node.components.collision?.blocked===false&&Object.keys(node.components.collision).length===1)delete node.components.collision;
+  if(node.configuration){delete node.configuration.terrain;delete node.configuration.terrainConfig;}
+  if(!Object.keys(node.components).length&&!Object.keys(node.tags).length)candidate.world.remove(node.id,true);
+  else{candidate.world.remove(node.id);candidate.world.add(node);}
+ }
+ candidate.applyLegacy(result.map);
+ return validateTreeDocument(candidate);
 }
 export function placeTreePrefab(document,prefab,tile,r,c,options={}){
   if(options.stack!==true)throw new Error('树实体放置需要显式启用叠层');

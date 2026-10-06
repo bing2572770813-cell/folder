@@ -4,7 +4,7 @@ import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mj
 import {nodePermissions} from './entities/node-permissions.mjs';
 import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
-import {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode,forkTreeDocument} from './entities/tree-commands.mjs';
+import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,configureNode,forkTreeDocument} from './entities/tree-commands.mjs';
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
@@ -18,7 +18,7 @@ import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, tileThickness, tileGradualRate, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './entities/tile-model.mjs';
 import { axisKey, uniqueFoldAxes, foldGroupAt, inFoldRange, foldStrokes } from './tags/fold-geometry.mjs';
 import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
-import {footprint,placeEntity,removeEntity} from './entities/placement-model.mjs';
+import {footprint,removeEntity} from './entities/placement-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {inspectionCells,batchProperties,selectionDetails} from './editor/batch-inspection.mjs';
@@ -592,7 +592,8 @@ function placementCandidate(r,c){
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
  const candidate=$('stackPlacement').checked||!prefab.tile
   ?placeTreePrefab(documentModel,prefab,tile,r,c,{stack:true,isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)})
-  :candidateForMap(placeEntity(map,prefab,tile,r,c,cellHidden).map);
+  :replaceTreePrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden});
+ assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
  assertTreeVisibility(candidate);
  return candidate;
 }

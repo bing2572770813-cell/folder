@@ -6,10 +6,10 @@ import {importTreeMap,serializeTreeMap} from '../dist/entities/tree-serializatio
 import {loadTree} from '../dist/entities/legacy-map.js';
 
 const bundled = await build({
-  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
+  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
   bundle:true,platform:'node',format:'esm',write:false,
 });
-const {TreeDocument,moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
+const {TreeDocument,moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
 const entity = (id, components) => ({id,prefabId:id,transformId:id,components,tags:{},static:{}});
 function fixture() {
   return {version:2,width:6,height:6,
@@ -18,6 +18,39 @@ function fixture() {
     cellTags:{},legacyMetadata:{spawn:{r:1,c:1,dir:0},exit:null}};
 }
 const error = /纸张方格上最多只能叠加一个 terrain 实体/;
+
+test('replacing paper clears independent terrain but preserves keys and unrelated components',()=>{
+ const input=fixture();input.transforms[1].parentId=null;input.transforms[1].local={r:1,c:1,dir:0};
+ input.entities[2].components={key:{name:'铜'}};
+ input.transforms[2].parentId=null;input.transforms[2].local={r:1,c:1,dir:0};
+ input.entities[1].configuration={terrain:'fire',blocked:false};input.entities[1].components.collision={blocked:false};
+ const doc=new TreeDocument(input),before=doc.serialize();
+ const prefab={id:'paper_ai',size:{width:1,height:1},occupied:[true],tile:{color:'white'}};
+ const plain=replaceTreePrefab(doc,prefab,{color:'white',prefabId:'paper_ai'},1,1);
+ assert.equal(plain.world.at(1,1).some(node=>node.components.fire),false);
+ assert.equal(plain.world.serialize().some(node=>node.id==='fire'),false);
+ assert.equal(plain.world.at(1,1).some(node=>node.components.key),true);
+ const cold=replaceTreePrefab(doc,{...prefab,id:'ice_ai'}, {color:'white',prefabId:'ice_ai',terrain:'ice'},1,1);
+ assert.equal(cold.world.at(1,1).some(node=>node.components.fire),false);
+ assert.equal(cold.world.at(1,1).some(node=>node.components.ice),true);
+ assert.throws(()=>replaceTreePrefab(doc,prefab,prefab.tile,1,1,{nodeHidden:node=>node.id==='fire'}),/隐藏/);
+ assert.deepEqual(doc.serialize(),before);
+});
+
+test('replacement removes terrain capabilities while keeping a mixed overlay and refuses partial terrain footprints',()=>{
+ const input=fixture();input.transforms[1].parentId=null;input.transforms[1].local={r:1,c:1,dir:0};
+ input.transforms[2].parentId=null;input.transforms[2].local={r:1,c:1,dir:0};
+ input.entities[1].components.key={name:'银'};
+ const prefab={id:'paper_ai',size:{width:1,height:1},occupied:[true],tile:{color:'white',prefabId:'paper_ai'}};
+ const doc=new TreeDocument(input),plain=replaceTreePrefab(doc,prefab,prefab.tile,1,1);
+ assert.deepEqual(plain.world.get('fire').components,{key:{name:'银'}});
+ input.transforms[1].footprint={width:2,height:1,occupied:[true,true]};
+ input.entities.push(entity('support',{surface:{}}));
+ input.transforms.push({id:'support',parentId:null,local:{r:1,c:2,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ const multi=new TreeDocument(input),before=multi.serialize();
+ assert.throws(()=>replaceTreePrefab(multi,prefab,prefab.tile,1,1),/不能部分替换多格地形/);
+ assert.deepEqual(multi.serialize(),before);
+});
 
 test('paper tiles allow zero or one terrain entity and ordinary overlays',()=>{
   const input=fixture();assert.doesNotThrow(()=>importTreeMap(input));

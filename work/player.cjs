@@ -395,6 +395,11 @@ function beginFoldDrag(r, c, startY) {
     const hinge = env.getFoldHinge(group);
     hinge.side = playerSide;
     const axis = { ...P.chosenFold };
+    // Snapshot the selection so a rejected fold can hand control back to it.
+    const previousSelection = {
+      fold: P.chosenFold ? { ...P.chosenFold } : null,
+      player: env.getSelectionRing().visible,
+    };
     disposableClear(env.getEffectLayer());
     P.legalMoves = [];
     P.legalFoldMoves = [];
@@ -405,6 +410,7 @@ function beginFoldDrag(r, c, startY) {
       cells,
       creaseCells,
       hinge,
+      previousSelection,
       startY,
       angle: 0,
       sign: playerSide,
@@ -512,6 +518,11 @@ function tick(now) {
         if (t >= 1) {
           cancelFoldMotion();
           clearSelection();
+          // A rebound means the fold was rejected, so restore what was selected.
+          if (motion.previousSelection?.fold) {
+            const back = motion.previousSelection.fold;
+            selectFold(back.r, back.c, back.type);
+          } else if (motion.previousSelection?.player) selectPlayer();
           renderPlayer();
           updateUI();
         }

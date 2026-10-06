@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 const bundle=async file=>{const result=await build({entryPoints:[fileURLToPath(new URL(file,import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));};
 const {TreeDocument}=await bundle('../../entities/tree-document.mjs');
-const {moveNode,reparentNode,deleteNode,placeTreePrefab}=await bundle('../../entities/tree-commands.mjs');
+const {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode}=await bundle('../../entities/tree-commands.mjs');
 const document=()=>new TreeDocument({version:1,width:6,height:6,spawn:{r:1,c:1,dir:0},tiles:Array.from({length:6},(_,r)=>Array.from({length:6},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null))});
 const prefab={id:'hot',tile:{color:'red'},components:{fire:{damage:2}},static:{walkable:true}};
 test('stacking preserves surface and snapshots inherited mixed component configuration',()=>{
@@ -13,6 +13,15 @@ test('stacking preserves surface and snapshots inherited mixed component configu
   assert.equal(placed.world.at(1,1).length,2);assert.deepEqual(doc.serialize(),original);
   const mixed=placed.world.at(1,1).find(n=>n.prefabId==='mixed');assert.equal(mixed.components.surface.color,'blue');assert.equal(mixed.components.fire.damage,3);assert.ok(mixed.components.ice);assert.equal(mixed.static.walkable,true);assert.equal(placed.cellTags['1,1'].regionTag,'A');
   assert.deepEqual(placed.world.runtime(original.entities[0].id,'surface'),{visited:true});assert.ok(placed.world.transforms.referenceOwners(original.transforms[0].id).includes('player'));
+});
+test('native overlay has no ground and unique tags reject atomically',()=>{
+ const source=document().serialize();source.entities[0].tags={spawn:true};const doc=new TreeDocument(source),before=doc.serialize();assert.throws(()=>placeTreePrefab(doc,{id:'start',components:{tag:{}},tags:{spawn:true}},{},3,3,{stack:true}),/起点/);assert.deepEqual(doc.serialize(),before);
+ const native=placeTreePrefab(doc,{id:'key',components:{key:{name:'铜'}}},{},3,3,{stack:true});const node=native.world.at(3,3)[0];assert.equal(node.components.surface,undefined);assert.equal(node.components.collision,undefined);assert.equal(native.view().tiles[3][3],null);
+ const entry=placeTreePrefab(doc,{id:'entry',components:{tag:{}},tags:{entry:true}},{},3,3,{stack:true});assert.throws(()=>placeTreePrefab(entry,{id:'entry2',components:{tag:{}},tags:{entry:true}},{},4,4,{stack:true}),/入口/);
+});
+test('node permissions preserve unreadable state and reject readonly edits',()=>{
+ const doc=placeTreePrefab(document(),prefab,{},2,2,{stack:true}),node=doc.world.at(2,2)[0],schema={components:{children:{fire:{children:{damage:{tempEditable:false}}},surface:{children:{color:{readable:false}}}}}};
+ const visible=structuredClone(node.components);delete visible.surface.color;const next=configureNode(doc,node.id,visible,node.tags,()=>false,()=>false,schema);assert.equal(next.world.get(node.id).components.surface.color,'red');visible.fire.damage=7;assert.throws(()=>configureNode(doc,node.id,visible,node.tags,()=>false,()=>false,schema),/不可编辑/);
 });
 test('sparse prefab children move with their root; reparent preserves world coordinates',()=>{
   const doc=placeTreePrefab(document(),{...prefab,size:{width:2,height:2},occupied:[true,false,false,true],children:[{prefabId:'leaf',local:{r:0,c:1,dir:0}}]}, {},2,2,{stack:true,resolve:()=>({id:'leaf',tile:{color:'yellow'},components:{key:{name:'钥匙'}}})});

@@ -4,7 +4,7 @@ import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-c
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor} from './render/fold-motion.mjs';
 import {createTableScene} from './render/table-scene.mjs';
-import {creaseGuides,creaseSelection,creaseAreaSelection} from './render/crease-guides.mjs';
+import {creaseGuides,creaseSelection,creaseRegionOutline} from './render/crease-guides.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -148,11 +148,10 @@ const creaseDotMaterial=new THREE.MeshBasicMaterial({color:'#48664d',toneMapped:
 const highlightMaterial=(color,opacity)=>new THREE.MeshBasicMaterial({color,toneMapped:false,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide});
 const creaseSelectionMaterial=highlightMaterial('#174f50',1);
 const creaseHaloMaterial=highlightMaterial('#fff9df',.9);
-const foldSourceMaterial=highlightMaterial('#e6ac48',.42);
-const foldTargetMaterial=highlightMaterial('#54bdad',.32);
-const foldHatchMaterial=highlightMaterial('#176a63',.28);
+const foldSourceMaterial=highlightMaterial('#b17d2d',.95);
+const foldTargetMaterial=highlightMaterial('#2477e8',.95);
 const sharedGeometries=new Set([tileGeo,markerGeo]);
-const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial,creaseSelectionMaterial,creaseHaloMaterial,foldSourceMaterial,foldTargetMaterial,foldHatchMaterial]);
+const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial,creaseSelectionMaterial,creaseHaloMaterial,foldSourceMaterial,foldTargetMaterial]);
 let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group(), foldAxisLayer=new THREE.Group(), creaseGuideLayer=new THREE.Group(), foldSelectionLayer=new THREE.Group();
 let foldSelectionSignature='';
 paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer);
@@ -589,7 +588,7 @@ function buildCreaseGuides(){
   mesh.userData.triangleCells=cells;mesh.renderOrder=8;creaseGuideLayer.add(mesh);
  }
 }
-// Selected crease and filled halves stay attached to their paper surfaces.
+// Selected crease and outlined halves stay attached to their paper surfaces.
 function selectedFold(){return P.mode==='play'&&P.chosenFold&&P.chosenFold.type?{r:P.chosenFold.r,c:P.chosenFold.c,type:P.chosenFold.type}:null;}
 function refreshFoldSelection(){
  const chosen=selectedFold(),signature=chosen?`${chosen.type}:${chosen.r},${chosen.c}:${P.player.r},${P.player.c}`:'';
@@ -611,11 +610,10 @@ function buildFoldSelection(){
   const mesh=new THREE.Mesh(geometry,material);mesh.userData.triangleCells=cells;mesh.renderOrder=order;foldSelectionLayer.add(mesh);
  };
  const regions=controller.foldHighlightRegions(chosen);
- const source=creaseAreaSelection(map,regions.source,group,options);
- const target=creaseAreaSelection(map,regions.target,group,{...options,striped:true});
+ const source=creaseRegionOutline(map,regions.source,group,options);
+ const target=creaseRegionOutline(map,regions.target,group,{...options,dashed:true});
  add(source.positions,source.cells,foldSourceMaterial,5);
  add(target.positions,target.cells,foldTargetMaterial,5);
- add(target.stripes,target.stripeCells,foldHatchMaterial,6);
  const halo=creaseSelection(map,group,{...options,width:.105,lift:.012,flatLift:.022});
  const core=creaseSelection(map,group,{...options,width:.038,lift:.016,flatLift:.026});
  add(halo.positions,halo.cells,creaseHaloMaterial,9);

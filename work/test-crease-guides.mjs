@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { creaseGuides, creaseSelection, creaseAreaSelection } from './render/crease-guides.mjs';
+import { creaseGuides, creaseSelection, creaseRegionOutline } from './render/crease-guides.mjs';
 import { DEFAULT_CREASE_DEPTH } from './render/paper-surface.mjs';
 import { uniqueFoldAxes } from './tags/fold-geometry.mjs';
 import { normalizeTile } from './tile-model.mjs';
@@ -125,22 +125,27 @@ assert.deepEqual(creaseSelection(fixture(), uniqueFoldAxes(fixture())[0], {
 }), { positions: [], cells: [] });
 for(const type of ['h','v','d1','d2']){
   const map=fixture(type),group=uniqueFoldAxes(map)[0];
-  const source=creaseAreaSelection(map,[{r:3,c:3,half:1}],group);
-  const target=creaseAreaSelection(map,[{r:3,c:3,half:-1}],group,{striped:true});
+  const source=creaseRegionOutline(map,[{r:3,c:3,half:1}],group);
+  const target=creaseRegionOutline(map,[{r:3,c:3,half:-1}],group,{dashed:true});
   const dr=group.to.r-group.from.r,dc=group.to.c-group.from.c;
   for(const [geometry,sign] of [[source,1],[target,-1]]){
     assert.ok(geometry.positions.length&&geometry.positions.every(Number.isFinite));
     assert.equal(geometry.cells.length,geometry.positions.length/9);
     for(let i=0;i<geometry.positions.length;i+=3){
       const x=geometry.positions[i],z=geometry.positions[i+2];
-      assert.ok((x*dr-z*dc)*sign>=-1e-8,'axis-cell tint is clipped to its correct half');
+      assert.ok((x*dr-z*dc)*sign>=-.026*Math.hypot(dr,dc),'axis-cell contour follows its correct half');
     }
+    let area=0;
+    for(let i=0;i<geometry.positions.length;i+=9){const p=geometry.positions;area+=Math.abs((p[i+3]-p[i])*(p[i+8]-p[i+2])-(p[i+6]-p[i])*(p[i+5]-p[i+2]))/2;}
+    assert.ok(area<.25,'narrow outline ribbons leave the interior unfilled');
   }
-  assert.ok(target.stripes.length,'target has a pattern as well as its color');
-  assert.equal(target.stripeCells.length,target.stripes.length/9);
-  assert.equal(source.stripes.length,0);
-  const hidden=creaseAreaSelection(map,[{r:3,c:3}],group,{hidden:()=>true});
+  assert.notDeepEqual(target,creaseRegionOutline(map,[{r:3,c:3,half:-1}],group), 'target has gaps in its contour');
+  const hidden=creaseRegionOutline(map,[{r:3,c:3}],group,{hidden:()=>true});
   assert.equal(hidden.positions.length,0);
-  map.tiles[3][3]=null;assert.equal(creaseAreaSelection(map,[{r:3,c:3}],group).positions.length,0);
+  map.tiles[3][3]=null;assert.equal(creaseRegionOutline(map,[{r:3,c:3}],group).positions.length,0);
 }
+const joinedMap=fixture();joinedMap.tiles[3][3].folds=[];joinedMap.tiles[3][4].folds=[];joinedMap.foldCells=[];
+const joinedOutline=creaseRegionOutline(joinedMap,[{r:3,c:3},{r:3,c:4}],uniqueFoldAxes(fixture())[0]);
+for(let i=0;i<joinedOutline.positions.length;i+=3)
+  assert.ok(!(Math.abs(joinedOutline.positions[i]-.5)<.026&&Math.abs(joinedOutline.positions[i+2])<.4),'shared interior cell edge is not outlined');
 console.log('PASS: crease hints and selection highlights follow groove depth in all four directions and respect visibility.');

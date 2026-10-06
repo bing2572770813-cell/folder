@@ -375,52 +375,53 @@ export function creaseSelection(map, group, {
   return { positions, cells };
 }
 
-/** Top-surface fills for controller-classified fold cells, including axis halves. */
-export function creaseAreaSelection(map, region, group, {
+/** Contours of actual reached cells; neighbouring cells share no interior edge. */
+export function creaseRegionOutline(map, region, group, {
   hidden = () => false,
   showFolds = true,
   creaseDepth = DEFAULT_CREASE_DEPTH,
-  lift = .008,
-  striped = false,
+  lift = .012,
+  width = .05,
+  dashed = false,
 } = {}) {
-  const positions = [], cells = [], stripes = [], stripeCells = [];
-  const offset = [-(map.width - 1) / 2, 0, -(map.height - 1) / 2];
-  const dr = group?.to.r - group?.from.r, dc = group?.to.c - group?.from.c;
-  const emit = (polygon, output, metadata, cell, extraLift = 0) => {
-    for (let i = 1; i < polygon.length - 1; i++) {
-      for (const p of [polygon[0], polygon[i], polygon[i + 1]])
-        output.push(p[0] + offset[0], p[1] + lift + extraLift, p[2] + offset[2]);
-      metadata.push({r:cell.r,c:cell.c});
-    }
-  };
-  for (const cell of region) {
-    const {r,c,half} = cell, tile = map.tiles[r]?.[c];
-    if (!tile || hidden(r,c)) continue;
-    const surface = paperSurface(map,r,c,hidden,showFolds,creaseDepth);
-    const triangles = [];
-    if (surface) {
-      // Top/bottom triangles are paired; the final ring closes the side walls.
-      const end = surface.positions.length - surface.boundary.length * 18;
-      for(let i=0;i<end;i+=18)triangles.push([
-        surface.positions.slice(i,i+3),surface.positions.slice(i+3,i+6),surface.positions.slice(i+6,i+9),
-      ]);
-    } else {
-      const y=tileHeight(tile);
-      triangles.push([[-.5,y,-.5],[-.5,y,.5],[.5,y,-.5]],[[.5,y,-.5],[-.5,y,.5],[.5,y,.5]]);
-    }
-    for (const triangle of triangles) {
-      let polygon = triangle.map(p=>[p[0]+c,p[1],p[2]+r]);
-      if(half)polygon=clipPolygon(polygon,p=>((p[0]-group.center.c)*dr-(p[2]-group.center.r)*dc)*half);
-      if(polygon.length<3)continue;
-      emit(polygon,positions,cells,cell);
-      if(!striped)continue;
-      const values=polygon.map(p=>p[0]+p[2]),period=.3,width=.035;
-      for(let band=Math.floor(Math.min(...values)/period);band*period<=Math.max(...values);band++){
-        const start=band*period;
-        const stripe=clipPolygon(clipPolygon(polygon,p=>p[0]+p[2]-start),p=>start+width-p[0]-p[2]);
-        emit(stripe,stripes,stripeCells,cell,.002);
+  const positions = [], cells = [];
+  const active = new Map(region.filter(p=>map.tiles[p.r]?.[p.c]&&!hidden(p.r,p.c)).map(p=>[p.r+','+p.c,p]));
+  const {cellSurface,sample}=createSampler(map,{hidden,showFolds,creaseDepth,lift,flatLift:lift,voidPlane:(r,c)=>tileHeight(map.tiles[r]?.[c])});
+  const dr=group?.to.r-group?.from.r,dc=group?.to.c-group?.from.c;
+  const side=p=>(p[0]-group.center.c)*dr-(p[1]-group.center.r)*dc;
+  for(const cell of active.values()){
+    const {r,c,half}=cell;
+    let polygon=[[c-.5,r-.5],[c-.5,r+.5],[c+.5,r+.5],[c+.5,r-.5]];
+    if(half)polygon=clipPolygon(polygon,p=>side(p)*half);
+    for(let i=0;i<polygon.length;i++){
+      const a=polygon[i],b=polygon[(i+1)%polygon.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);
+      if(length<EPSILON)continue;
+      // The parameter polygon is clockwise; its left normal points outward.
+      const outside=[(a[0]+b[0])/2-dz/length*1e-6,(a[1]+b[1])/2+dx/length*1e-6];
+      const nc=Math.floor(outside[0]+.5),nr=Math.floor(outside[1]+.5),neighbour=active.get(nr+','+nc);
+      if((nr!==r||nc!==c)&&neighbour&&(!neighbour.half||side(outside)*neighbour.half>=-EPSILON))continue;
+      const localA=[a[0]-c,a[1]-r],localB=[b[0]-c,b[1]-r];
+      const breaks=strokeBreaks(localA,localB,r,c,cellSurface);
+      // Keep dash phase continuous across mesh subdivisions and cell seams.
+      const sign=dx>EPSILON||Math.abs(dx)<EPSILON&&dz>0?1:-1;
+      const phase=sign*(a[0]*dx+a[1]*dz)/length;
+      if(dashed)for(let k=Math.floor(Math.min(phase,phase+sign*length)/.3)-1;k*.3<=Math.max(phase,phase+sign*length);k++){
+        for(const boundary of [k*.3,k*.3+.17]){
+          const t=(boundary-phase)/(sign*length);if(t>EPSILON&&t<1-EPSILON)breaks.push(t);
+        }
+      }
+      breaks.sort((a,b)=>a-b);
+      for(let j=1;j<breaks.length;j++){
+        const t0=breaks[j-1],t1=breaks[j];if(t1-t0<EPSILON)continue;
+        const at=phase+sign*length*(t0+t1)/2;
+        if(dashed&&((at%.3)+.3)%.3>.17)continue;
+        const p0=interpolate(localA,localB,t0),p1=interpolate(localA,localB,t1),nx=-dz/length*width/2,nz=dx/length*width/2;
+        const points=[[p0[0]+nx,p0[1]+nz],[p1[0]+nx,p1[1]+nz],[p1[0]-nx,p1[1]-nz],[p0[0]-nx,p0[1]-nz]].map(p=>sample(r,c,p).position);
+        for(const triangle of [[0,1,2],[0,2,3]]){
+          for(const index of triangle)positions.push(...points[index]);cells.push({r,c});
+        }
       }
     }
   }
-  return {positions,cells,stripes,stripeCells};
+  return {positions,cells};
 }

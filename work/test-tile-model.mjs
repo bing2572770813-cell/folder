@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {normalizeTile,normalizePrefab,columnLabel,applyFoldLine,foldsOf,blocked,foldsAt,TERRAIN_TYPES} from './tile-model.mjs';
+import {normalizeTile,normalizePrefab,columnLabel,applyFoldLine,foldsOf,blocked,foldsAt,tileCollision,TERRAIN_TYPES} from './tile-model.mjs';
 assert.equal(normalizeTile({color:'white',fold:null}).height,.09);
 assert.equal(blocked(normalizeTile({color:'black',fold:null})),true);
 assert.equal(columnLabel(25),'Z');assert.equal(columnLabel(26),'AA');assert.equal(columnLabel(127),'DX');
@@ -52,3 +52,9 @@ console.log('PASS: entity instance metadata rejects malformed footprints and pre
 const retiredGoal=normalizeTile({color:'red',terrain:'goal',terrainConfig:{},prefabId:'goal_ai',tags:{exitTo:'下一地区'}});assert.equal(retiredGoal.terrain,undefined);assert.equal(retiredGoal.prefabId,null);assert.equal(retiredGoal.color,'red');assert.equal(retiredGoal.tags.exitTo,'下一地区');
 
 assert.equal(normalizeTile({color:'yellow',terrain:'key',keyName:' 门钥匙 '}).keyName,'门钥匙');assert.throws(()=>normalizeTile({terrain:'key',keyName:''}));assert.equal(normalizeTile({terrain:'key'}).keyName,'钥匙');
+
+assert.equal(tileCollision(normalizeTile({color:'white'})),true,'placed entities carry a collision box by default');
+assert.equal(tileCollision(normalizeTile({color:'white',collision:false})),false,'prefabs may opt out of collision');
+assert.equal(tileCollision(null),false,'void is transparent scenery with no collision box');
+assert.throws(()=>normalizeTile({color:'white',collision:1}),/碰撞箱/);
+console.log('PASS: collision box flag defaults on for entities, opts out per prefab and stays absent for void.');

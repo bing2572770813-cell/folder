@@ -18,6 +18,9 @@ export const blocked=tile=>!!tile&&(tile.blocked??tile.color==='black');
 export const tileHeight=tile=>tile?.height??(tile?.color==='black'?.25:.09);
 export const tileThickness=tile=>tile?.thickness??tileHeight(tile);
 export const tileGradualRate=tile=>tile?.gradualRate??(2/3);
+// Every placed entity blocks a folding flap unless its prefab opts out. Void
+// tiles are transparent scenery and never carry a collision box.
+export const tileCollision=tile=>!!tile&&tile.collision!==false;
 export function normalizeTile(tile) {
   if(tile===null)return null;
   // Retired goal tiles keep their geometry and exit tags when importing old maps.
@@ -49,9 +52,10 @@ export function normalizeTile(tile) {
   const keyName=terrain==='key'?(tile.keyName??'钥匙'):undefined;
   if(keyName!==undefined&&(typeof keyName!=='string'||!keyName.trim()||keyName.trim().length>80))throw new Error('钥匙名须为 1–80 字');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
+  if(tile.collision!==undefined&&typeof tile.collision!=='boolean')throw new Error('碰撞箱属性无效');
   const propertyExtras={...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
-  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),collision:tileCollision(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||!data.tile)throw new Error('实体方块需要 version:1、id、name 和 tile');

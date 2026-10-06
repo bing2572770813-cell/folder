@@ -16,6 +16,7 @@ const names = {
   thickness: "厚度",
   gradualRate: "过渡比例",
   blocked: "阻挡",
+  collision: "碰撞箱",
   prefabId: "实体 ID",
   instance: "实例身份",
   kind: "外观类型",

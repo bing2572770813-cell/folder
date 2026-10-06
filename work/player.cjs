@@ -5,12 +5,16 @@ function createPlayerController(env){
  const {THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx,wz,tileTop}=env;
  P.terrainState=createTerrainState();
 function canMoveTo(r,c){const map=env.getMap();const delta=(map.tiles[r]?.[c]?.height??.09)-(map.tiles[P.player.r]?.[P.player.c]?.height??.09);return walkable(r,c)&&delta<=P.moveHeight.maxUp+1e-9&&-delta<=P.moveHeight.maxDown+1e-9&&canEnterTerrain(map,{r,c},P.terrainState).valid;}
-function setPlayerProperties({r,c,dir,maxUp,maxDown}) {
+function setPlayerProperties({r,c,dir,maxUp,maxDown,overheat=P.terrainState.overheat,frozen=P.terrainState.frozen,actions=P.terrainState.actions,collectedKeys=P.terrainState.collectedKeys}) {
  if(P.mode!=='play'||P.moving)throw new Error('请在游玩模式且移动结束后修改玩家属性');
  if(!inside(r,c)||!Number.isInteger(dir)||dir<0||dir>7)throw new Error('玩家坐标或朝向无效');
  if(![maxUp,maxDown].every(n=>Number.isFinite(n)&&n>=0&&n<=16))throw new Error('可移动高度差须为 0–16');
- const tile=env.getMap().tiles[r]?.[c];if(!tile||blocked(tile)||!canEnterTerrain(env.getMap(),{r,c},P.terrainState).valid)throw new Error('玩家坐标需要可通行实体');
- record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.revealedRegions.add(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
+ if(!Number.isSafeInteger(overheat)||overheat<0||!Number.isSafeInteger(actions)||actions<0||typeof frozen!=='boolean')throw new Error('过热与机制行动次数须为非负整数，冰冻须为布尔值');
+ const keys=new Set(env.getMap().tiles.flat().filter(t=>t?.terrain==='key'&&!blocked(t)).map(t=>t.keyName?.trim()||'钥匙'));
+ if(!Array.isArray(collectedKeys)||collectedKeys.some(k=>typeof k!=='string'||!keys.has(k)))throw new Error('已收集钥匙须为地图中合法钥匙名的 JSON 数组');
+ const terrainState={...P.terrainState,overheat,frozen,actions,collectedKeys:[...new Set(collectedKeys)],hasKey:collectedKeys.length>0,eruptionOpen:actions>0&&actions%3===2};
+ const tile=env.getMap().tiles[r]?.[c];if(!tile||blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid))throw new Error('玩家坐标需要可通行实体');
+ record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.terrainState=terrainState;P.revealedRegions.add(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
 }
 function validateForPlay() {const map=env.getMap();
   const errors=[...validateTerrains(map),...validateRegions(map)];

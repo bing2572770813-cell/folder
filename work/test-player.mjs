@@ -65,3 +65,12 @@ assert.throws(()=>hintController.setPlayerProperties({r:0,c:0,dir:0,maxUp:-1,max
 hintController.setPlayerProperties({r:0,c:0,dir:2,maxUp:0,maxDown:0});hintController.undo();assert.deepEqual(P.moveHeight,debugBefore.moveHeight);assert.equal(P.steps,debugBefore.steps);
 hintController.restart();assert.deepEqual(P.moveHeight,{maxUp:1,maxDown:1});assert.deepEqual(P.player,map.spawn);
 console.log('PASS: asymmetric walking heights, inclusive boundaries, unlimited folds, atomic player edits, undo and restart.');
+map.tiles[0][3]={color:'white',terrain:'key',keyName:'调试钥匙',regionTag:'A',height:.09,blocked:false};
+const statusArgs={r:P.player.r,c:P.player.c,dir:P.player.dir,maxUp:1,maxDown:1};
+const statusBefore=hintController.snapshot();hintController.setPlayerProperties({...statusArgs,overheat:5,frozen:true,actions:2,collectedKeys:['调试钥匙','调试钥匙']});
+assert.equal(P.terrainState.overheat,5);assert.equal(P.terrainState.frozen,true);assert.equal(P.terrainState.actions,2);assert.equal(P.terrainState.eruptionOpen,true);assert.equal(P.terrainState.hasKey,true);assert.deepEqual(P.terrainState.collectedKeys,['调试钥匙']);assert.equal(P.steps,statusBefore.steps);
+const statusEdited=hintController.snapshot(),statusHistory=P.playHistory.length;
+for(const invalid of [{overheat:-1},{overheat:1.5},{actions:Infinity},{frozen:'yes'},{collectedKeys:['不存在']}])assert.throws(()=>hintController.setPlayerProperties({...statusArgs,...invalid}));
+assert.deepEqual(hintController.snapshot(),statusEdited);assert.equal(P.playHistory.length,statusHistory);
+hintController.undo();assert.deepEqual(P.terrainState,statusBefore.terrainState);hintController.setPlayerProperties({...statusArgs,overheat:3,frozen:true,actions:5,collectedKeys:[]});assert.equal(P.terrainState.hasKey,false);hintController.restart();assert.equal(P.terrainState.overheat,0);assert.equal(P.terrainState.frozen,false);assert.equal(P.terrainState.actions,0);
+console.log('PASS: mechanism state debugging, derived key/eruption states, validation, independent undo and lifecycle reset.');

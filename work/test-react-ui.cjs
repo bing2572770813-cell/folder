@@ -21,6 +21,8 @@ const esbuild = require("esbuild");
   const { document } = parseHTML(module.exports.renderEditorMarkup());
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
+  for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])
+    assert.equal(document.getElementById(id).closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.ok(document.querySelector('#cellPropertyInspector'));
   assert.equal(document.querySelector('#clearMap').closest('.tool-grid').className,'tool-grid');
   assert.equal(document.querySelector('#freeTeleportToggle').closest('[role="tabpanel"]').id,'panelDeveloper');

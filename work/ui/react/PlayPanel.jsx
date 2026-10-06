@@ -1,5 +1,12 @@
 import React from "react";
-import { UiButton, UiDisclosure, UiInput, UiSelect } from "./controls.jsx";
+import {
+  UiButton,
+  UiDisclosure,
+  UiInput,
+  UiSelect,
+  UiCheckbox,
+  UiTextarea,
+} from "./controls.jsx";
 import { TabbedSections } from "./TabbedSections.jsx";
 
 export const PlayPanel = React.memo(function PlayPanel() {
@@ -139,6 +146,46 @@ export const PlayPanel = React.memo(function PlayPanel() {
                           defaultValue={1}
                         />
                       </label>
+                    </fieldset>
+                    <fieldset className="player-height-limits">
+                      <legend>机制状态</legend>
+                      <label>
+                        过热层数
+                        <UiInput
+                          id="playerOverheat"
+                          aria-label="过热层数"
+                          type="number"
+                          min={0}
+                          step={1}
+                          defaultValue={0}
+                        />
+                      </label>
+                      <label>
+                        冰冻
+                        <UiCheckbox id="playerFrozen" aria-label="玩家冰冻" />
+                      </label>
+                      <label>
+                        机制行动次数
+                        <UiInput
+                          id="playerActions"
+                          aria-label="机制行动次数"
+                          type="number"
+                          min={0}
+                          step={1}
+                          defaultValue={0}
+                        />
+                      </label>
+                      <label>
+                        已收集钥匙（JSON 名称数组）
+                        <UiTextarea
+                          id="playerCollectedKeys"
+                          aria-label="已收集钥匙"
+                          defaultValue="[]"
+                        />
+                      </label>
+                      <p className="studio-readout">
+                        持有钥匙状态由名称列表决定；修改机制行动次数会同步喷发周期。
+                      </p>
                     </fieldset>
                     <UiButton id="applyPlayerProperties">应用玩家属性</UiButton>
                     <p

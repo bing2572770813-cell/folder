@@ -11,3 +11,5 @@
 变更事件为 `transformChanged`，监听器异常由 `notificationErrors` 返回，不使已提交操作回滚或阻断其他监听器。取消函数支持重复调用。
 
 验证：`npm --prefix work run backend:test`。后续仍需实体、组件、prefab 继承、地图转换、浏览器适配和 player.cjs 交互接入。
+
+`PrefabRegistry` 已提供 JSON 模板继承：递归对象合并、数组替换、缺失父模板和循环拒绝。`instantiate` 从调用方接收实体 ID 与 Transform ID，生成独立配置快照并深冻结静态标记；实例运行时状态不写入 prefab 或实体配置。此模块暂未接入磁盘目录或编辑器，组合子模板和字段编辑权限仍需后续接入。

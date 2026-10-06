@@ -20,14 +20,29 @@ function fixture(type='h'){
  const renderPlayer=()=>{player.position.set(P.player.c-3,.108,P.player.r-3);player.rotation.set(0,-P.player.dir*Math.PI/4,0);};
  let controller;
  const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>player,getSelectionRing:()=>ring,getEffectLayer:()=>paper,getFoldHinge:g=>hingeFor(map,g,c=>c-3,r=>r-3),foldView:view,invalidateAxes:noop,isHidden:()=>false,blocked,inside,walkable:(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c]),canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c-3,wz:r=>r-3,tileTop:(r,c)=>map.tiles[r]?.[c]?.height??0};
+ const selectionChanges=[];env.onSelectionChanged=()=>selectionChanges.push(P.chosenFold?{...P.chosenFold}:null);
  controller=runtime.createPlayerController(env);controller.setMode('play');renderPlayer();controller.selectFold(3,3,type);
- return {P,map,controller,view,layer,player,mesh};
+ return {P,map,controller,view,layer,player,mesh,env,selectionChanges};
 }
 // The rendered angle eases toward the pointer under a bounded angular speed,
 // so tests advance the clock instead of expecting an instantaneous pose.
 const settle=(f,seconds=1)=>{const start=performance.now();for(let elapsed=0;elapsed<=seconds*1000;elapsed+=16)f.controller.tick(start+elapsed);};
 for(const type of ['h','v','d1','d2']){
  const f=fixture(type),before=JSON.stringify(f.map),source={...f.P.player};
+ assert.deepEqual(f.selectionChanges.at(-1),{r:3,c:3,type},'selection notifies rendering immediately');
+ const preview=f.controller.foldHighlightRegions(),group=uniqueFoldAxes(f.map)[0];
+ const d=type==='h'?{r:0,c:1}:type==='v'?{r:1,c:0}:type==='d1'?{r:1,c:1}:{r:1,c:-1};
+ const side=p=>(p.c-group.center.c)*d.r-(p.r-group.center.r)*d.c;
+ const sign=Math.sign(side(source));
+ assert.ok(preview.source.length&&preview.target.length,'both sides have filled areas');
+ for(const p of preview.source){assert.ok(inFoldRange(group,p));assert.ok(p.half===sign||side(p)*sign>0);}
+ for(const p of preview.target){assert.ok(inFoldRange(group,p));assert.ok(p.half===-sign||side(p)*sign<0);}
+ assert.ok(preview.source.some(p=>p.r===source.r&&p.c===source.c));
+ f.env.isHidden=(r,c)=>r===source.r&&c===source.c;
+ assert.ok(!f.controller.foldHighlightRegions().source.some(p=>p.r===source.r&&p.c===source.c),'hidden cells stay excluded');
+ f.env.isHidden=()=>false;
+ f.controller.clearSelection();assert.equal(f.selectionChanges.at(-1),null,'clearing selection clears highlights immediately');
+ f.controller.click(3,3);assert.deepEqual(f.selectionChanges.at(-1),{r:3,c:3,type});
  assert.equal(f.controller.beginFoldDrag(source.r,source.c,300),true);
  assert.ok(f.P.foldMotion.creaseCells.length,'crease cells must have mixed halves');
  assert.equal(f.controller.updateFoldDrag(180,240),false,'90 degrees is not above target');settle(f);
@@ -51,3 +66,11 @@ const debug=fixture();debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:
 const polygon=[{position:[-1,0,0],uv:[0,0]},{position:[1,0,0],uv:[1,0]},{position:[0,0,1],uv:[.5,1]}];
 for(const positive of [false,true]){const half=clipFoldPolygon(polygon,v=>v.position[0],positive);assert.ok(half.length>=3);assert.ok(half.every(v=>positive?v.position[0]>=0:v.position[0]<=0));}
 console.log('PASS: four physical fold axes, mixed crease halves, player attachment, aligned drop, rebound, stale gates, undo and immutable maps.');
+const outOfRange=fixture();outOfRange.map.tiles[3][0].folds=[];outOfRange.map.tiles[3][6].folds=[];outOfRange.P.player={r:0,c:0,dir:0};assert.deepEqual(outOfRange.controller.foldHighlightRegions(),{source:[],target:[]});
+const onAxis=fixture();onAxis.P.player={r:3,c:3,dir:0};assert.deepEqual(onAxis.controller.foldHighlightRegions(),{source:[],target:[]});
+const even=fixture();for(const c of [0,1,4,5,6])even.map.tiles[3][c].folds=[];
+const evenPreview=even.controller.foldHighlightRegions();
+assert.ok(evenPreview.source.every(p=>p.r>=2&&p.r<=3&&p.c>=2&&p.c<=3),'even-run radius uses both central cells');
+assert.ok(evenPreview.target.every(p=>p.r>=3&&p.r<=4&&p.c>=2&&p.c<=3));
+even.map.tiles[4][2]=null;assert.ok(!even.controller.foldHighlightRegions().target.some(p=>p.r===4&&p.c===2),'void target cells are not filled');
+console.log('PASS: immediate crease selection updates and source/target region halves follow player side, range and hidden-cell guards.');

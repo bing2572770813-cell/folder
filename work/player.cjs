@@ -168,6 +168,7 @@ function clearSelection() {
       $("foldDetail").textContent = "—";
       $("teleportBtn").disabled = true;
     }
+    env.onSelectionChanged?.();
   }
 function selectPlayer(){const map=env.getMap();clearSelection();env.getSelectionRing().visible=true;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const r=P.player.r+dr,c=P.player.c+dc;if(canMoveTo(r,c)){P.legalMoves.push({r,c});overlay(r,c,'#bce772',.44);tileOutline(r,c,'#7a9b52');}}if(P.foldHints){const seen=new Set();for(const axis of env.getFoldAxes()){const target=foldTarget(axis),key=target.r+','+target.c;if(!target.valid||seen.has(key))continue;seen.add(key);P.legalFoldMoves.push({r:target.r,c:target.c,axis:{r:axis.r,c:axis.c,type:axis.type}});if(!P.legalMoves.some(p=>p.r===target.r&&p.c===target.c)){overlay(target.r,target.c,'#91d6c9',.4);tileOutline(target.r,target.c,'#4b967d');}}}$('toolStatus').textContent='玩家 '+coord(P.player.r,P.player.c);}
 function reflectPoint(r,c,axis){const map=env.getMap();const dr=r-axis.r,dc=c-axis.c;if(axis.type==='h')return {r:axis.r-dr,c};if(axis.type==='v')return {r,c:axis.c-dc};if(axis.type==='d1')return {r:axis.r+dc,c:axis.c+dr};return {r:axis.r-dc,c:axis.c-dr};}
@@ -176,6 +177,27 @@ function selectFold(r,c,preferredType=null){const map=env.getMap();const directi
   const a=P.chosenFold;env.invalidateAxes();
   if(inside(t.r,t.c)){overlay(t.r,t.c,t.valid?'#91d6c9':'#de9b91',.4);tileOutline(t.r,t.c,t.valid?'#4b967d':'#b4594e');}
   $('foldTitle').textContent=coord(r,c)+' · '+FOLD_NAMES[a.type];$('foldDetail').textContent=t.valid?coord(P.player.r,P.player.c)+' → '+coord(t.r,t.c):t.reason;$('teleportBtn').disabled=!t.valid;$('toolStatus').textContent=t.valid?'再次点击 '+coord(t.r,t.c)+' 传送':t.reason;
+  env.onSelectionChanged?.();
+}
+// The preview uses the same radius and player-side partition as physical folds.
+// Target tint describes geometry; the existing landing gate still decides drops.
+function foldHighlightRegions(axis=P.chosenFold){
+  const source=[],target=[],map=env.getMap();
+  const group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);
+  if(!group||!inFoldRange(group,P.player))return {source,target};
+  const d=group.type==='h'?{r:0,c:1}:group.type==='v'?{r:1,c:0}:group.type==='d1'?{r:1,c:1}:{r:1,c:-1};
+  const side=p=>(p.c-group.center.c)*d.r-(p.r-group.center.r)*d.c;
+  const playerSide=Math.sign(side(P.player));
+  if(!playerSide)return {source,target};
+  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
+    const p={r,c};if(!map.tiles[r][c]||env.isHidden(r,c)||!inFoldRange(group,p))continue;
+    const s=side(p)*playerSide;
+    if(s>0)source.push(p);else if(s<0)target.push(p);
+    else if(group.cells.some(q=>q.r===r&&q.c===c)){
+      source.push({...p,half:playerSide});target.push({...p,half:-playerSide});
+    }
+  }
+  return {source,target};
 }
 function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();updateUI();}
 function testTeleport(r, c) {
@@ -643,6 +665,6 @@ function undo() {
     const previous = P.playHistory.pop();
     if (previous) restore(previous);
   }
-return {beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,setPlayerProperties,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click};
+return {foldHighlightRegions,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,setPlayerProperties,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click};
 }
 module.exports={createPlayerState,createPlayerController,playerPrefabDefaults};

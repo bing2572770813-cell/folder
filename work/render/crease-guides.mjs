@@ -1,5 +1,5 @@
 import { tileHeight, tileGradualRate } from '../entities/tile-model.mjs';
-import { foldStrokes, foldDistance, axisKey } from '../tags/fold-geometry.mjs';
+import { foldStrokes } from '../tags/fold-geometry.mjs';
 import { isPaper, paperSurface, DEFAULT_CREASE_DEPTH } from './paper-surface.mjs';
 
 const EPSILON = 1e-9;
@@ -281,7 +281,8 @@ export function creaseGuides(map, groups, {
 
   for (const group of groups) {
     // The selected crease is drawn by creaseSelection, so skip its dashes.
-    if (selected && axisKey(group) === axisKey(selected)) continue;
+    if (selected && group.type === selected.type &&
+      group.cells.some(p => p.r === selected.r && p.c === selected.c)) continue;
     for (const [from, to] of foldStrokes(group)) {
       const a = [from.c, from.r],
         b = [to.c, to.r];
@@ -302,60 +303,8 @@ export function creaseGuides(map, groups, {
 }
 
 /**
- * Dash/dot crease hints that hug the physical groove: paper cells sample the
- * deformed surface, void cells fall back to a flat plane just above the table.
- * The selected crease is left to creaseSelection, which draws it as one
- * continuous thick stroke instead of a dash/dot run.
- *
- * Render data only; fold placement and range stay unchanged.
- */
-/**
- * Bounding box of the tiles one fold group reaches. Reach is a Chebyshev ball
- * around the group centre; for even-length groups the in-range set is the
- * intersection of the two central cells' balls. The result is always
- * rectangular, and it is trimmed to tiles that exist and are currently shown.
- */
-function reachBounds(map, rows, cols, group, hidden) {
-  const cells = group.cells ?? [],
-    radius = group.radius ?? 0,
-    middle = Math.floor(cells.length / 2),
-    mids =
-      cells.length % 2 ? [cells[middle]] : [cells[middle - 1], cells[middle]];
-  let r0 = -Infinity,
-    r1 = Infinity,
-    c0 = -Infinity,
-    c1 = Infinity;
-  for (const p of mids) {
-    r0 = Math.max(r0, p.r - radius);
-    r1 = Math.min(r1, p.r + radius);
-    c0 = Math.max(c0, p.c - radius);
-    c1 = Math.min(c1, p.c + radius);
-  }
-  r0 = Math.max(0, Math.round(r0));
-  r1 = Math.min(rows - 1, Math.round(r1));
-  c0 = Math.max(0, Math.round(c0));
-  c1 = Math.min(cols - 1, Math.round(c1));
-  let top = Infinity,
-    bottom = -Infinity,
-    left = Infinity,
-    right = -Infinity;
-  for (let r = r0; r <= r1; r++)
-    for (let c = c0; c <= c1; c++) {
-      if (!map.tiles[r]?.[c] || hidden(r, c)) continue;
-      if (foldDistance(group, { r, c }) > radius) continue;
-      top = Math.min(top, r);
-      bottom = Math.max(bottom, r);
-      left = Math.min(left, c);
-      right = Math.max(right, c);
-    }
-  return bottom < top ? null : { r0: top, r1: bottom, c0: left, c1: right };
-}
-
-/**
- * Highlight for the crease that is currently selected: one continuous thick
- * stroke spanning the whole line, plus a thick outline around the tiles the
- * fold reaches. Sampling matches the dash/dot hints, so the highlight rides
- * the groove and folds together with the paper.
+ * Continuous surface-conforming ribbon for the selected crease itself.
+ * Area fills are separate geometry; no bounding rectangle is drawn.
  *
  * Render data only; fold placement and range stay unchanged.
  */
@@ -366,7 +315,6 @@ export function creaseSelection(map, group, {
   voidPlane = () => 0,
   showFolds = true,
   width = .085,
-  reach = .055,
   creaseDepth = DEFAULT_CREASE_DEPTH,
 } = {}) {
   const { width: cols, height: rows, cellSurface, sample } = createSampler(map, {
@@ -424,16 +372,55 @@ export function creaseSelection(map, group, {
 
   if (!group?.cells?.length) return { positions, cells };
   stroke([group.from.c, group.from.r], [group.to.c, group.to.r], width / 2);
-  const box = reachBounds(map, rows, cols, group, hidden);
-  if (box) {
-    const corners = [
-      [box.c0 - .5, box.r0 - .5],
-      [box.c1 + .5, box.r0 - .5],
-      [box.c1 + .5, box.r1 + .5],
-      [box.c0 - .5, box.r1 + .5],
-    ];
-    for (let i = 0; i < corners.length; i++)
-      stroke(corners[i], corners[(i + 1) % corners.length], reach / 2);
-  }
   return { positions, cells };
+}
+
+/** Top-surface fills for controller-classified fold cells, including axis halves. */
+export function creaseAreaSelection(map, region, group, {
+  hidden = () => false,
+  showFolds = true,
+  creaseDepth = DEFAULT_CREASE_DEPTH,
+  lift = .008,
+  striped = false,
+} = {}) {
+  const positions = [], cells = [], stripes = [], stripeCells = [];
+  const offset = [-(map.width - 1) / 2, 0, -(map.height - 1) / 2];
+  const dr = group?.to.r - group?.from.r, dc = group?.to.c - group?.from.c;
+  const emit = (polygon, output, metadata, cell, extraLift = 0) => {
+    for (let i = 1; i < polygon.length - 1; i++) {
+      for (const p of [polygon[0], polygon[i], polygon[i + 1]])
+        output.push(p[0] + offset[0], p[1] + lift + extraLift, p[2] + offset[2]);
+      metadata.push({r:cell.r,c:cell.c});
+    }
+  };
+  for (const cell of region) {
+    const {r,c,half} = cell, tile = map.tiles[r]?.[c];
+    if (!tile || hidden(r,c)) continue;
+    const surface = paperSurface(map,r,c,hidden,showFolds,creaseDepth);
+    const triangles = [];
+    if (surface) {
+      // Top/bottom triangles are paired; the final ring closes the side walls.
+      const end = surface.positions.length - surface.boundary.length * 18;
+      for(let i=0;i<end;i+=18)triangles.push([
+        surface.positions.slice(i,i+3),surface.positions.slice(i+3,i+6),surface.positions.slice(i+6,i+9),
+      ]);
+    } else {
+      const y=tileHeight(tile);
+      triangles.push([[-.5,y,-.5],[-.5,y,.5],[.5,y,-.5]],[[.5,y,-.5],[-.5,y,.5],[.5,y,.5]]);
+    }
+    for (const triangle of triangles) {
+      let polygon = triangle.map(p=>[p[0]+c,p[1],p[2]+r]);
+      if(half)polygon=clipPolygon(polygon,p=>((p[0]-group.center.c)*dr-(p[2]-group.center.r)*dc)*half);
+      if(polygon.length<3)continue;
+      emit(polygon,positions,cells,cell);
+      if(!striped)continue;
+      const values=polygon.map(p=>p[0]+p[2]),period=.3,width=.035;
+      for(let band=Math.floor(Math.min(...values)/period);band*period<=Math.max(...values);band++){
+        const start=band*period;
+        const stripe=clipPolygon(clipPolygon(polygon,p=>p[0]+p[2]-start),p=>start+width-p[0]-p[2]);
+        emit(stripe,stripes,stripeCells,cell,.002);
+      }
+    }
+  }
+  return {positions,cells,stripes,stripeCells};
 }

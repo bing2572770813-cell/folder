@@ -205,6 +205,10 @@ export const PlayPanel = React.memo(function PlayPanel() {
                 <div className="fold-state">
                   <strong id="foldTitle">{"未选择折纸线"}</strong>
                   <span id="foldDetail">{"—"}</span>
+                  <div id="foldHighlightLegend" className="fold-highlight-legend" aria-label="折叠高亮图例" hidden>
+                    <span><i className="fold-swatch fold-swatch-source" aria-hidden="true" />被折叠区域</span>
+                    <span><i className="fold-swatch fold-swatch-target" aria-hidden="true" />目标区域 · 斜纹</span>
+                  </div>
                   <UiButton
                     className="teleport-btn"
                     id="teleportBtn"

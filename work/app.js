@@ -4,7 +4,7 @@ import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-c
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor} from './render/fold-motion.mjs';
 import {createTableScene} from './render/table-scene.mjs';
-import {creaseGuides,creaseSelection} from './render/crease-guides.mjs';
+import {creaseGuides,creaseSelection,creaseAreaSelection} from './render/crease-guides.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -80,7 +80,7 @@ const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer)
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,foldView:{begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz),syncFoldState:()=>syncState(),resetDebugState:()=>{debugOverrides.clear();clearInspection();},getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,foldView:{begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),resetDebugState:()=>{debugOverrides.clear();clearInspection();},getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -145,9 +145,14 @@ const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new TH
 const gridMaterial=new THREE.LineBasicMaterial({color:'#b9bdbb',transparent:true,opacity:.8});
 const creaseDashMaterial=new THREE.LineBasicMaterial({color:'#48664d',toneMapped:false});
 const creaseDotMaterial=new THREE.MeshBasicMaterial({color:'#48664d',toneMapped:false});
-const creaseSelectionMaterial=new THREE.MeshBasicMaterial({color:'#2477e8',toneMapped:false,depthTest:false});
+const highlightMaterial=(color,opacity)=>new THREE.MeshBasicMaterial({color,toneMapped:false,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide});
+const creaseSelectionMaterial=highlightMaterial('#174f50',1);
+const creaseHaloMaterial=highlightMaterial('#fff9df',.9);
+const foldSourceMaterial=highlightMaterial('#e6ac48',.42);
+const foldTargetMaterial=highlightMaterial('#54bdad',.32);
+const foldHatchMaterial=highlightMaterial('#176a63',.28);
 const sharedGeometries=new Set([tileGeo,markerGeo]);
-const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial,creaseSelectionMaterial]);
+const sharedMaterials=new Set([...Object.values(materials),gridMaterial,creaseDashMaterial,creaseDotMaterial,creaseSelectionMaterial,creaseHaloMaterial,foldSourceMaterial,foldTargetMaterial,foldHatchMaterial]);
 let tileLayer=new THREE.Group(), foldLayer=new THREE.Group(), boardLayer=new THREE.Group(), gridLayer=new THREE.Group(), effectLayer=new THREE.Group(), entityEdgeLayer=new THREE.Group(), foldAxisLayer=new THREE.Group(), creaseGuideLayer=new THREE.Group(), foldSelectionLayer=new THREE.Group();
 let foldSelectionSignature='';
 paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer);
@@ -445,8 +450,7 @@ function updateUI(){
   $('undoBtn').disabled=!currentHistory().length||P.moving;$('restartBtn').disabled=!playing||P.moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=P.moving);$('teleportBtn').disabled=P.moving||!P.chosenFold||!foldTarget(P.chosenFold).valid;
   $('redoBtn').disabled=P.mode!=='edit'||!redoHistory.length||P.moving;drawEditSelection();
   scheduleInspection();
-  const foldSignature=P.mode==='play'&&P.chosenFold?P.chosenFold.type+':'+P.chosenFold.r+','+P.chosenFold.c:'';
-  if(foldSignature!==foldSelectionSignature){foldSelectionSignature=foldSignature;buildCreaseGuides();buildFoldSelection();}
+  refreshFoldSelection();
   syncState();
 }
 
@@ -585,9 +589,14 @@ function buildCreaseGuides(){
   mesh.userData.triangleCells=cells;mesh.renderOrder=8;creaseGuideLayer.add(mesh);
  }
 }
-// The selected crease line becomes one continuous thick blue stroke and its
-// reach is outlined; both ride the paper so they fold with the flap.
+// Selected crease and filled halves stay attached to their paper surfaces.
 function selectedFold(){return P.mode==='play'&&P.chosenFold&&P.chosenFold.type?{r:P.chosenFold.r,c:P.chosenFold.c,type:P.chosenFold.type}:null;}
+function refreshFoldSelection(){
+ const chosen=selectedFold(),signature=chosen?`${chosen.type}:${chosen.r},${chosen.c}:${P.player.r},${P.player.c}`:'';
+ if(signature!==foldSelectionSignature){foldSelectionSignature=signature;buildCreaseGuides();buildFoldSelection();}
+ $('foldHighlightLegend').hidden=!chosen;
+ syncState();
+}
 function buildFoldSelection(){
  disposableClear(foldSelectionLayer);
  foldSelectionLayer.visible=false;
@@ -595,12 +604,22 @@ function buildFoldSelection(){
  if(!chosen)return;
  const group=foldGroupAt(foldAxes,chosen.r,chosen.c,chosen.type);
  if(!group)return;
- const guides=creaseSelection(map,group,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>voidPlaneTop(r,c)});
- if(!guides.positions.length)return;
- const geometry=new THREE.BufferGeometry();
- geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));
- const mesh=new THREE.Mesh(geometry,creaseSelectionMaterial);
- mesh.userData.triangleCells=guides.cells;mesh.renderOrder=9;foldSelectionLayer.add(mesh);
+ const options={hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>map.tiles[r]?.[c]?tileTop(r,c):voidPlaneTop(r,c)};
+ const add=(positions,cells,material,order)=>{
+  if(!positions.length)return;
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const mesh=new THREE.Mesh(geometry,material);mesh.userData.triangleCells=cells;mesh.renderOrder=order;foldSelectionLayer.add(mesh);
+ };
+ const regions=controller.foldHighlightRegions(chosen);
+ const source=creaseAreaSelection(map,regions.source,group,options);
+ const target=creaseAreaSelection(map,regions.target,group,{...options,striped:true});
+ add(source.positions,source.cells,foldSourceMaterial,5);
+ add(target.positions,target.cells,foldTargetMaterial,5);
+ add(target.stripes,target.stripeCells,foldHatchMaterial,6);
+ const halo=creaseSelection(map,group,{...options,width:.105,lift:.012,flatLift:.022});
+ const core=creaseSelection(map,group,{...options,width:.038,lift:.016,flatLift:.026});
+ add(halo.positions,halo.cells,creaseHaloMaterial,9);
+ add(core.positions,core.cells,creaseSelectionMaterial,10);
  foldSelectionLayer.visible=foldLayer.visible;
 }
 function updateFoldAxes(){}

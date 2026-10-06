@@ -13,3 +13,4 @@
 .tag-picker-row{display:flex;align-items:center;gap:8px;margin-top:16px}.tag-picker-label{flex:none;font-size:11px;white-space:nowrap}.tag-picker-row>.prefab-picker{flex:1;min-width:0}#tagSummary span{min-width:0;overflow-wrap:anywhere}
 
 #foldDirectionPanel{grid-column:1/-1;margin:0;padding:12px 8px;border:1px solid var(--line);border-radius:5px;background:#eef1e9}#foldDirectionPanel[hidden]{display:none}
+.fold-highlight-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-block:10px;color:#42584b;font-size:11px;line-height:1.6}.fold-highlight-legend[hidden]{display:none}.fold-highlight-legend>span{display:inline-flex;align-items:center;gap:6px;margin:0;color:#42584b;font-size:11px;line-height:1.6}.fold-swatch{display:inline-block;flex:none;width:15px;height:15px;border-radius:3px}.fold-swatch-source{background:#e6ac48}.fold-swatch-target{background:repeating-linear-gradient(135deg,transparent 0 4px,#176a6370 4px 5px),#54bdad}

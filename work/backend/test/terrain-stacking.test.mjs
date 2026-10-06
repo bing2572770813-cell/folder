@@ -136,3 +136,18 @@ test('legacy key and terrain prefabs reuse paper when stacked, but paper prefabs
   assert.throws(()=>placeTreePrefab(doc,{id:'paper_ai',tile:{color:'white'}},{},1,1,{stack:true}),/多个纸张/);
   assert.deepEqual(doc.serialize(),before);
 });
+
+test('lift belongs to its single paper and removal stays removed across import',()=>{
+ const input=fixture(),lift={minHeight:.09,maxHeight:1,initialHeight:.4,turnsPerLeg:3};
+ input.entities[0].components.lift=lift;input.entities[0].configuration={lift};
+ const doc=new TreeDocument(input),before=doc.serialize();
+ const removed=configureNode(doc,'paper',{surface:{color:'white'}},{});
+ assert.equal(removed.world.get('paper').components.lift,undefined);
+ assert.equal(removed.world.get('paper').configuration.lift,undefined);
+ assert.equal(new TreeDocument(removed.serialize()).world.get('paper').components.lift,undefined);
+ assert.deepEqual(doc.serialize(),before);
+ const updated=configureNode(doc,'paper',{surface:{color:'white'},lift:{...lift,initialHeight:.7}},{});
+ assert.equal(updated.world.get('paper').configuration.lift.initialHeight,.7);
+ input.entities[2].components={lift};assert.throws(()=>importTreeMap(input),/升降.*纸张/);
+ delete input.entities[0].components.lift;assert.throws(()=>importTreeMap(input),/升降.*纸张/);
+});

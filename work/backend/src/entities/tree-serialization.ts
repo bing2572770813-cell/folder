@@ -39,9 +39,11 @@ export function importTreeMap(input:unknown):ImportedTree {
   }else throw new Error('Unsupported map version');
   tree=migratePaperTiles(tree);
   for(const node of tree.entities){
-    if(!node.components.lift&&node.configuration?.lift)node.components.lift=jsonObject(node.configuration.lift);
     if(node.components.lift)node.components.lift=migrateLiftConfig(node.components.lift);
-    if(node.configuration?.lift)node.configuration.lift=migrateLiftConfig(jsonObject(node.configuration.lift));
+    if(node.configuration){
+      if(node.components.lift)node.configuration.lift=jsonObject(node.components.lift);
+      else delete node.configuration.lift;
+    }
     if(node.components.lift&&node.configuration?.propertySchema){
       const schema=jsonObject(node.configuration.propertySchema);
       migrateLiftSchema(schema);node.configuration.propertySchema=schema;

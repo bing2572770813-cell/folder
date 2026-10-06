@@ -8,6 +8,8 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 验证：node work/test-cell-entity.mjs。玩家状态机仍位于 work/player.cjs。
 
+升降组件必须属于单格纸张本体，不能作为独立叠加实体。同格最多一个纸张，因此最多一个升降控制来源。version:2 的 components 是升降配置的唯一来源，configuration.lift 只同步组件快照；删除组件时同时移除快照，导入不得从快照恢复已删除能力。version:1 的旧配置仍由兼容转换提升为组件。
+
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。
 
 节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。

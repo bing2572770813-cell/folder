@@ -18,16 +18,20 @@
 
 `snapshotRuntime` / `restoreRuntime` 为游玩历史提供独立组件状态快照，恢复先校验完整输入再替换状态。Transform 的 `referenceOwners` 返回副本，`assertRemovable` 提供不释放引用的删除预检，供编辑事务保留外部引用保护。
 
-`legacyMapToTree` 提供尚未接入导入 UI 的旧地图转换：每个剩余实体格保留自己的表面、通行、地形和标签配置，同一旧实例的格使用父子引用组合；孔洞不产生节点。虚空折线生成透明不可通行节点。地图名称、起点、出口等旧元数据保存为独立配置。当前只是迁移基础，完整字段权限、复制粘贴、导出往返和 UI 还需接入，不能把此转换器视为生产导入路径已完成。
+`legacyMapToTree` 提供旧地图转换：每个剩余实体格保留自己的表面、通行、地形和标签配置，同一旧实例的格使用父子引用组合；孔洞不产生节点。虚空折线生成透明不可通行节点。地图名称、起点、出口等旧元数据保存为独立配置。
 
-`ComponentRegistry` 注册受控组件处理器，分发 enter/leave/interact。事件先检查全部组件和进入限制，再返回独立的 actor/runtime/messages 结果；不在处理器中计步、切换区域或提交玩家状态。碰撞、火焰、冰、喷发和钥匙已有基本效果；邻近篝火解冻、完整标签触发和 player.cjs 协调仍需接入。
+`ComponentRegistry` 注册受控组件处理器，分发 enter/leave/interact。事件先检查全部组件和进入限制，再返回独立的 actor/runtime/messages 结果；不在处理器中计步、切换区域或提交玩家状态。static.events 限制效果订阅，不禁用碰撞预检；static.walkable=false 阻止进入。
 
 旧 tile 的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和序列化权限过滤仍需完成，暂不用于生产保存。
 
-`importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 基础配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。当前 version:2 是内部迁移合同，未切换编辑器导入/导出 UI；生产输出的 serializable 权限过滤尚未接入。
+`importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。
 
 持久化调用可传入 `projectProperties` 和 `schemaFor(node)`，复用核心模块的嵌套 serializable 权限，并同时过滤 configuration 及旧字段在组件、标签中的副本。默认无投影的序列化用于完整编辑历史；组件运行时状态始终独立。
 
 区域归属已由用户明确为方格属性。`TreeMap.cellTags["r,c"].regionTag` 保存该格区域；同格实体共享区域，移动 Transform 不移动方格区域。旧 tile 转换时从实体配置移出 regionTag，保存在 cellTags，实体 tags 只保留实体附着标记。
 
-浏览器使用 `work/entities/tree-runtime.mjs` 导出同一份 TS 纯模型。构建插件支持 TS 与 NodeNext 的 .js→.ts 源码解析，并拒绝 Node 内置模块进入浏览器包。后端 tests/browser-models.test.mjs 使用实际构建插件打包并执行纯模型。app.js 尚未切换地图状态，打包入口已就绪不代表 UI 已接入。
+浏览器使用 `work/entities/tree-runtime.mjs` 导出同一份 TS 纯模型。构建插件支持 TS 与 NodeNext 的 .js→.ts 源码解析，并拒绝 Node 内置模块进入浏览器包。后端 tests/browser-models.test.mjs 使用实际构建插件打包并执行纯模型。
+
+`TreeDocument` 为 app.js 的地图配置来源；tiles 是供现有纸张渲染和编辑工具使用的独立兼容投影。编辑以原子事务提交树，保留同格节点、身份、父子引用、运行时和外部引用。导入支持 v1/v2，localStorage、JSON 和独立 HTML 导出保存 v2；编辑撤销/重做使用完整树快照。复制粘贴目前仍只处理兼容投影，需要后续切换完整实体子树。
+
+`player.cjs` 通过 getEntityWorld 查询同格节点并协调 enter/leave/interact，保留原计步、动画、折纸、邻近篝火与区域规则。游玩历史独立保存组件运行时，撤销恢复，重启清空；钥匙门槛检查同格所有节点。实体选择、层级编辑和同格渲染仍需后续实现。

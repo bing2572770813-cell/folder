@@ -4,7 +4,7 @@ import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mj
 import {nodePermissions} from './entities/node-permissions.mjs';
 import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
-import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,configureNode,forkTreeDocument} from './entities/tree-commands.mjs';
+import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,configureNode,forkTreeDocument,renameTreeKeys} from './entities/tree-commands.mjs';
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
@@ -648,7 +648,7 @@ function drawPlacementPreview(hit){
  $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':($('stackPlacement').checked?'叠加':'替换')+'预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
 
-$('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$('keyName').value,cellHidden);applyPropertyMap(next);buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('applyKeyName').onclick=()=>treeAction(()=>renameTreeKeys(documentModel,selectedCells,$('keyName').value,{isHidden:cellHidden,nodeHidden,schemaFor:nodeSchema}));
 
 $('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};
 

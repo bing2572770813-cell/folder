@@ -6,10 +6,10 @@ import {importTreeMap,serializeTreeMap} from '../dist/entities/tree-serializatio
 import {loadTree} from '../dist/entities/legacy-map.js';
 
 const bundled = await build({
-  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
+  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab,renameTreeKeys} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
   bundle:true,platform:'node',format:'esm',write:false,
 });
-const {TreeDocument,moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
+const {TreeDocument,moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab,renameTreeKeys,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
 const entity = (id, components) => ({id,prefabId:id,transformId:id,components,tags:{},static:{}});
 function fixture() {
   return {version:2,width:6,height:6,
@@ -150,4 +150,20 @@ test('lift belongs to its single paper and removal stays removed across import',
  assert.equal(updated.world.get('paper').configuration.lift.initialHeight,.7);
  input.entities[2].components={lift};assert.throws(()=>importTreeMap(input),/升降.*纸张/);
  delete input.entities[0].components.lift;assert.throws(()=>importTreeMap(input),/升降.*纸张/);
+});
+
+test('rename stacked keys and exit references atomically, preserving remaining names and permissions',()=>{
+ const input=fixture();input.entities[1].components={key:{name:'铜'}};input.entities[2].components={key:{name:'铁'}};
+ input.entities[0].tags={requiredKeys:['铜','铁'],exitTo:'B'};
+ const doc=new TreeDocument(input),before=doc.serialize();
+ const renamed=renameTreeKeys(doc,[{r:1,c:1}],'银');
+ assert.equal(renamed.world.get('fire').components.key.name,'银');assert.equal(renamed.world.get('other').components.key.name,'银');
+ assert.deepEqual(renamed.world.get('paper').tags.requiredKeys,['银']);assert.deepEqual(doc.serialize(),before);
+ assert.throws(()=>renameTreeKeys(doc,[{r:1,c:1}],'银',{nodeHidden:n=>n.id==='other'}),/隐藏/);
+ assert.throws(()=>renameTreeKeys(doc,[{r:1,c:1}],'银',{schemaFor:()=>({components:{children:{key:{children:{name:{tempEditable:false}}}}}})}),/只读|修改|编辑/);
+ assert.throws(()=>renameTreeKeys(doc,[{r:1,c:1}],'银',{schemaFor:n=>n.id==='paper'?{tags:{children:{requiredKeys:{tempEditable:false}}}}:{}}),/只读|修改|编辑/);
+ input.entities.push({...entity('remaining',{key:{name:'铜'}}),transformId:'other-paper'});
+ input.entities.push(entity('other-paper',{surface:{}}));input.transforms.push({id:'other-paper',parentId:null,local:{r:2,c:2,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ const remaining=renameTreeKeys(new TreeDocument(input),[{r:1,c:1}],'银');assert.deepEqual(remaining.world.get('paper').tags.requiredKeys,['铜','银']);
+ assert.deepEqual(doc.serialize(),before);
 });

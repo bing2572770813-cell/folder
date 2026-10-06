@@ -4,6 +4,7 @@ import {normalizeTile} from './tile-model.mjs';
 import {normalizeBaseEntity,createEntityBehavior} from './behaviors.mjs';
 import {placeEntity} from './placement-model.mjs';
 import {projectProperties,updateProperty,mergeSerializableProperties} from '../core/property-model.mjs';
+import {legalKeyNames} from '../tags/keys.mjs';
 
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
@@ -12,6 +13,25 @@ export function forkTreeDocument(document){
   const owners=new Set(document.world.serialize().map(node=>'entity:'+node.id));
   for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);
   return candidate;
+}
+
+/** Rename every selected key owner, then update references only when its old name disappears. */
+export function renameTreeKeys(document,cells,name,{isHidden=()=>false,nodeHidden=()=>false,schemaFor=()=>({})}={}){
+ name=name.trim();if(!name||name.length>80)throw new Error('钥匙名须为 1–80 字');
+ const nodes=[...new Map(cells.flatMap(({r,c})=>document.world.at(r,c)).filter(node=>node.components.key).map(node=>[node.id,node])).values()];
+ if(!nodes.length)throw new Error('先选择钥匙实体');
+ let candidate=forkTreeDocument(document);const oldNames=new Set();
+ for(const node of nodes){
+  oldNames.add(String(node.components.key.name??'钥匙').trim());
+  const components=copy(node.components);components.key.name=name;
+  candidate=configureNode(candidate,node.id,components,node.tags,isHidden,nodeHidden,schemaFor(node));
+ }
+ const remaining=new Set(legalKeyNames(candidate.view(),candidate.world));
+ for(const node of candidate.world.serialize())if(node.tags.requiredKeys){
+  const keys=[...new Set(node.tags.requiredKeys.map(key=>oldNames.has(key)&&!remaining.has(key)?name:key))];
+  if(JSON.stringify(keys)!==JSON.stringify(node.tags.requiredKeys))candidate=configureNode(candidate,node.id,node.components,{...node.tags,requiredKeys:keys},isHidden,nodeHidden,schemaFor(node));
+ }
+ return candidate;
 }
 function subtree(world,id){return [id,...world.transforms.childrenOf(id).flatMap(child=>subtree(world,child))];}
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){

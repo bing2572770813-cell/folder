@@ -17,7 +17,10 @@ function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   for(const node of world.serialize())if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
-function validate(candidate){const registry=defaultComponents();for(const node of candidate.world.serialize())registry.validate(node);return candidate;}
+function validate(candidate){const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of candidate.world.at(r,c))Object.assign(tags,node.tags);if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');return candidate;}
+export function configureNode(document,id,components,tags,isHidden=()=>false,nodeHidden=()=>false){
+ const original=document.world.get(id);check(document.world,[original.transformId],isHidden,nodeHidden);const snapshot=document.serialize(),node=snapshot.entities.find(item=>item.id===id);node.components=copy(components);node.tags=copy(tags);const candidate=new TreeDocument(snapshot);const runtime=document.world.snapshotRuntime();for(const key of Object.keys(runtime[id]??{}))if(!Object.hasOwn(components,key))delete runtime[id][key];candidate.world.restoreRuntime(runtime);const owners=new Set(document.world.serialize().map(item=>'entity:'+item.id));for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);return validate(candidate);
+}
 export function moveNode(document,id,local,isHidden=()=>false,nodeHidden=()=>false){
   const transform=document.world.get(id).transformId,ids=subtree(document.world,transform);check(document.world,ids,isHidden,nodeHidden);
   const candidate=fork(document);candidate.world.transforms.setLocal(transform,local);check(candidate.world,ids,isHidden,nodeHidden);return validate(candidate);
@@ -44,7 +47,7 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     const normalized=normalizeTile({...record.tile,...configuration,prefabId:record.id});delete normalized.instance;
     const seed={version:1,width:candidate.world.transforms.width,height:candidate.world.transforms.height,tiles:Array.from({length:candidate.world.transforms.height},()=>Array(candidate.world.transforms.width).fill(null))};seed.tiles[0][0]=normalized;
     const node=importTreeMap(seed).world.serialize()[0],uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
-    node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(node.components,record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=copy(normalized);delete node.configuration.regionTag;registry.validate(node);
+    node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id};delete node.configuration.regionTag;registry.validate(node);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});
     check(candidate.world,[transformId],options.isHidden,options.nodeHidden);

@@ -59,11 +59,13 @@ export function normalizePrefab(data) {
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
   const propertySchema=normalizePropertySchema(data.propertySchema??data.tile.propertySchema??{});
   const extras={};
-  for(const key of ['components','static'])if(data[key]!==undefined){
+  if(data.children!==undefined){const children=copyJson(data.children);if(!Array.isArray(children)||children.some(child=>!child||typeof child!=='object'||Array.isArray(child)))throw new Error('children 须为子实体列表');extras.children=children;}
+  for(const key of ['components','static','tags'])if(data[key]!==undefined){
     const value=copyJson(data[key]);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error(key+' 须为 JSON 对象');
     if(key==='components')for(const config of Object.values(value))if(!config||typeof config!=='object'||Array.isArray(config))throw new Error('组件配置须为 JSON 对象');
     extras[key]=value;
   }
+  if(extras.tags?.regionTag!==undefined)throw new Error('区域标签只能属于地图格');
   return {...extras,version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})};
 }
 export function columnLabel(c) {

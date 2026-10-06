@@ -68,7 +68,7 @@ test('native disk prefabs inherit component and child defaults without fabricati
 test('catalog rejects invalid static fields on save and reports their source files on read',async()=>{
  const root=await fixture();
  try{
-  for(const [index,statics] of [{events:'enter'},{walkable:'false'},{render:1},{transparent:null},{placeable:0},{events:['unknown']}].entries()){
+  for(const [index,statics] of [{events:'enter'},{walkable:'false'},{render:1},{transparent:null},{placeable:0},{events:['unknown']},{events:[['enter']]},{events:[{type:'enter'}]},{events:[1]}].entries()){
    const definition={version:1,id:'invalid_'+index+'_ai',name:'invalid',components:{tag:{}},static:statics};
    await assert.rejects(()=>savePrefab(root,definition),/Invalid static/);
    await assert.rejects(()=>fs.stat(path.join(root,'entity',definition.id+'.json')),/ENOENT/);
@@ -76,7 +76,7 @@ test('catalog rejects invalid static fields on save and reports their source fil
   }
   const catalog=await readCatalog(root);
   assert.equal(catalog.prefabs.length,1);
-  for(let index=0;index<6;index++)assert.ok(catalog.errors.some(error=>error.file==='entity/invalid_'+index+'_ai.json'&&/Invalid static/.test(error.message)));
+  for(let index=0;index<9;index++)assert.ok(catalog.errors.some(error=>error.file==='entity/invalid_'+index+'_ai.json'&&/Invalid static/.test(error.message)));
  }finally{await fs.rm(root,{recursive:true,force:true});}
 });
 test('catalog preserves valid inherited static fields accepted by entity worlds',async()=>{

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import runtime from './player.cjs';
-import {createFoldMotionView,hingeFor,clipFoldPolygon} from './render/fold-motion.mjs';
+import {createFoldMotionView,hingeFor,clipFoldPolygon,tabletopHeight} from './render/fold-motion.mjs';
 import {uniqueFoldAxes,foldGroupAt,inFoldRange} from './tags/fold-geometry.mjs';
 import {blocked,foldsAt} from './entities/tile-model.mjs';
 import {validateRegions,taggedCells,regionOf} from './tags/regions.mjs';
@@ -61,7 +61,7 @@ const blockedTarget=fixture();blockedTarget.controller.beginFoldDrag(2,3,300);bl
 assert.equal(blockedTarget.controller.endFoldDrag(),false,'release rechecks changed target');assert.equal(blockedTarget.P.steps,0);
 blockedTarget.controller.setMode('edit');assert.equal(blockedTarget.view.active(),false);assert.equal(blockedTarget.P.foldMotion,null);
 const cancelled=fixture();cancelled.controller.beginFoldDrag(2,3,300);cancelled.controller.updateFoldDrag(73);cancelled.controller.endFoldDrag(true);assert.equal(cancelled.P.foldMotion.phase,'return');assert.equal(cancelled.P.steps,0);
-const full=fixture();full.controller.beginFoldDrag(2,3,300);full.controller.updateFoldDrag(60);settle(full);assert.equal(full.P.foldMotion.ready,true,'180-degree fold aligns surface feet with target');full.controller.cancelFoldMotion();
+const full=fixture();full.controller.beginFoldDrag(2,3,300);full.controller.updateFoldDrag(60);settle(full);assert.equal(full.P.foldMotion.ready,false,'feet below the tabletop cannot drop');full.controller.cancelFoldMotion();
 const debug=fixture();debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:.25,foldHorizontal:.1});assert.deepEqual(debug.P.foldDrop,{vertical:.25,horizontal:.1});debug.controller.undo();assert.deepEqual(debug.P.foldDrop,{vertical:1,horizontal:.35});assert.throws(()=>debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:0}),/阈值/);
 const polygon=[{position:[-1,0,0],uv:[0,0]},{position:[1,0,0],uv:[1,0]},{position:[0,0,1],uv:[.5,1]}];
 for(const positive of [false,true]){const half=clipFoldPolygon(polygon,v=>v.position[0],positive);assert.ok(half.length>=3);assert.ok(half.every(v=>positive?v.position[0]>=0:v.position[0]<=0));}
@@ -74,3 +74,5 @@ assert.ok(evenPreview.source.every(p=>p.r>=2&&p.r<=3&&p.c>=2&&p.c<=3),'even-run 
 assert.ok(evenPreview.target.every(p=>p.r>=3&&p.r<=4&&p.c>=2&&p.c<=3));
 even.map.tiles[4][2]=null;assert.ok(!even.controller.foldHighlightRegions().target.some(p=>p.r===4&&p.c===2),'void target cells are not filled');
 console.log('PASS: immediate crease selection updates and source/target region halves follow player side, range and hidden-cell guards.');
+
+const raised=fixture();raised.map.tiles[4][3].height=10;const base=tabletopHeight(raised.map);assert.equal(hingeFor(raised.map,uniqueFoldAxes(raised.map)[0],c=>c,r=>r).origin[1],base);raised.controller.beginFoldDrag(2,3,300);raised.controller.updateFoldDrag(70);settle(raised);assert.equal(raised.P.foldMotion.ready,true,'target surface height does not change the tabletop-relative drop threshold');raised.controller.cancelFoldMotion();

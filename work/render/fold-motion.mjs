@@ -1,4 +1,15 @@
 import * as THREE from "three";
+import {tileHeight,tileThickness} from '../entities/tile-model.mjs';
+import {isPaper} from './paper-surface.mjs';
+
+export function tabletopHeight(map,hidden=()=>false){
+  const heights=[];
+  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
+    const tile=map.tiles[r]?.[c];
+    if(isPaper(tile)&&!hidden(r,c))heights.push(tileHeight(tile)-tileThickness(tile));
+  }
+  return heights.length?Math.min(...heights):0;
+}
 
 // Temporary render transforms only. Static map cells are never mutated.
 export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
@@ -205,20 +216,14 @@ export function clipFoldPolygon(vertices, distance, positive) {
   return result;
 }
 
-export function hingeFor(map, group, wx, wz) {
+export function hingeFor(map, group, wx, wz, tableHeight=tabletopHeight(map)) {
   const direction = new THREE.Vector3(
     group.to.c - group.from.c,
     0,
     group.to.r - group.from.r,
   ).normalize();
-  const heights = group.cells
-      .map((p) => map.tiles[p.r]?.[p.c]?.height)
-      .filter(Number.isFinite),
-    height = heights.length
-      ? heights.reduce((a, b) => a + b, 0) / heights.length
-      : 0;
   return {
-    origin: [wx(group.center.c), height, wz(group.center.r)],
+    origin: [wx(group.center.c), tableHeight, wz(group.center.r)],
     direction: direction.toArray(),
   };
 }

@@ -364,3 +364,5 @@ player 的 `foldDrop.vertical`（默认 1）与 `foldDrop.horizontal`（默认 0
 地图仍由 TreeDocument/EntityWorld/TransformManager 管理，保存 version:2，区域属于固定格。物理折叠仅修改渲染对象；松开后合法掉落经统一 fold/teleport 回合结算一次，包含钥匙、升降、终局和撤销。掉落动画使用折叠末端世界位置，不进入地图配置。拖拽期间拒绝其他回合，失败回滚实体运行时及历史。无入口的区域出口仅累计揭示目标区域，不触发第二次到达或传送。
 
 保留物理属性、纸张平滑连接/厚度/过渡比例、桌子和折痕虚线开关、player prefab 与摄像机跟随。共享模型的 surfaceConnected 能力决定纸面连接，升降实体继续使用其整体升降表现。详细适配及验收见 docs/backend-frontend-migration-bridge.md 第 8 节。
+
+折叠轴位于桌面平面（最低可见纸张底面），关闭桌子只隐藏外观，不改变轴或检测基准。掉落的竖直阈值使用 player 脚部到桌面的世界 Y 距离，脚部低于桌面不可掉落；水平对齐仍以镜像目标格为准，不使用目标实体高度作为阈值基准。

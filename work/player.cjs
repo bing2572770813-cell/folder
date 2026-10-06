@@ -456,7 +456,7 @@ function refreshFoldTarget(motion){
     const target = foldTarget(motion.axis),
       position = env.foldView.footPosition?.()??env.foldView.playerPosition();
     const horizontal = Math.hypot(position[0]-wx(target.c),position[2]-wz(target.r)),
-      vertical = position[1] - tileTop(target.r, target.c);
+      vertical = position[1] - (env.getTabletopHeight?.() ?? motion.hinge.origin[1]);
     const ready =
       target.valid &&
       horizontal <= P.foldDrop.horizontal &&

@@ -32,3 +32,13 @@ test('returns 404 and rejects encoded path traversal', async () => {
   assert.ok([403, 404].includes((await app.inject('/%2e%2e/%2e%2e/secret')).statusCode));
   await app.close();
 });
+
+test('static reader failures distinguish missing files from server IO errors',async()=>{
+ const outputRoot=await fixture();let code='ENOENT';
+ const app=await createApp({port:4173,outputRoot,prefabRoot:outputRoot},{readStaticFile:async()=>{throw Object.assign(new Error('unreadable'),{code});}});
+ try{
+  assert.equal((await app.inject('/asset.js')).statusCode,404);
+  code='EACCES';const failure=await app.inject('/asset.js');assert.equal(failure.statusCode,500);assert.deepEqual(failure.json(),{error:'文件读取失败'});
+  assert.equal((await app.inject('/%ZZ')).statusCode,400);
+ }finally{await app.close();await fs.rm(outputRoot,{recursive:true,force:true});}
+});

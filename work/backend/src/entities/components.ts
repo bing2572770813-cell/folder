@@ -1,7 +1,9 @@
 import {jsonObject,type JsonObject,type EntityNode,type ComponentRuntime} from './entity-model.js';
 
 export type EntityEvent='enter'|'leave'|'interact';
-export interface EventContext {type:EntityEvent;nodes:EntityNode[];actor:JsonObject;runtime:ComponentRuntime}
+/** Exclusive cause of an arrival/departure; omitted for initialization or interaction. */
+export type ArrivalTrigger='walk'|'teleport';
+export interface EventContext {type:EntityEvent;trigger?:ArrivalTrigger;nodes:EntityNode[];actor:JsonObject;runtime:ComponentRuntime}
 export interface ComponentEffect {actor?:JsonObject;state?:JsonObject;messages?:string[]}
 export interface ComponentHandler {
   /** Lower values run first; default 0, hazards 10, collection 20. */
@@ -25,9 +27,10 @@ export class ComponentRegistry {
   }
   dispatch(input:EventContext):EventResult {
     if(!['enter','leave','interact'].includes(input.type))throw new Error('Unknown entity event');
+    if(input.trigger!==undefined&&!['walk','teleport'].includes(input.trigger))throw new Error('Unknown arrival trigger');
     const nodes=structuredClone(input.nodes).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
     for(const node of nodes)this.validate(node);
-    const context:EventContext={type:input.type,nodes,actor:jsonObject(input.actor),runtime:structuredClone(input.runtime)};
+    const context:EventContext={type:input.type,...(input.trigger===undefined?{}:{trigger:input.trigger}),nodes,actor:jsonObject(input.actor),runtime:structuredClone(input.runtime)};
     if(input.type==='enter')for(const node of nodes){
       if(node.static.walkable===false)return {valid:false,reason:'目标是阻挡方块',actor:jsonObject(input.actor),runtime:structuredClone(input.runtime),messages:[]};
       for(const [id,config] of Object.entries(node.components)){

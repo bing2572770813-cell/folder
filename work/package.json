@@ -1,12 +1,20 @@
 {
   "dependencies": {
+    "@mantine/core": "^9.7.0",
+    "@mantine/hooks": "^9.7.0",
     "esbuild": "^0.25.10",
     "lucide": "^0.468.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "three": "^0.180.0"
   },
   "scripts": {
     "start": "node server.cjs",
     "build": "node build.cjs",
     "test": "node test-runner.cjs"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.13",
+    "prettier": "^3.9.9"
   }
 }

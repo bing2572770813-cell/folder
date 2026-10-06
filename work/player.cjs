@@ -5,6 +5,15 @@ function createPlayerController(env){
  const {THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx,wz,tileTop}=env;
  P.terrainState=createTerrainState();
 function world(){return env.getEntityWorld?.();}
+// Structural checks ignore temporary mechanisms such as the eruption cycle.
+function structuralEntryCheck(r,c){
+ if(!inside(r,c))return {valid:false,reason:'目标超出地图'};
+ const nodes=world().at(r,c);
+ if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
+ if(nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked))return {valid:false,reason:'目标是阻挡方块'};
+ if(nodes.some(node=>Object.hasOwn(node.components,'campfire')))return {valid:false,reason:'篝火方块不可进入'};
+ return {valid:true,reason:''};
+}
 function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRuntime(),nodes=world().at(position.r,position.c)){
  return env.componentRegistry.dispatch({type,nodes,actor,runtime});
 }
@@ -42,13 +51,14 @@ function validateForPlay() {const map=env.getMap();
       for(const node of nodes)if(Object.hasOwn(node.components,'key')&&(!Array.isArray(node.static.events)||node.static.events.includes('enter')))keys.add(String(node.components.key.name??'钥匙').trim());
     }
     for(const cell of taggedCells(map,'exitTo'))for(const key of cell.tile.tags.requiredKeys??[])if(!keys.has(key))regionErrors.push('出口所需钥匙不存在或不可收集：'+key);
+    for(const cell of taggedCells(map,'entry')){const check=structuralEntryCheck(cell.r,cell.c);if(!check.valid)regionErrors.push('区域入口不可通行：'+regionOf(cell.tile)+'（'+check.reason+'）');}
   }
   const errors=[...validateTerrains(map),...new Set(regionErrors)];
   const start=map.tiles[map.spawn.r]?.[map.spawn.c];if(!start||(world()?!entryCheck(map.spawn.r,map.spawn.c,true).valid:blocked(start)||start.terrain==='campfire'))errors.push('玩家起点无效');
   if(map.exit&&!exitIsValid())errors.push('出口必须在可行走方块上');
   return {valid:errors.length===0,errors};
 }
-function exitIsValid() {const map=env.getMap();if(!map.exit||!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r]?.[map.exit.c])return false;const tree=world();if(!tree)return walkable(map.exit.r,map.exit.c);const nodes=tree.at(map.exit.r,map.exit.c);return nodes.some(node=>node.components.surface)&&!nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked||node.components.campfire);}
+function exitIsValid() {const map=env.getMap();if(!map.exit||!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r]?.[map.exit.c])return false;return world()?structuralEntryCheck(map.exit.r,map.exit.c).valid:walkable(map.exit.r,map.exit.c);}
 function isAtExit() {const map=env.getMap(); return exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
 function foldTargetFor(axis,position=P.player) {const map=env.getMap();
   const t=reflectPoint(position.r,position.c,axis);const same=t.r===position.r&&t.c===position.c;let reason='';
@@ -94,7 +104,7 @@ function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();upda
 function testTeleport(r,c){const map=env.getMap();if(P.mode!=='play'||!P.freeTeleport||P.moving||P.levelWon||P.stepLimitHit||!inside(r,c))return;const tile=map.tiles[r]?.[c];if(!tile||!(world()?entryCheck(r,c,true).valid:!blocked(tile)&&entryCheck(r,c).valid)){toast('测试传送需要可通行实体',true);return;}if(r===P.player.r&&c===P.player.c)return;record();const prev={...P.player};leaveTree(prev);P.revealedRegions.add(regionOf(tile));P.player={r,c,dir:P.player.dir};P.steps++;P.teleports++;applyTerrainEntry();clearSelection();buildPaper();animatePlayer(prev,P.player,'teleport');updateUI();}
 function setFoldHints(enabled){P.foldHints=!!enabled;const axis=P.chosenFold,selected=env.getSelectionRing().visible;if(axis)selectFold(axis.r,axis.c,axis.type);else if(selected)selectPlayer();updateUI();}
 function animatePlayer(from,to,type){const map=env.getMap();P.moving=true;P.animation={start:performance.now(),duration:type==='teleport'?480:220,from:new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,checkEnd:true};updateUI();}
-function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry||(world()&&!entryCheck(entry.r,entry.c,true).valid))return false;leaveTree(P.player);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
+function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.terrainState.message='跳转区域缺少入口：'+target;return false;}const check=entryCheck(entry.r,entry.c,true);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
 function collectKey(){if(world()){const nodes=world().at(P.player.r,P.player.c).filter(node=>Object.hasOwn(node.components,'key')&&node.static.walkable!==false&&!node.components.collision?.blocked).map(node=>({...node,components:{key:node.components.key}}));if(nodes.length)commitTreeEvent('enter',P.player,nodes);return;}const tile=env.getMap().tiles[P.player.r]?.[P.player.c];if(tile?.terrain!=='key'||blocked(tile))return;const name=tile.keyName?.trim()||'钥匙';P.terrainState.collectedKeys=[...new Set([...P.terrainState.collectedKeys,name])];P.terrainState.hasKey=true;P.terrainState.message='获得钥匙：'+name;}
 function applyTerrainEntry(){const map=env.getMap();if(world()){enterTree();P.terrainState=finishAction(P.terrainState);const transitioned=!P.terrainState.gameOver&&transitionRegion();if(transitioned)enterTree();if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);return transitioned;}const result=enterTerrain(map,P.player,P.terrainState);P.terrainState=finishAction(result.state);collectKey();const transitioned=!P.terrainState.gameOver&&transitionRegion();if(transitioned){P.terrainState=enterTerrain(map,P.player,P.terrainState).state;collectKey();}if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);return transitioned;}
 function movePlayer(r,c){const map=env.getMap();if(P.mode!=='play'||P.moving||P.levelWon||P.stepLimitHit)return;if(!P.legalMoves.some(t=>t.r===r&&t.c===c)||!canMoveTo(r,c)){toast(entryCheck(r,c).reason||(walkable(r,c)?'请先点击玩家查看可移动范围':'黑色或空格方块不可移动'),true);return;}record();const prev={...P.player},dr=r-P.player.r,dc=c-P.player.c;leaveTree(prev);P.player.r=r;P.player.c=c;P.player.dir=(Math.round(Math.atan2(dc,-dr)/(Math.PI/4))+8)%8;P.steps++;const transitioned=applyTerrainEntry();clearSelection();animatePlayer(prev,P.player,transitioned?'teleport':'move');updateUI();}

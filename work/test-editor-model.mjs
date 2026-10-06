@@ -40,7 +40,7 @@ const pointerSource=readFileSync(new URL('./app.js',import.meta.url),'utf8').spl
 function pointerSelection(nodes){
  let handler,selected=[{r:9,c:9}];
  const context={renderer:{domElement:{addEventListener:(event,fn)=>handler=fn}},finishGesture:()=>{},activePointers:new Set([1]),pointerDown:{button:0,x:10,y:10},manualPan:false,multiTouch:false,dragEdited:false,lastEditKey:null,syncState:()=>{},P:{mode:'edit'},hitAt:()=>({r:0,c:0,nodeId:nodes[0]?.id}),documentModel:{primaryAt:()=>null,world:{at:()=>nodes}},refreshTreePanel:()=>{},map:{tiles:[[null]]},tool:'select',setSelectedCells:value=>selected=value,drawEditSelection:()=>{},editAt:(r,c)=>selected=[{r,c}]};
- runInNewContext(pointerSource,context);handler({pointerId:1,clientX:10,clientY:10});return selected;
+ runInNewContext(pointerSource,context);handler({pointerId:1,clientX:10,clientY:10});return structuredClone(selected);
 }
 assert.deepEqual(pointerSelection([{id:'key',components:{key:{name:'only'}}}]),[{r:0,c:0}]);
 assert.deepEqual(pointerSelection([]),[],'真正虚空保留原有清空单选规则');

@@ -31,6 +31,15 @@ export function jsonObject(value:unknown):JsonObject {
   if(!copied||typeof copied!=='object'||Array.isArray(copied))throw new Error('Expected JSON object');
   return copied;
 }
+/** Entity tag semantics apply to every node, including nodes without a surface. */
+export function validateEntityTags(value:unknown):JsonObject {
+  const tags=jsonObject(value);
+  if(Object.hasOwn(tags,'regionTag'))throw new Error('区域标签只能属于地图格');
+  for(const key of ['spawn','entry'])if(tags[key]!==undefined&&typeof tags[key]!=='boolean')throw new Error('方块标签无效');
+  if(tags.exitTo!==undefined&&(typeof tags.exitTo!=='string'||!tags.exitTo.trim()||tags.exitTo.length>80))throw new Error('跳转区域名称无效');
+  if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(key=>typeof key!=='string'||!key.trim()||key.length>80)))throw new Error('所需钥匙必须是名称列表');
+  return tags;
+}
 export function freezeJson<T extends JsonValue>(value:T):T {
   if(value&&typeof value==='object'){for(const item of Object.values(value))freezeJson(item);Object.freeze(value);}
   return value;

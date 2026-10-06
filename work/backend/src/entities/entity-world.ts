@@ -1,5 +1,5 @@
 import {TransformManager} from './transform-manager.js';
-import {jsonObject,freezeJson,type EntityNode,type JsonObject,type ComponentRuntime} from './entity-model.js';
+import {jsonObject,freezeJson,validateEntityTags,type EntityNode,type JsonObject,type ComponentRuntime} from './entity-model.js';
 
 /** Entity identity and state registry. Spatial lookup belongs exclusively to TransformManager. */
 export class EntityWorld {
@@ -17,7 +17,7 @@ export class EntityWorld {
     for(const [id,config] of Object.entries(jsonObject(node.components)))components[id]=jsonObject(config);
     for(const flag of ['render','transparent','walkable','placeable'])if(node.static?.[flag]!==undefined&&typeof node.static[flag]!=='boolean')throw new Error('Invalid static '+flag);
     if(node.static?.events!==undefined&&(!Array.isArray(node.static.events)||node.static.events.some(event=>!['enter','leave','interact'].includes(String(event)))))throw new Error('Invalid static events');
-    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:jsonObject(node.tags),static:freezeJson(jsonObject(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
+    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:validateEntityTags(node.tags),static:freezeJson(jsonObject(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
   }
   get(id:string):EntityNode {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);

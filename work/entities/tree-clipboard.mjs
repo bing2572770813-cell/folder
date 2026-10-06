@@ -1,6 +1,6 @@
 import {validateTreeDocument} from './tree-commands.mjs';
 import {TreeDocument} from './tree-document.mjs';
-import {defaultComponents} from './tree-runtime.mjs';
+import {defaultComponents,validateEntityTags} from './tree-runtime.mjs';
 export function copyTree(document,cells,{isHidden=()=>false,nodeHidden=()=>false}={}){
  if(!cells.length)throw new Error('先选择方格');const world=document.world;
  const transformIds=new Set(cells.flatMap(p=>world.transforms.at(p.r,p.c)));
@@ -14,6 +14,7 @@ export function copyTree(document,cells,{isHidden=()=>false,nodeHidden=()=>false
  return {kind:'tree',entities:structuredClone(nodes),transforms,cellTags:regions,width:Math.max(...allCells.map(p=>p.c))-c+1,height:Math.max(...allCells.map(p=>p.r))-r+1};
 }
 export function pasteTree(document,clipboard,r,c,{isHidden=()=>false,nodeHidden=()=>false}={}){
+ for(const node of clipboard.entities)validateEntityTags(node.tags);
  const snapshot=structuredClone(document.serialize()),ids=new Map(clipboard.transforms.map(node=>[node.id,'transform-'+globalThis.crypto.randomUUID()]));
  const transforms=clipboard.transforms.map(node=>({...structuredClone(node),id:ids.get(node.id),parentId:node.parentId?ids.get(node.parentId):null,local:node.parentId?node.local:{...node.local,r:node.local.r+r,c:node.local.c+c}}));
  const instances=new Map();const entities=clipboard.entities.map(node=>{const next={...structuredClone(node),id:'entity-'+globalThis.crypto.randomUUID(),transformId:ids.get(node.transformId)};delete next.tags.spawn;delete next.tags.entry;if(next.configuration?.instance){const instance=next.configuration.instance;if(!instances.has(instance.id))instances.set(instance.id,globalThis.crypto.randomUUID());instance.id=instances.get(instance.id);instance.anchorR=r;instance.anchorC=c;}return next;});

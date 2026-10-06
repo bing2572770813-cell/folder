@@ -12,7 +12,7 @@ export function tabletopHeight(map,hidden=()=>false){
 }
 
 // Temporary render transforms only. Static map cells are never mutated.
-export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
+export function createFoldMotionView({ paper, layers, playerGroup, wx, wz, canFold=()=>true }) {
   let session = null;
   function reset() {
     if (!session) return;
@@ -69,7 +69,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
           for (let i = 0; i < object.count; i++) {
             object.getMatrixAt(i, matrix);
             const cell = object.userData.cells?.[i];
-            if (cell && creaseCells.has(cell.r + "," + cell.c)) {
+            if (cell && canFold(cell) && creaseCells.has(cell.r + "," + cell.c)) {
               const mesh = new THREE.Mesh(
                 object.geometry.clone().applyMatrix4(matrix),
                 object.material,
@@ -87,7 +87,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
               splitObject(mesh);
               mesh.geometry.dispose();
             } else {
-              const moving=cell?selected.has(cell.r+','+cell.c):selectedPosition(matrix.elements[12],matrix.elements[14]);
+              const moving=canFold(cell)&&(cell?selected.has(cell.r+','+cell.c):selectedPosition(matrix.elements[12],matrix.elements[14]));
               batches[Number(moving)].push(matrix.clone());
             }
           }
@@ -107,7 +107,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
         const clone = object.clone(true);
         if(layer.position.lengthSq()>0){clone.position.add(layer.position);clone.quaternion.premultiply(layer.quaternion);}
         clone.visible = true;
-        add(clone, selectedPosition(clone.position.x, clone.position.z));
+        add(clone, canFold(object.userData.cell)&&selectedPosition(clone.position.x, clone.position.z));
       }
     }
     function splitObject(object) {
@@ -120,7 +120,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
         const indices = Array.from({ length: primitive }, (_, j) =>
           index ? index.getX(i + j) : i + j,
         );
-        const cell = object.userData.triangleCells?.[i / 3];
+        const cell = primitive===2?object.userData.segmentCells?.[i/2]:object.userData.triangleCells?.[i / 3];
         const x = indices.reduce((n, k) => n + position.getX(k), 0) / primitive,
           z = indices.reduce((n, k) => n + position.getZ(k), 0) / primitive;
         const key = cell
@@ -134,14 +134,16 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz }) {
             ]),
           ),
         );
-        if (creaseCells.has(key) && primitive === 3) {
+        if(!canFold(cell)){append(split[0],vertices);continue;}
+        if (creaseCells.has(key)) {
           for (let moving = 0; moving < 2; moving++) {
             const polygon = clipFoldPolygon(
               vertices,
               (v) => side(v.position[0], v.position[2]),
               !!moving,
             );
-            for (let j = 1; j < polygon.length - 1; j++)
+            if(primitive===2){if(polygon.length>=2)append(split[moving],polygon.slice(0,2));}
+            else for (let j = 1; j < polygon.length - 1; j++)
               append(split[moving], [polygon[0], polygon[j], polygon[j + 1]]);
           }
         } else

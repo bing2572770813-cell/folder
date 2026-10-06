@@ -366,3 +366,5 @@ player 的 `foldDrop.vertical`（默认 1）与 `foldDrop.horizontal`（默认 0
 保留物理属性、纸张平滑连接/厚度/过渡比例、桌子和折痕虚线开关、player prefab 与摄像机跟随。共享模型的 surfaceConnected 能力决定纸面连接，升降实体继续使用其整体升降表现。详细适配及验收见 docs/backend-frontend-migration-bridge.md 第 8 节。
 
 折叠轴位于桌面平面（最低可见纸张底面），关闭桌子只隐藏外观，不改变轴或检测基准。掉落的竖直阈值使用 player 脚部到桌面的世界 Y 距离，脚部低于桌面不可掉落；水平对齐仍以镜像目标格为准，不使用目标实体高度作为阈值基准。
+
+实体可跟随折叠使用布尔字段 followFold；规范实体树保存为 components.physics.followFold，兼容 tile.followFold。纸张默认开启，其他实体默认关闭，可在检视中单独修改。区域内各叠加实体分别判断，不跟随的实体保持棋盘位置；玩家仅在脚下有可折叠支撑时随纸面旋转。权限、地图往返与撤销继续生效。

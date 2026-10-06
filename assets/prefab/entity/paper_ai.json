@@ -3,6 +3,7 @@
   "id": "paper_ai",
   "name": "纸张方块",
   "tile": {
+    "followFold": true,
     "color": "white",
     "edgeColor": "#adada9",
     "height": 0.09,

@@ -174,6 +174,7 @@ function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)
  if(nodes.some(node=>node.static.walkable===false))return {valid:false,reason:'目标是阻挡方块'};
  return treeEntryCheck({r,c},P.terrainState,trigger);
 }
+function canFoldCell(r,c){return env.canFoldCell?.(r,c)??(env.getMap().tiles[r]?.[c]?.followFold!==false);}
 function canMoveTo(r,c){const map=env.getMap();const delta=(map.tiles[r]?.[c]?.height??.09)-(map.tiles[P.player.r]?.[P.player.c]?.height??.09);return (world()?true:walkable(r,c))&&delta<=P.moveHeight.maxUp+1e-9&&-delta<=P.moveHeight.maxDown+1e-9&&entryCheck(r,c,false,Trigger.Walk).valid;}
 function commitTreeEvent(type,position,nodes,trigger){const tree=world(),result=treeEvent(type,position,P.terrainState,tree.snapshotRuntime(),nodes,trigger);if(result.valid){P.terrainState={...result.actor,message:result.messages.join('；')};tree.restoreRuntime(result.runtime);}return result;}
 function leaveTree(position,trigger){if(world())commitTreeEvent('leave',position,undefined,trigger);}
@@ -281,9 +282,9 @@ function foldHighlightRegions(axis=P.chosenFold){
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const p={r,c};if(!map.tiles[r][c]||env.isHidden(r,c)||!inFoldRange(group,p))continue;
     const s=side(p)*playerSide;
-    if(s>0)source.push(p);else if(s<0)target.push(p);
+    if(s>0&&canFoldCell(r,c))source.push(p);else if(s<0)target.push(p);
     else if(group.cells.some(q=>q.r===r&&q.c===c)){
-      source.push({...p,half:playerSide});target.push({...p,half:-playerSide});
+      if(canFoldCell(r,c))source.push({...p,half:playerSide});target.push({...p,half:-playerSide});
     }
   }
   return {source,target};
@@ -380,7 +381,7 @@ function beginFoldDrag(r, c, startY) {
       P.chosenFold.c,
       P.chosenFold.type,
     );
-    if (!group || !inFoldRange(group, P.player)) return false;
+    if (!group || !inFoldRange(group, P.player)||!canFoldCell(P.player.r,P.player.c)) return false;
     const direction =
       group.type === "h"
         ? { r: 0, c: 1 }
@@ -398,6 +399,7 @@ function beginFoldDrag(r, c, startY) {
       !playerSide ||
       !map.tiles[r]?.[c] ||
       env.isHidden(r, c) ||
+      !canFoldCell(r,c) ||
       side({ r, c }) * playerSide <= 0 ||
       !inFoldRange(group, { r, c })
     )
@@ -408,7 +410,7 @@ function beginFoldDrag(r, c, startY) {
       for (let column = 0; column < map.width; column++) {
         const p = { r: row, c: column };
         if (
-          !map.tiles[row][column] ||
+          !map.tiles[row][column] || !canFoldCell(row,column) ||
           env.isHidden(row, column) ||
           !inFoldRange(group, p)
         )

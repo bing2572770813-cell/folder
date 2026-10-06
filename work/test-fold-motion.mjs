@@ -76,3 +76,13 @@ even.map.tiles[4][2]=null;assert.ok(!even.controller.foldHighlightRegions().targ
 console.log('PASS: immediate crease selection updates and source/target region halves follow player side, range and hidden-cell guards.');
 
 const raised=fixture();raised.map.tiles[4][3].height=10;const base=tabletopHeight(raised.map);assert.equal(hingeFor(raised.map,uniqueFoldAxes(raised.map)[0],c=>c,r=>r).origin[1],base);raised.controller.beginFoldDrag(2,3,300);raised.controller.updateFoldDrag(70);settle(raised);assert.equal(raised.P.foldMotion.ready,true,'target surface height does not change the tabletop-relative drop threshold');raised.controller.cancelFoldMotion();
+
+const mixedRoot=new THREE.Group(),mixedLayer=new THREE.Group(),mixedPlayer=new THREE.Group();mixedRoot.add(mixedLayer,mixedPlayer);
+const movingPaper=new THREE.Mesh(new THREE.BoxGeometry(.9,.1,.9),new THREE.MeshBasicMaterial());movingPaper.name='moving-paper';movingPaper.position.set(0,.2,0);movingPaper.userData.cell={r:0,c:0,nodeId:'paper'};
+const fixedEntity=movingPaper.clone();fixedEntity.name='fixed-key';fixedEntity.userData.cell={r:0,c:0,nodeId:'key'};mixedLayer.add(movingPaper,fixedEntity);mixedPlayer.position.copy(movingPaper.position);
+const mixedView=createFoldMotionView({paper:mixedRoot,layers:[mixedLayer],playerGroup:mixedPlayer,wx:c=>c,wz:r=>r,canFold:cell=>cell?.nodeId==='paper'});
+mixedView.begin([{r:0,c:0}],{origin:[1,0,0],direction:[0,0,1],side:1});mixedView.setAngle(Math.PI/2);mixedRoot.updateMatrixWorld(true);
+const visibleNamed=name=>{let result;mixedRoot.traverse(o=>{if(o.name===name&&o.visible)result=o;});return result;};
+assert.deepEqual(visibleNamed('fixed-key').getWorldPosition(new THREE.Vector3()).toArray(),[0,.2,0],'nonfoldable entity stays fixed even on a rotating paper cell');
+assert.notDeepEqual(visibleNamed('moving-paper').getWorldPosition(new THREE.Vector3()).toArray(),[0,.2,0]);mixedView.reset();assert.equal(movingPaper.visible,true);assert.equal(fixedEntity.visible,true);
+const notFoldable=fixture();notFoldable.map.tiles[2][3].followFold=false;assert.equal(notFoldable.controller.beginFoldDrag(2,3,300),false,'player standing on a nonfoldable entity cannot start a fold');

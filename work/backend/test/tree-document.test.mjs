@@ -120,6 +120,8 @@ test('old lift duration maps import as turn-based configuration without modifyin
  assert.deepEqual(migrated.configuration.propertySchema.turnsPerLeg,{tempEditable:false,label:'单程回合数'});
  assert.deepEqual(migrated.configuration.propertySchema.components.children.lift.children.turnsPerLeg,{serializable:false,label:'单程回合数'});
  assert.equal(migrated.configuration.propertySchema.durationMs,undefined);
+ const snapshotOnly=structuredClone(v2);snapshotOnly.entities[0].configuration.lift=structuredClone(snapshotOnly.entities[0].components.lift);delete snapshotOnly.entities[0].components.lift;
+ assert.equal(new TreeDocument(snapshotOnly).world.get(snapshotOnly.entities[0].id).components.lift.turnsPerLeg,3);
  for(const durationMs of [0,-1,'1800']){
   const invalid=structuredClone(v2);invalid.entities[0].components.lift.durationMs=durationMs;
   assert.throws(()=>new TreeDocument(invalid),/Invalid lift|单程回合数/);

@@ -16,6 +16,8 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 高级 JSON 可删除完整的可编辑组件对象，删除递归检查对象内所有字段权限；不能通过删除父对象绕过隐藏或只读子字段。
 
+旧 version:2 中只有 configuration.lift 且仍含 durationMs 的快照允许一次兼容提升；转换后移除 durationMs。新回合配置快照没有独立恢复组件的权限。
+
 纸面连接由 surface.connected 能力控制，兼容视图使用 surfaceConnected，权限双向同步。缺省时可通行的普通纸面连接相邻纸面，阻挡、地形及静态 token 默认保持独立；升降平台始终独立。自定义 prefab 名称不改变表面连接能力。
 
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。

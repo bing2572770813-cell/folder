@@ -9,7 +9,11 @@ export const InspectorPanel = React.memo(function InspectorPanel() {
         <p id="inspectedEntity" className="studio-readout" role="status">
           {"使用地图工具的选区选择方格"}
         </p>
+        <h3 className="section-label">实体整体属性</h3>
         <div id="propertyInspector" className="property-inspector" />
+        <h3 className="section-label">直接选中方格的独立属性</h3>
+        <p id="inspectedCellProperties" className="studio-readout" />
+        <div id="cellPropertyInspector" className="property-inspector" />
         <p id="propertyEditStatus" className="studio-readout" role="status" />
         <UiDisclosure>
           <summary>{"实际配置与折线"}</summary>

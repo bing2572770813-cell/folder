@@ -37,3 +37,11 @@ assert.ok(cleared.tiles.flat().every(t=>t===null));assert.deepEqual(cleared.fold
 assert.throws(()=>clearMapCells(protectedMap,()=>true),/隐藏/);
 assert.throws(()=>clearMapCells(protectedMap,()=>false,{folds:true,player:false}),/隐藏标签/);
 console.log('PASS: multi-cell overwrite refusal, whole-instance removal, holes and atomic clear-map hidden guards.');
+const uniform=assignRegion(protectedMap,[{r:1,c:1}],'完整实体');
+assert.ok(footprint(prefab,0,0).every(p=>uniform.tiles[p.r][p.c].regionTag==='完整实体'));
+assert.equal(uniform.tiles[0][1].regionTag,'默认区域','掩码空洞不属于实体');
+const {assertEntityRegions}=await import('./tags/regions.mjs');assert.doesNotThrow(()=>assertEntityRegions(uniform));
+const inconsistent=structuredClone(uniform);inconsistent.tiles[1][1].regionTag='错误区域';assert.throws(()=>assertEntityRegions(inconsistent),/必须一致/);
+const mixedBase=structuredClone(map);mixedBase.tiles[1][1].regionTag='其他区域';const uniformPlacement=placeEntity(mixedBase,prefab,prefab.tile,0,0);assert.doesNotThrow(()=>assertEntityRegions(uniformPlacement.map));
+console.log('PASS: region assignment and placement keep all instance cells together; mixed instance regions are rejected.');
+const {validateMap:validateEntityMap}=await import('./core/map-model.mjs');assert.throws(()=>validateEntityMap({...inconsistent,version:1},true),/必须一致/);

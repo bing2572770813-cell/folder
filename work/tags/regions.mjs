@@ -1,7 +1,11 @@
 import {legalKeyNames} from './keys.mjs';
 import {blocked} from '../entities/tile-model.mjs';
+import {inspectionCells} from '../editor/batch-inspection.mjs';
 export const DEFAULT_REGION='默认区域';
 export const regionOf=tile=>tile?.regionTag??DEFAULT_REGION;
+export function assertEntityRegions(map){
+ const regions=new Map();for(const row of map.tiles)for(const tile of row){const id=tile?.instance?.id;if(!id)continue;const name=regionOf(tile);if(regions.has(id)&&regions.get(id)!==name)throw new Error('多方块实体的区域标签必须一致');regions.set(id,name);}
+}
 export function migrateRegions(map){
  const legacy=!map.tiles.flat().some(t=>t&&(t.regionTag!==undefined||t.tags!==undefined));
  for(const row of map.tiles)for(const tile of row)if(tile)tile.regionTag??=DEFAULT_REGION;
@@ -23,7 +27,7 @@ export function validateRegions(map){
 }
 export function assignRegion(map,cells,name,existing=false){
  name=name.trim();if(!name||name.length>80)throw new Error('区域名称须为 1–80 字');if(!existing&&regionNames(map).includes(name))throw new Error('区域名称已存在');if(existing&&!regionNames(map).includes(name))throw new Error('区域不存在');
- const next=JSON.parse(JSON.stringify(map)),oldNames=new Set();let count=0;for(const p of cells)if(next.tiles[p.r]?.[p.c]){oldNames.add(regionOf(next.tiles[p.r][p.c]));next.tiles[p.r][p.c].regionTag=name;count++;}
+ const next=JSON.parse(JSON.stringify(map)),oldNames=new Set();let count=0;for(const p of inspectionCells(map,cells))if(next.tiles[p.r]?.[p.c]){oldNames.add(regionOf(next.tiles[p.r][p.c]));next.tiles[p.r][p.c].regionTag=name;count++;}
  if(!count)throw new Error('选区中没有可设置标签的方块');
  const remaining=new Set(regionNames(next));for(const p of taggedCells(next,'exitTo'))if(oldNames.has(p.tile.tags.exitTo)&&!remaining.has(p.tile.tags.exitTo))p.tile.tags.exitTo=name;
  const conflicts=validateRegions(next).filter(e=>e.startsWith('区域入口不能')||e.startsWith('区域只能'));if(conflicts.length)throw new Error(conflicts.join('；'));

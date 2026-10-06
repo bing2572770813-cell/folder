@@ -413,6 +413,8 @@ function beginFoldDrag(r, c, startY) {
       previousSelection,
       startY,
       angle: 0,
+      dragAngle: 0,
+      lastTick: null,
       sign: playerSide,
       phase: "drag",
       ready: false,
@@ -422,24 +424,10 @@ function beginFoldDrag(r, c, startY) {
     updateUI();
     return true;
   }
-function updateFoldDrag(clientY, dragSpan = 240) {
-    const motion = P.foldMotion;
-    if (!motion || motion.phase !== "drag") return false;
-    motion.angle = Math.max(
-      0,
-      Math.min(
-        Math.PI,
-        ((motion.startY - clientY) / Math.max(1, dragSpan)) * Math.PI,
-      ),
-    );
-    // For this axis convention, positive angle lifts the positive side.
-    env.foldView.setAngle(motion.angle * motion.sign);
+function refreshFoldTarget(motion){
     const target = foldTarget(motion.axis),
       position = env.foldView.footPosition?.()??env.foldView.playerPosition();
-    const horizontal = Math.hypot(
-        position[0] - wx(target.c),
-        position[2] - wz(target.r),
-      ),
+    const horizontal = Math.hypot(position[0]-wx(target.c),position[2]-wz(target.r)),
       vertical = position[1] - tileTop(target.r, target.c);
     const ready =
       target.valid &&
@@ -459,7 +447,39 @@ function updateFoldDrag(clientY, dragSpan = 240) {
       : `折叠 ${Math.round((motion.angle * 180) / Math.PI)}° · ${target.valid ? "尚未对齐目标" : target.reason}`;
     $("teleportBtn").disabled = true;
     env.syncFoldState?.();
-    return ready;
+  }
+function updateFoldMotion(now){
+    const motion=P.foldMotion;
+    if(!motion||motion.phase!=='drag')return;
+    const maxSpeed=env.getLighting?.()?.foldMaxSpeed??Math.PI*2;
+    const last=motion.lastTick??now;
+    let dt=(now-last)/1000;
+    if(!(dt>0))dt=1/60;
+    if(dt>.1)dt=.1;
+    motion.lastTick=now;
+    const diff=motion.dragAngle-motion.angle;
+    const step=Math.sign(diff)*Math.min(Math.abs(diff),maxSpeed*dt);
+    if(step){
+      motion.angle+=step;
+      env.foldView.setAngle(motion.angle*motion.sign);
+    }
+    refreshFoldTarget(motion);
+  }
+function updateFoldDrag(clientY, dragSpan = 240) {
+    const motion = P.foldMotion;
+    if (!motion || motion.phase !== "drag") return false;
+    // Pointer motion only moves the desired angle; tick() eases the rendered
+    // angle toward it under a bounded angular speed (rad/s), so the fold
+    // rotation never snaps instantaneously.
+    motion.dragAngle = Math.max(
+      0,
+      Math.min(
+        Math.PI,
+        ((motion.startY - clientY) / Math.max(1, dragSpan)) * Math.PI,
+      ),
+    );
+    updateFoldMotion(performance.now());
+    return motion.ready;
   }
 function endFoldDrag(cancelled = false) {
     const motion = P.foldMotion;
@@ -512,6 +532,10 @@ function endFoldDrag(cancelled = false) {
 function tick(now) {
     if (P.foldMotion) {
       const motion = P.foldMotion;
+      if (motion.phase === "drag") {
+        updateFoldMotion(now);
+        return;
+      }
       if (motion.phase === "return") {
         const t = Math.min(1, (now - motion.returnStart) / 350);
         env.foldView.setAngle(motion.returnAngle * (1 - t * t * (3 - 2 * t)));

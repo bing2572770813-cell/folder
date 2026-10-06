@@ -333,7 +333,7 @@ function inspectSelection(){
   const directKeys=new Set(directSelectedCells.map(p=>p.r+','+p.c));
   const cellEntries=entries.filter((entry,i)=>directKeys.has(cells[i].r+','+cells[i].c)).map(entry=>({...entry,values:Object.fromEntries(Object.entries(entry.values).filter(([key])=>cellKeys.has(key)))}));
   const independent=batchProperties(cellEntries);
-  $('inspectedCellProperties').textContent=directSelectedCells.map(p=>coord(p.r,p.c)).join('、')+' · 区域与外观按整个实体修改，位置标签和折线按直接选中格修改';
+  $('inspectedCellProperties').textContent=directSelectedCells.map(p=>coord(p.r,p.c)).join('、')+' · 纸张按单格编辑，多选可批量修改；标签、折线及区域属于选中格';
   $('inspectedEntity').textContent=cells.length===1?coord(cells[0].r,cells[0].c)+' · '+(map.tiles[cells[0].r][cells[0].c]?(prefabs.find(p=>p.id===entityType(map.tiles[cells[0].r][cells[0].c]))?.name||'实体方块'):'虚空'):'批量检视 · '+selectedCells.length+' 个选中格 / '+cells.length+' 个实体占用格';
   $('inspectedProperties').textContent=JSON.stringify({entity:projectProperties(values,schema,'readable'),cells:projectProperties(independent.values,independent.schema,'readable')},null,2);
   renderPropertyInspector($('propertyInspector'),values,schema,applyInspectedProperty,error=>toast(error.message,true),mixed);

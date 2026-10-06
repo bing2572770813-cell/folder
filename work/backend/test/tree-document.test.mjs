@@ -57,19 +57,20 @@ test('failed shrink retains tree and erase retains fixed cell regions',()=>{
   const edge=doc.world.at(4,4)[0];doc.world.transforms.retain(edge.transformId,'guard');assert.throws(()=>doc.applyLegacy(next),/references/);assert.deepEqual(doc.serialize(),before);
   const clear=doc.view();clear.tiles[1][1]=null;doc.applyLegacy(clear);assert.equal(doc.serialize().cellTags['1,1'].regionTag,'A');
 });
-test('real multi-cell placement groups transforms and root movement carries children',()=>{
+test('legacy multi-cell paper placement becomes independent single tiles',()=>{
   const doc=new TreeDocument(legacy());
   const prefab={id:'wide',size:{width:2,height:1},occupied:[true,true]};
   doc.applyLegacy(placeEntity(doc.view(),prefab,{color:'blue',prefabId:'wide'},2,1).map);
   const nodes=doc.world.at(2,1).concat(doc.world.at(2,2)),left=nodes.find(n=>doc.world.transforms.world(n.transformId).c===1),right=nodes.find(n=>n.id!==left.id);
-  assert.equal(doc.world.transforms.get(right.transformId).parentId,left.transformId);
-  doc.world.transforms.setLocal(left.transformId,{r:3,c:1,dir:0});assert.equal(doc.view().tiles[3][2].prefabId,'wide');assert.equal(doc.view().tiles[2][2],null);
+  assert.equal(doc.world.transforms.get(right.transformId).parentId,null);
+  assert.equal(right.configuration.instance,undefined);
+  doc.world.transforms.setLocal(left.transformId,{r:3,c:1,dir:0});assert.equal(doc.view().tiles[2][2].prefabId,'wide');assert.equal(doc.view().tiles[3][2],null);
 });
-test('placing on erased cell preserves its fixed region and joins existing instance root',()=>{
+test('placing on erased cell preserves its fixed region without grouping paper',()=>{
   const doc=new TreeDocument(legacy()),erase=doc.view();erase.tiles[1][1]=null;doc.applyLegacy(erase);
   doc.applyLegacy(placeEntity(doc.view(),{size:{width:1,height:1},occupied:[true]},{color:'blue'},1,1).map);assert.equal(doc.view().tiles[1][1].regionTag,'A');
   const root=doc.world.at(1,1)[0],before=doc.world.transforms.get(root.transformId),edit=doc.view();edit.tiles[1][2]={...structuredClone(edit.tiles[1][1])};doc.applyLegacy(edit);
-  const child=doc.world.at(1,2)[0];assert.equal(doc.world.transforms.get(child.transformId).parentId,root.transformId);assert.deepEqual(doc.world.transforms.get(root.transformId),before);
+  const child=doc.world.at(1,2)[0];assert.equal(doc.world.transforms.get(child.transformId).parentId,null);assert.deepEqual(doc.world.transforms.get(root.transformId),before);
 });
 test('key-only overlays keep ground geometry and contribute tags without copying ownership',()=>{
   const tree=new TreeDocument(legacy()).serialize(),ground=tree.entities[0];ground.tags={};ground.components.surface.height=.7;

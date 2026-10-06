@@ -15,14 +15,11 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
   if(!Array.isArray(map.tiles)||map.tiles.length!==map.height||map.tiles.some(row=>row.length!==map.width))throw new Error('Invalid legacy grid');
   const entities:EntityNode[]=[];const transforms:TransformNode[]=[];
   const cellTags:Record<string,JsonObject>={};
-  const roots=new Map<string,{id:string;r:number;c:number}>();
   const footprint={width:1,height:1,occupied:[true]};
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r][c];if(!tile)continue;
     const id=`entity-${r}-${c}`,transformId=`transform-${r}-${c}`;
-    const root=tile.instance?roots.get(tile.instance.id):undefined;
-    transforms.push({id:transformId,parentId:root?.id??null,local:{r:r-(root?.r??0),c:c-(root?.c??0),dir:0},footprint:structuredClone(footprint)});
-    if(tile.instance&&!root)roots.set(tile.instance.id,{id:transformId,r,c});
+    transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:structuredClone(footprint)});
     const surface:JsonObject={height:tile.height??.09,thickness:tile.thickness??tile.height??.09,gradualRate:tile.gradualRate??2/3};
     if(tile.color!==undefined)surface.color=tile.color;if(tile.edgeColor!==undefined)surface.edgeColor=tile.edgeColor;
     const components:Record<string,JsonObject>={surface,collision:{blocked:tile.blocked??tile.color==='black'}};
@@ -31,8 +28,10 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};
     cellTags[r+','+c]={regionTag:tile.regionTag??'默认区域'};
-    const {regionTag:ignoredRegion,...configuration}=tile;
-    entities.push({id,prefabId:tile.prefabId??'paper_ai',transformId,components,tags:{...tile.tags},static:{},configuration:jsonObject(configuration)});
+    const {regionTag:ignoredRegion,instance:ignoredInstance,...configuration}=tile;
+    const prefabId=tile.prefabId==='large_paper_ai'?'paper_ai':tile.prefabId??'paper_ai';
+    if(configuration.prefabId==='large_paper_ai')configuration.prefabId='paper_ai';
+    entities.push({id,prefabId,transformId,components,tags:{...tile.tags},static:{},configuration:jsonObject(configuration)});
   }
   const virtual=new Map<string,EntityNode>();
   for(const fold of map.foldCells??[]){

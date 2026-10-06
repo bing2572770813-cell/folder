@@ -17,7 +17,7 @@ test('legacy entities retain sparse instance footprint, tags, mechanisms and voi
   assert.equal(world.at(2,2)[0].components.fire.damage,1);
   assert.equal(tree.cellTags['1,1'].regionTag,'A');
   assert.equal(world.at(1,1)[0].tags.region,undefined);
-  const {regionTag,...configuration}=tile;
+  const {regionTag,instance,...configuration}=tile;
   assert.deepEqual(world.at(1,1)[0].configuration,configuration);
   assert.deepEqual(world.at(0,0)[0].components.fold.directions,['v']);
   assert.deepEqual(map,before);

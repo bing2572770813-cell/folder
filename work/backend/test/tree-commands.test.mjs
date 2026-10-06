@@ -24,8 +24,8 @@ test('node permissions preserve unreadable state and reject readonly edits',()=>
  const visible=structuredClone(node.components);delete visible.surface.color;const next=configureNode(doc,node.id,visible,node.tags,()=>false,()=>false,schema);assert.equal(next.world.get(node.id).components.surface.color,'red');visible.fire.damage=7;assert.throws(()=>configureNode(doc,node.id,visible,node.tags,()=>false,()=>false,schema),/不可编辑/);
 });
 test('sparse prefab children move with their root; reparent preserves world coordinates',()=>{
-  const doc=placeTreePrefab(document(),{...prefab,size:{width:2,height:2},occupied:[true,false,false,true],children:[{prefabId:'leaf',local:{r:0,c:1,dir:0}}]}, {},2,2,{stack:true,resolve:()=>({id:'leaf',tile:{color:'yellow'},components:{key:{name:'钥匙'}}})});
-  const root=doc.world.at(2,2).find(n=>n.prefabId==='hot'),child=doc.world.at(2,3).find(n=>n.prefabId==='leaf');assert.equal(doc.world.at(3,2).length,0);assert.equal(doc.world.at(3,3).length,1);
+  const doc=placeTreePrefab(document(),{id:'root',components:{tag:{}},size:{width:2,height:2},occupied:[true,false,false,true],children:[{prefabId:'leaf',local:{r:0,c:1,dir:0}}]}, {},2,2,{stack:true,resolve:()=>({id:'leaf',tile:{color:'yellow'},components:{key:{name:'钥匙'}}})});
+  const root=doc.world.at(2,2).find(n=>n.prefabId==='root'),child=doc.world.at(2,3).find(n=>n.prefabId==='leaf');assert.equal(doc.world.at(3,2).length,0);assert.equal(doc.world.at(3,3).length,1);
   const moved=moveNode(doc,root.id,{r:3,c:2,dir:0});assert.equal(moved.world.at(3,3)[0].id,child.id);assert.equal(doc.world.at(2,3)[0].id,child.id);
   const detached=reparentNode(moved,child.id,null,true);assert.deepEqual(detached.world.transforms.world(child.transformId),moved.world.transforms.world(child.transformId));assert.equal(detached.world.transforms.get(child.transformId).parentId,null);
   assert.throws(()=>deleteNode(doc,root.id),/children/);

@@ -3,7 +3,9 @@ import {normalizePrefab} from './tile-model.mjs';
 import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import {clearMapCells} from './editor/clear-map.mjs';
 import {assignRegion,tagCell,validateRegions,migrateRegions,regionNames} from './regions.mjs';
-const prefab=normalizePrefab({version:1,id:'large_ai',name:'large',size:{width:2,height:3},occupied:[true,false,true,true,true,true],tile:{color:'white'}});
+// Exercise old placement compatibility separately from the new prefab authoring boundary.
+const prefab={version:1,id:'large_ai',name:'large',size:{width:2,height:3},occupied:[true,false,true,true,true,true],tile:{color:'white'}};
+assert.throws(()=>normalizePrefab(prefab),/纸张实体只能占一个方格/);
 const map=migrateRegions({width:5,height:5,spawn:{r:4,c:4,dir:0},tiles:Array.from({length:5},()=>Array.from({length:5},()=>({color:'white'})))});
 const fixedTags={'0,0':{regionTag:'OverlayOnly'},'1,1':{regionTag:'EmptyFixed'}};
 assert.deepEqual(regionNames(map,fixedTags),['EmptyFixed','OverlayOnly','默认区域']);

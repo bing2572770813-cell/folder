@@ -2,6 +2,7 @@ import {EntityWorld} from './entity-world.js';
 import {jsonObject,type JsonObject} from './entity-model.js';
 import {legacyMapToTree,loadTree,type TreeMap} from './legacy-map.js';
 import {validateTerrainStacking} from './terrain-stacking.js';
+import {migratePaperTiles} from './paper-tiles.js';
 
 export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Record<string,JsonObject>}
 
@@ -18,6 +19,7 @@ export function importTreeMap(input:unknown):ImportedTree {
     tree=data as unknown as TreeMap;
     tree.legacyMetadata=jsonObject(tree.legacyMetadata??{});
   }else throw new Error('Unsupported map version');
+  tree=migratePaperTiles(tree);
   const world=loadTree(tree);
   const cellTags:Record<string,JsonObject>={};
   for(const [key,value] of Object.entries(jsonObject(tree.cellTags??{}))){

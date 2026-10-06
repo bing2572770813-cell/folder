@@ -10,6 +10,8 @@ export function isTerrainEntity(node:EntityNode):boolean {
 export function validateTerrainStacking(world:EntityWorld):void {
   const checked = new Set<string>();
   for (const node of world.serialize()) {
+    const footprint=world.transforms.get(node.transformId).footprint;
+    if(Object.hasOwn(node.components,'surface')&&(footprint.width!==1||footprint.height!==1))throw new Error('纸张实体只能占一个方格：'+node.id);
     if (terrainComponents.filter(id => Object.hasOwn(node.components, id)).length > 1)
       throw new Error('同一实体不能同时包含多种地形：' + node.id);
     for (const {r, c} of world.transforms.worldCells(node.transformId)) {

@@ -26,12 +26,16 @@ export class ComponentRegistry {
     const nodes=structuredClone(input.nodes).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
     for(const node of nodes)this.validate(node);
     const context:EventContext={type:input.type,nodes,actor:jsonObject(input.actor),runtime:structuredClone(input.runtime)};
-    if(input.type==='enter')for(const node of nodes)for(const [id,config] of Object.entries(node.components)){
+    if(input.type==='enter')for(const node of nodes){
+      if(node.static.walkable===false)return {valid:false,reason:'目标是阻挡方块',actor:jsonObject(input.actor),runtime:structuredClone(input.runtime),messages:[]};
+      for(const [id,config] of Object.entries(node.components)){
       const reason=this.handlers.get(id)!.canEnter?.(structuredClone(context),jsonObject(config),jsonObject(context.runtime[node.id]?.[id]??{}));
       if(reason)return {valid:false,reason,actor:jsonObject(input.actor),runtime:structuredClone(input.runtime),messages:[]};
+      }
     }
     const messages:string[]=[];
     for(const node of nodes)for(const [id,config] of Object.entries(node.components).sort(([a],[b])=>a<b?-1:a>b?1:0)){
+      if(Array.isArray(node.static.events)&&!node.static.events.includes(input.type))continue;
       const handler=this.handlers.get(id)!.events?.[input.type];if(!handler)continue;
       const effect=handler(structuredClone(context),jsonObject(config),jsonObject(context.runtime[node.id]?.[id]??{}));
       if(effect.actor)context.actor={...context.actor,...jsonObject(effect.actor)};

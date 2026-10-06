@@ -36,3 +36,12 @@ test('registered leave/interact events work without core changes and reject unkn
   assert.deepEqual(registry.dispatch({type:'leave',nodes,actor:actor(),runtime:first.runtime}).messages,['left']);
   assert.throws(()=>registry.dispatch({type:'enter',nodes:[node('bad',{unknown:{}})],actor:actor(),runtime:{}}),/Unregistered/);
 });
+test('static event declarations restrict effects while entry restrictions always apply',()=>{
+  const registry=defaultComponents(),initial=actor();
+  const fire={...node('fire',{fire:{damage:2}}),static:{events:['leave']}};
+  assert.equal(registry.dispatch({type:'enter',nodes:[fire],actor:initial,runtime:{}}).actor.overheat,0);
+  const blocked={...node('blocked',{collision:{blocked:true}}),static:{events:['leave']}};
+  assert.equal(registry.dispatch({type:'enter',nodes:[fire,blocked],actor:initial,runtime:{}}).valid,false);
+  const staticBlocked={...node('static',{surface:{}}),static:{walkable:false}};
+  assert.equal(registry.dispatch({type:'enter',nodes:[staticBlocked],actor:initial,runtime:{}}).valid,false);
+});

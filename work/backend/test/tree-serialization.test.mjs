@@ -88,3 +88,44 @@ test('dynamic permission schema filters key name and terrain config without chan
   assert.deepEqual(saved.entities[0].components.fold,{directions:[]});
   assert.deepEqual(saved.cellTags,imported.cellTags);
 });
+
+test('virtual void fold permissions remove directions while preserving structural nodes',()=>{
+  const imported=importTreeMap(source());
+  const before=imported.world.serialize();
+  const virtual=before.find(node=>node.prefabId==='void_ai');
+  assert.equal(virtual.configuration,undefined);
+  const saved=serializeTreeMap(imported.world,imported.metadata,imported.cellTags,{
+    projectProperties,
+    schemaFor:node=>node.prefabId==='void_ai'?{folds:{serializable:false}}:{},
+  });
+  const filtered=saved.entities.find(node=>node.id===virtual.id);
+  assert.deepEqual(filtered.components.fold,{});
+  assert.equal(filtered.configuration,undefined);
+  assert.equal(filtered.transformId,virtual.transformId);
+  assert.deepEqual(filtered.static,virtual.static);
+  assert.deepEqual(saved.transforms,imported.world.transforms.serialize());
+  assert.deepEqual(imported.world.serialize(),before);
+  assert.deepEqual(importTreeMap(saved).world.get(virtual.id),filtered);
+});
+
+test('cell permission projection filters regions independently and preserves raw snapshots',()=>{
+  const imported=importTreeMap(source());
+  imported.cellTags['0,0'].public='keep';
+  imported.cellTags['1,1']={regionTag:'empty-cell-region',public:'also keep'};
+  const before=structuredClone(imported.cellTags);
+  const entities=imported.world.serialize();
+  const calls=[];
+  const saved=serializeTreeMap(imported.world,imported.metadata,imported.cellTags,{
+    projectProperties,
+    schemaForCell:(r,c,tags)=>{
+      calls.push([r,c,tags.regionTag]);
+      return {regionTag:{serializable:false}};
+    },
+  });
+  assert.deepEqual(saved.cellTags,{'0,0':{public:'keep'},'1,1':{public:'also keep'}});
+  assert.deepEqual(calls,[[0,0,'A'],[1,1,'empty-cell-region']]);
+  assert.deepEqual(imported.cellTags,before);
+  assert.deepEqual(imported.world.serialize(),entities);
+  assert.deepEqual(serializeTreeMap(imported.world,imported.metadata,imported.cellTags).cellTags,before);
+  assert.deepEqual(importTreeMap(saved).cellTags,saved.cellTags);
+});

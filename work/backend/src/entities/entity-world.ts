@@ -15,7 +15,7 @@ export class EntityWorld {
     this.transforms.get(node.transformId);
     const components:Record<string,JsonObject>={};
     for(const [id,config] of Object.entries(jsonObject(node.components)))components[id]=jsonObject(config);
-    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:jsonObject(node.tags),static:freezeJson(jsonObject(node.static))};
+    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:jsonObject(node.tags),static:freezeJson(jsonObject(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
   }
   get(id:string):EntityNode {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);

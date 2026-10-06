@@ -7,6 +7,7 @@ export interface EntityNode {
   components:Record<string,JsonObject>;
   tags:JsonObject;
   static:Readonly<JsonObject>;
+  configuration?:JsonObject;
 }
 export interface ComponentRuntime { [entityId:string]:Record<string,JsonObject> }
 

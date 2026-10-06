@@ -28,7 +28,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     else if(tile.terrain==='key')components.key={...tile.terrainConfig,name:tile.keyName??'钥匙'};
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};
-    entities.push({id,prefabId:tile.prefabId??'paper_ai',transformId,components,tags:{...tile.tags,region:tile.regionTag??'默认区域'},static:{}});
+    entities.push({id,prefabId:tile.prefabId??'paper_ai',transformId,components,tags:{...tile.tags,region:tile.regionTag??'默认区域'},static:{},configuration:jsonObject(tile)});
   }
   const virtual=new Map<string,EntityNode>();
   for(const fold of map.foldCells??[]){

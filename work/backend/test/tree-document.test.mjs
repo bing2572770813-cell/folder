@@ -59,7 +59,7 @@ test('key-only overlays keep ground geometry and contribute tags without copying
   const doc=new TreeDocument(tree),before=doc.serialize();assert.equal(doc.primaryAt(1,1).id,ground.id);assert.equal(doc.view().tiles[1][1].height,.7);assert.equal(doc.view().tiles[1][1].tags.spawn,true);
   doc.applyLegacy(doc.view());assert.deepEqual(doc.serialize(),before);
   const edit=doc.view();edit.tiles[1][1].height=.8;doc.applyLegacy(edit);assert.deepEqual(doc.world.get(ground.id).tags,{});assert.deepEqual(doc.world.get('000-key').tags,{spawn:true});
-  const map=doc.view();const controller=player.createPlayerController({state:player.createPlayerState(map.spawn),createTerrainState:()=>({}),getMap:()=>map,getEntityWorld:()=>doc.world,componentRegistry:{dispatch:()=>({valid:true})},inside:()=>true,isHidden:()=>false,validateTerrains:()=>[],validateRegions,taggedCells,blocked:tile=>tile.blocked});assert.equal(controller.validateForPlay().valid,true);
+  const map=doc.view();const controller=player.createPlayerController({state:player.createPlayerState(map.spawn),createTerrainState:()=>({}),getMap:()=>map,getEntityWorld:()=>doc.world,componentRegistry:{validate:()=>{},dispatch:()=>({valid:true})},inside:()=>true,isHidden:()=>false,validateTerrains:()=>[],validateRegions,taggedCells,blocked:tile=>tile.blocked});assert.equal(controller.validateForPlay().valid,true);
   const tagEdit=doc.view();delete tagEdit.tiles[1][1].tags.spawn;doc.applyLegacy(tagEdit);assert.deepEqual(doc.world.get('000-key').tags,{});assert.deepEqual(doc.world.get(ground.id).tags,{});
 });
 test('transparent and key-only nodes do not fabricate ground; conflicting tags reject',()=>{

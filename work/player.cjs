@@ -22,6 +22,7 @@ function interact(){if(!world()||P.mode!=='play'||P.moving||P.levelWon||P.stepLi
 function validateForPlay() {const map=env.getMap();
   let regionErrors=validateRegions(map);
   if(world()){
+    for(const node of world().serialize())try{env.componentRegistry.validate(node);}catch(error){regionErrors.push(error.message);}
     regionErrors=regionErrors.filter(error=>!error.startsWith('出口所需钥匙不存在或不可收集：'));
     const keys=new Set();
     for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
@@ -33,10 +34,10 @@ function validateForPlay() {const map=env.getMap();
   }
   const errors=[...validateTerrains(map),...new Set(regionErrors)];
   const start=map.tiles[map.spawn.r]?.[map.spawn.c];if(!start||(world()?!entryCheck(map.spawn.r,map.spawn.c,true).valid:blocked(start)||start.terrain==='campfire'))errors.push('玩家起点无效');
-  if(map.exit&&(!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r][map.exit.c]||blocked(map.tiles[map.exit.r][map.exit.c])))errors.push('出口必须在可行走方块上');
+  if(map.exit&&!exitIsValid())errors.push('出口必须在可行走方块上');
   return {valid:errors.length===0,errors};
 }
-function exitIsValid() {const map=env.getMap(); return !!map.exit&&walkable(map.exit.r,map.exit.c); }
+function exitIsValid() {const map=env.getMap();if(!map.exit||!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r]?.[map.exit.c])return false;const tree=world();if(!tree)return walkable(map.exit.r,map.exit.c);const nodes=tree.at(map.exit.r,map.exit.c);return nodes.some(node=>node.components.surface)&&!nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked||node.components.campfire);}
 function isAtExit() {const map=env.getMap(); return exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
 function foldTargetFor(axis,position=P.player) {const map=env.getMap();
   const t=reflectPoint(position.r,position.c,axis);const same=t.r===position.r&&t.c===position.c;let reason='';

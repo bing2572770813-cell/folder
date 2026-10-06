@@ -98,3 +98,8 @@ test('static event subscriptions never suppress collision preflight',()=>{
  const f=fixture([['wall',1,1,{collision:{blocked:true}},{events:['leave']}]]);
  assert.equal(f.controller.canMoveTo(1,1),false);assert.equal(f.state.terrainState.actions,0);
 });
+test('play validation checks overlays and exit uses stable structural walkability',()=>{
+ const f=fixture();f.add('bad',2,2,{unknown:{}});assert.equal(f.controller.validateForPlay().valid,false);f.world.remove('bad',true);
+ f.map.exit={r:1,c:1};f.add('cycle',1,1,{eruption:{}});assert.equal(f.controller.exitIsValid(),true);
+ f.add('blocked-exit',1,1,{collision:{blocked:true}});assert.equal(f.controller.exitIsValid(),false);assert.equal(f.controller.validateForPlay().valid,false);
+});

@@ -4,11 +4,13 @@ import { MapEditorPanel } from "./MapEditorPanel.jsx";
 import { InspectorPanel } from "./InspectorPanel.jsx";
 import { MapProperties } from "./MapProperties.jsx";
 import { LayerVisibility } from "./LayerVisibility.jsx";
+import { PhysicsPanel } from "./PhysicsPanel.jsx";
 const panels = [
   ["map", "地图编辑", "tabMap", "panelMap", MapEditorPanel],
   ["inspect", "检视", "tabInspect", "panelInspect", InspectorPanel],
   ["properties", "地图属性", "tabProperties", "panelProperties", MapProperties],
   ["layers", "图层", "tabLayers", "panelLayers", LayerVisibility],
+  ["physics", "物理属性", "tabPhysics", "panelPhysics", PhysicsPanel],
 ];
 export const EditorPanel = React.memo(function EditorPanel() {
   return (

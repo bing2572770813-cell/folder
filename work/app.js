@@ -1,6 +1,7 @@
 import {validateMap as normalizeMap} from './core/map-model.mjs';
 import {paperSurface,isPaper} from './render/paper-surface.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
+import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -123,6 +124,10 @@ const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambi
 const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(-9,18,8); sunlight.castShadow=true;
 sunlight.shadow.mapSize.set(2048,2048); sunlight.shadow.camera.left=-20;sunlight.shadow.camera.right=20;sunlight.shadow.camera.top=20;sunlight.shadow.camera.bottom=-20;sunlight.shadow.camera.near=1;sunlight.shadow.camera.far=55;sunlight.shadow.bias=-.0006;sunlight.shadow.normalBias=.025; sunlight.shadow.radius=4;scene.add(sunlight);
 const fill=new THREE.DirectionalLight('#d1e8ee',1.1); fill.position.set(12,5,-8); scene.add(fill);
+let lighting={...lightingDefaults};
+function updateLighting(){lighting=applyLighting({sunlight,ambient,fill,renderer},lighting,map.width,map.height);}
+for(const [key] of lightingFields)$('lighting-'+key).oninput=()=>{try{const proposal={...lighting,[key]:Number($('lighting-'+key).value)};applyLighting({sunlight,ambient,fill,renderer},proposal,map.width,map.height);lighting=proposal;$('lightingStatus').textContent='光照预览已更新';}catch(e){$('lightingStatus').textContent=e.message;}};
+$('resetLighting').onclick=()=>{lighting={...lightingDefaults};for(const [key] of lightingFields)$('lighting-'+key).value=lighting[key];updateLighting();$('lightingStatus').textContent='已恢复默认光照';};
 const tileGeo=new THREE.BoxGeometry(1,1,1);
 const markerGeo=new THREE.PlaneGeometry(.94,.94);
 const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new THREE.MeshStandardMaterial({color:v,roughness:.86,flatShading:true})]));
@@ -163,6 +168,7 @@ function makeToken(color){
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}return g;
 }
 function buildPaper() {
+  updateLighting();
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=new Map(),buckets=new Map(),edges=[],styleEdges=new Map(),terrains=new Map();
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
@@ -203,6 +209,7 @@ function buildPaper() {
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z+.5,x+.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
   rebuildFoldAxes();
+  for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
   renderRegionControls();renderEntityVisibility();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
 }

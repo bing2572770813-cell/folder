@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 import {placeEntity} from '../../entities/placement-model.mjs';
+import player from '../../player.cjs';
+import {validateRegions,taggedCells} from '../../tags/regions.mjs';
 const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tree-document.mjs',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
@@ -50,4 +52,18 @@ test('placing on erased cell preserves its fixed region and joins existing insta
   doc.applyLegacy(placeEntity(doc.view(),{size:{width:1,height:1},occupied:[true]},{color:'blue'},1,1).map);assert.equal(doc.view().tiles[1][1].regionTag,'A');
   const root=doc.world.at(1,1)[0],before=doc.world.transforms.get(root.transformId),edit=doc.view();edit.tiles[1][2]={...structuredClone(edit.tiles[1][1])};doc.applyLegacy(edit);
   const child=doc.world.at(1,2)[0];assert.equal(doc.world.transforms.get(child.transformId).parentId,root.transformId);assert.deepEqual(doc.world.transforms.get(root.transformId),before);
+});
+test('key-only overlays keep ground geometry and contribute tags without copying ownership',()=>{
+  const tree=new TreeDocument(legacy()).serialize(),ground=tree.entities[0];ground.tags={};ground.components.surface.height=.7;
+  tree.entities.push({id:'000-key',prefabId:'key_ai',transformId:ground.transformId,components:{key:{name:'铜'}},tags:{spawn:true},static:{}});
+  const doc=new TreeDocument(tree),before=doc.serialize();assert.equal(doc.primaryAt(1,1).id,ground.id);assert.equal(doc.view().tiles[1][1].height,.7);assert.equal(doc.view().tiles[1][1].tags.spawn,true);
+  doc.applyLegacy(doc.view());assert.deepEqual(doc.serialize(),before);
+  const edit=doc.view();edit.tiles[1][1].height=.8;doc.applyLegacy(edit);assert.deepEqual(doc.world.get(ground.id).tags,{});assert.deepEqual(doc.world.get('000-key').tags,{spawn:true});
+  const map=doc.view();const controller=player.createPlayerController({state:player.createPlayerState(map.spawn),createTerrainState:()=>({}),getMap:()=>map,getEntityWorld:()=>doc.world,componentRegistry:{dispatch:()=>({valid:true})},inside:()=>true,isHidden:()=>false,validateTerrains:()=>[],validateRegions,taggedCells,blocked:tile=>tile.blocked});assert.equal(controller.validateForPlay().valid,true);
+  const tagEdit=doc.view();delete tagEdit.tiles[1][1].tags.spawn;doc.applyLegacy(tagEdit);assert.deepEqual(doc.world.get('000-key').tags,{});assert.deepEqual(doc.world.get(ground.id).tags,{});
+});
+test('transparent and key-only nodes do not fabricate ground; conflicting tags reject',()=>{
+  const tree=structuredClone(new TreeDocument(legacy()).serialize());tree.entities[0].static.transparent=true;const doc=new TreeDocument(tree);assert.equal(doc.primaryAt(1,1),null);assert.equal(doc.view().tiles[1][1],null);
+  tree.entities[0].static={render:false};assert.equal(new TreeDocument(tree).view().tiles[1][1].color,'white');
+  tree.entities[0].tags.exitTo='A';tree.entities.push({...structuredClone(tree.entities[0]),id:'other',tags:{exitTo:'B'}});assert.throws(()=>new TreeDocument(tree),/Conflicting/);
 });

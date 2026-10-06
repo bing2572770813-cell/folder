@@ -5,7 +5,16 @@ import {normalizeTile,foldsAt} from './tile-model.mjs';
 const copy=value=>structuredClone(value);
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const terrainIds=['campfire','ice','fire','eruption','key'];
-const visible=node=>!(node.prefabId==='void_ai'&&node.static.transparent);
+const visible=node=>!!node.components.surface&&!node.static.transparent;
+function mergedTags(nodes){
+  const tags={};
+  for(const node of nodes)for(const [key,value] of Object.entries(node.tags)){
+    if(key==='requiredKeys'){tags[key]=[...new Set([...(tags[key]??[]),...value])].sort();continue;}
+    if(Object.hasOwn(tags,key)&&!equal(tags[key],value))throw new Error('Conflicting entity tag: '+key);
+    tags[key]=copy(value);
+  }
+  return tags;
+}
 function tileOf(node){
   const tile={...copy(node.configuration??{}),...copy(node.components.surface??{}),prefabId:node.configuration?.prefabId??node.prefabId,tags:copy(node.tags)};
   delete tile.regionTag;
@@ -36,6 +45,7 @@ export class TreeDocument {
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
   }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
+  primaryAt(r,c){return this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(visible)??null;}
   view(){
     const {width,height}=this.world.transforms;
     const tiles=Array.from({length:height},()=>Array(width).fill(null)),foldCells=[];
@@ -43,7 +53,7 @@ export class TreeDocument {
       const nodes=this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id));
       const primary=nodes.find(visible);
       const folds=[...new Set(nodes.flatMap(node=>node.components.fold?.directions??[]))];
-      if(primary){const tile=tileOf(primary);tile.regionTag=this.cellTags[r+','+c]?.regionTag??'默认区域';tile.folds=folds;tile.fold=folds[0]??null;tiles[r][c]=normalizeTile(tile);}
+      if(primary){const tile=tileOf(primary);tile.tags=mergedTags(nodes);tile.regionTag=this.cellTags[r+','+c]?.regionTag??'默认区域';tile.folds=folds;tile.fold=folds[0]??null;tiles[r][c]=normalizeTile(tile);}
       else foldCells.push(...folds.map(type=>({r,c,type})));
     }
     return {...copy(this.metadata),version:1,width,height,tiles,foldCells};
@@ -65,7 +75,20 @@ export class TreeDocument {
         cellTags[r+','+c]={...cellTags[r+','+c],regionTag:old===null?(cellTags[r+','+c]?.regionTag??tile.regionTag??'默认区域'):(tile.regionTag??'默认区域')};
         const replace=primary&&(old.prefabId!==tile.prefabId||old.instance?.id!==tile.instance?.id);
         if(replace)erase(primary);
-        if(primary&&!replace){const node=updated.get(primary.id)??copy(primary);configure(node,tile,equal(oldFolds,folds)?node.components.fold?.directions??[]:folds);updated.set(node.id,node);}
+        if(primary&&!replace){
+          const node=updated.get(primary.id)??copy(primary),ownTags=copy(node.tags);
+          const priorTags=old.tags??{},nextTags=tile.tags??{};
+          for(const key of new Set([...Object.keys(priorTags),...Object.keys(nextTags)]))if(!equal(priorTags[key],nextTags[key])){
+            const owners=nodes.filter(member=>Object.hasOwn(member.tags,key));
+            for(const owner of owners.length?owners:[primary]){
+              const edited=owner.id===primary.id?node:(updated.get(owner.id)??copy(owner));
+              if(nextTags[key]===undefined)delete edited.tags[key];else edited.tags[key]=copy(nextTags[key]);
+              if(owner.id===primary.id){if(nextTags[key]===undefined)delete ownTags[key];else ownTags[key]=copy(nextTags[key]);}
+              else updated.set(owner.id,edited);
+            }
+          }
+          configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds);updated.set(node.id,node);
+        }
         else {
           const seed={version:1,width:next.width,height:next.height,tiles:Array.from({length:next.height},()=>Array(next.width).fill(null)),foldCells:[]};seed.tiles[r][c]=tile;
           const tree=importTreeMap(seed).world;const node=tree.serialize()[0],transform=tree.transforms.serialize()[0];

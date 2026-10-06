@@ -131,3 +131,8 @@ details[open] > .icon-select-summary::before {
 .multi-icon-select > .icon-select-summary {
   min-height: 40px;
 }
+.play-panel .editor-tabs { margin-bottom: 16px; }
+.player-properties .studio-fields { display: grid; gap: 10px; padding: 10px 0; }
+.player-properties label { display: grid; gap: 5px; }
+.player-height-limits { border: 1px solid #dce3d9; border-radius: 5px; padding: 10px; display: grid; gap: 10px; min-width: 0; }
+.player-height-limits legend { font-weight: 600; font-size: 11px; }

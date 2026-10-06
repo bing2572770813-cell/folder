@@ -21,6 +21,10 @@ const esbuild = require("esbuild");
   const { document } = parseHTML(module.exports.renderEditorMarkup());
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
+  assert.equal(document.querySelector('#clearMap').closest('.tool-grid').className,'tool-grid');
+  assert.equal(document.querySelector('#freeTeleportToggle').closest('[role="tabpanel"]').id,'panelDeveloper');
+  assert.equal(document.querySelector('#applyPlayerProperties').closest('[role="tabpanel"]').id,'panelPlayerState');
+  assert.equal(document.querySelector('#tabPlayerState .mantine-Tabs-tabLabel').textContent,'玩家状态');
   for (const panel of document.querySelectorAll('[role="tabpanel"]')) {
     assert.ok(document.getElementById(panel.getAttribute("aria-labelledby")));
     assert.ok(

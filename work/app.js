@@ -24,13 +24,14 @@ import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderRegionC
 import {renderPropertyInspector,clearPropertyInspector} from './ui/property-inspector.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
+import {Trash2} from 'lucide';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {LineSegments2} from 'three/examples/jsm/lines/LineSegments2.js';
 import {LineSegmentsGeometry} from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
 
-const icons = { Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Redo2 };
+const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Redo2 };
 for (const node of document.querySelectorAll('[data-lucide]')) {
   const name=node.dataset.lucide.replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
@@ -333,6 +334,7 @@ function applyInspectedProperty(path,value){
 }
 
 document.querySelectorAll('.rotate-left').forEach(b=>b.onclick=()=>turn(-1));document.querySelectorAll('.rotate-right').forEach(b=>b.onclick=()=>turn(1));
+$('applyPlayerProperties').onclick=()=>{try{controller.setPlayerProperties({r:Number($('playerRow').value)-1,c:Number($('playerColumn').value)-1,dir:Number($('playerDirection').value),maxUp:Number($('playerMaxUp').value),maxDown:Number($('playerMaxDown').value)});$('playerPropertyStatus').textContent='玩家属性已应用 · 可撤销，重启后重置';}catch(error){$('playerPropertyStatus').textContent=error.message;toast(error.message,true);}};
 
 
 $('editMode').onclick=()=>setMode('edit');$('playMode').onclick=()=>setMode('play');$('startBtn').onclick=()=>setMode(P.mode==='edit'?'play':'edit');
@@ -370,6 +372,8 @@ function updateUI(){
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
   const names={inspect:'点击实体或虚空检视 · 不修改地图',select:selectionMode==='single'?'单选 · 点击选择方格':'多选 · 点击累加 / 拖拽替换 / Shift 拖拽累加',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',entry:'设置区域入口','region-exit':'设置区域出口','clear-tags':'清除方块标签'};if(!P.chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(P.player.r,P.player.c):names[tool];
   $('steps').textContent=$('canvasSteps').textContent=String(P.steps).padStart(2,'0');$('teleports').textContent=String(P.teleports).padStart(2,'0');$('playerCoord').textContent=coord(P.player.r,P.player.c)+' · 朝'+FACE_NAMES[P.player.dir]+(playing?' · '+(P.terrainState.frozen?'冰冻 · ':'')+'过热 '+P.terrainState.overheat+(P.terrainState.hasKey?' · 持有钥匙':''):'');$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[P.player.dir];
+  for(const [id,value] of Object.entries({playerRow:P.player.r+1,playerColumn:P.player.c+1,playerDirection:P.player.dir,playerMaxUp:P.moveHeight.maxUp,playerMaxDown:P.moveHeight.maxDown}))if(document.activeElement!==$(id))$(id).value=value;
+  $('playerRow').max=map.height;$('playerColumn').max=map.width;$('applyPlayerProperties').disabled=!playing||P.moving;
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&(P.levelWon||P.stepLimitHit));

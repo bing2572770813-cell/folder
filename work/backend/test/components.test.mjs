@@ -55,3 +55,12 @@ test('lift configuration validates range, initial height and turn count',()=>{
   {minHeight:.1,maxHeight:1,initialHeight:.3,turnsPerLeg:0},
  ]) assert.throws(()=>registry.validate(node('bad',{lift})),/Invalid lift/);
 });
+
+test('hazards run before collection regardless of IDs or component grouping',()=>{
+ const registry=defaultComponents();
+ for(const nodes of [[node('a-fire',{fire:{damage:1}}),node('z-key',{key:{name:'铜'}})],[node('z-fire',{fire:{damage:1}}),node('a-key',{key:{name:'铜'}})],[node('mixed',{key:{name:'铜'},fire:{damage:1}})]]){
+  const result=registry.dispatch({type:'enter',nodes,actor:{...actor(),overheat:5},runtime:{}});
+  assert.equal(result.actor.gameOver,true);assert.deepEqual(result.actor.collectedKeys,[]);
+  assert.deepEqual(result.runtime,{});
+ }
+});

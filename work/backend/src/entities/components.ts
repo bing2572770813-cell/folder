@@ -4,6 +4,8 @@ export type EntityEvent='enter'|'leave'|'interact';
 export interface EventContext {type:EntityEvent;nodes:EntityNode[];actor:JsonObject;runtime:ComponentRuntime}
 export interface ComponentEffect {actor?:JsonObject;state?:JsonObject;messages?:string[]}
 export interface ComponentHandler {
+  /** Lower values run first; default 0, hazards 10, collection 20. */
+  effectOrder?:number;
   validate?:(config:JsonObject)=>void;
   canEnter?:(context:EventContext,config:JsonObject,state:JsonObject)=>string|undefined;
   events?:Partial<Record<EntityEvent,(context:EventContext,config:JsonObject,state:JsonObject)=>ComponentEffect>>;
@@ -34,7 +36,9 @@ export class ComponentRegistry {
       }
     }
     const messages:string[]=[];
-    for(const node of nodes)for(const [id,config] of Object.entries(node.components).sort(([a],[b])=>a<b?-1:a>b?1:0)){
+    const effects=nodes.flatMap(node=>Object.entries(node.components).map(([id,config])=>({node,id,config})));
+    effects.sort((a,b)=>(this.handlers.get(a.id)!.effectOrder??0)-(this.handlers.get(b.id)!.effectOrder??0)||(a.id<b.id?-1:a.id>b.id?1:0)||(a.node.id<b.node.id?-1:a.node.id>b.node.id?1:0));
+    for(const {node,id,config} of effects){
       if(Array.isArray(node.static.events)&&!node.static.events.includes(input.type))continue;
       const handler=this.handlers.get(id)!.events?.[input.type];if(!handler)continue;
       const effect=handler(structuredClone(context),jsonObject(config),jsonObject(context.runtime[node.id]?.[id]??{}));
@@ -68,16 +72,18 @@ export function defaultComponents():ComponentRegistry {
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{
+    effectOrder:10,
     validate:config=>{if(config.damage!==undefined&&(typeof config.damage!=='number'||!Number.isFinite(config.damage)||config.damage<0))throw new Error('Invalid fire damage');},
     events:{enter:(context,config)=>{
       const overheat=Number(context.actor.overheat??0)+Number(config.damage??1);
       return {actor:{overheat,...(overheat>=6?{gameOver:true}:{})},messages:overheat>=6?['过热层数达到 6 层，游戏结束']:[]};
     }},
   });
-  registry.register('ice',{events:{enter:(context):ComponentEffect=>context.actor.frozen
+  registry.register('ice',{effectOrder:10,events:{enter:(context):ComponentEffect=>context.actor.frozen
     ?{actor:{gameOver:true},messages:['冰冻状态下再次进入冰河，游戏结束']}
     :{actor:{frozen:true,overheat:0}}}});
   registry.register('key',{
+    effectOrder:20,
     validate:config=>{if(config.name!==undefined&&(typeof config.name!=='string'||!config.name.trim()||config.name.trim().length>80))throw new Error('Invalid key name');},
     events:{enter:(context,config,state)=>{
       const name=String(config.name??'钥匙').trim();

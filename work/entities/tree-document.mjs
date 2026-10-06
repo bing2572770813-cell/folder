@@ -97,8 +97,18 @@ export class TreeDocument {
         }
       }
       if(!tile&&folds.length){
-        const existing=nodes.find(node=>!visible(node)&&!removed.has(node.id));
-        if(existing){const node=copy(existing);node.components.fold={directions:folds};updated.set(node.id,node);}
+        const owners=nodes.filter(node=>node.components.fold&&!removed.has(node.id));
+        const existing=owners[0]??nodes.find(node=>!visible(node)&&!removed.has(node.id));
+        if(existing){
+          for(const owner of owners.length?owners:[existing]){
+            const node=updated.get(owner.id)??copy(owner);
+            const retained=(node.components.fold?.directions??[]).filter(direction=>folds.includes(direction));
+            const added=owner.id===existing.id?folds.filter(direction=>!oldFolds.includes(direction)):[];
+            const directions=[...new Set([...retained,...added])];
+            if(directions.length)node.components.fold={...node.components.fold,directions};else delete node.components.fold;
+            updated.set(node.id,node);
+          }
+        }
         else {const id='void-'+globalThis.crypto.randomUUID();added.push({id,prefabId:'void_ai',transformId:id+'-transform',components:{collision:{blocked:true},fold:{directions:folds}},tags:{},static:{placeable:false,transparent:true}});transforms.push({id:id+'-transform',parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});}
       }else if(!tile&&!folds.length)for(const node of nodes)if(!visible(node)){const edited=copy(node);delete edited.components.fold;updated.set(node.id,edited);}
       if(tile&&!equal(oldFolds,folds))for(const node of nodes)if(node.id!==primary?.id&&!removed.has(node.id)){const edited=updated.get(node.id)??copy(node);delete edited.components.fold;updated.set(node.id,edited);}

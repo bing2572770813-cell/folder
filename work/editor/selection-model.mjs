@@ -18,7 +18,8 @@ export function pasteRegion(map,tiles,r,c,isHidden=()=>false) {
     if(!affects(dr,dc))return;
     const value=copy(tile),old=next.tiles[r+dr][c+dc];
     if(value?.tags){delete value.tags.spawn;delete value.tags.entry;}
-    if(value&&old?.tags){value.tags={...value.tags,...old.tags};if(old.tags.spawn||old.tags.entry)value.regionTag=old.regionTag;}
+    if(value){delete value.regionTag;if(old?.regionTag!==undefined)value.regionTag=old.regionTag;}
+    if(value&&old?.tags){value.tags={...value.tags,...old.tags};}
     if(value?.instance){const source=value.instance;if(!instances.has(source.id))instances.set(source.id,globalThis.crypto.randomUUID());value.instance={...source,id:instances.get(source.id),anchorR:r+source.anchorR-(tiles.origin?.r??0),anchorC:c+source.anchorC-(tiles.origin?.c??0)};}
     next.tiles[r+dr][c+dc]=value;
   }));return {map:next,rect};

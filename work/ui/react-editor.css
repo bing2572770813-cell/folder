@@ -1,0 +1,138 @@
+#react-root {
+  height: 100%;
+}
+.react-input {
+  display: contents;
+}
+.mantine-Input-input,
+.mantine-NativeSelect-input,
+.mantine-Textarea-input {
+  font: inherit;
+  color: var(--ink);
+}
+.mantine-Checkbox-root {
+  vertical-align: middle;
+}
+.mantine-Checkbox-input {
+  width: 14px;
+  height: 14px;
+}
+.mantine-Paper-root {
+  background: transparent;
+}
+.mantine-UnstyledButton-root {
+  font: inherit;
+}
+.mantine-Input-wrapper {
+  min-width: 0;
+}
+label .mantine-NativeSelect-root {
+  min-width: 0;
+  width: 100%;
+}
+
+.editor-tabs button {
+  text-align: center;
+}
+.editor-tabs::before {
+  display: none;
+}
+.editor-tabs button::before {
+  display: none;
+}
+.mantine-Tabs-panel {
+  padding: 0;
+}
+
+.icon-select-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 12px;
+}
+.icon-select-label {
+  font-size: 11px;
+  padding-top: 23px;
+  white-space: nowrap;
+}
+.icon-select-content {
+  min-width: 0;
+}
+.icon-select-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+}
+.icon-select-summary::before {
+  content: "▸";
+  flex: none;
+}
+details[open] > .icon-select-summary::before {
+  content: "▾";
+}
+.icon-select-summary::-webkit-details-marker {
+  display: none;
+}
+#prefabSummary,
+#tagSummary {
+  width: 100%;
+  min-height: 62px;
+  gap: 8px;
+  padding: 6px;
+}
+#prefabSummary img,
+#tagSummary svg {
+  width: 48px;
+  height: 44px;
+  object-fit: contain;
+  flex: none;
+}
+.icon-select-grid {
+  margin-top: 8px;
+}
+.icon-select-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.icon-select-actions button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px;
+  background: white;
+}
+.layer-visibility-sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.icon-option-name {
+  display: block;
+  font-size: 10px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.icon-select-letter {
+  display: grid;
+  place-items: center;
+  height: 50px;
+  font-size: 22px;
+  color: var(--green);
+  background: #eef1e9;
+  border-radius: 4px;
+}
+.multi-icon-select > .icon-select-summary {
+  min-height: 40px;
+}
+.play-panel .editor-tabs { margin-bottom: 16px; }
+.player-properties .studio-fields { display: grid; gap: 10px; padding: 10px 0; }
+.player-properties label { display: grid; gap: 5px; }
+.player-height-limits { border: 1px solid #dce3d9; border-radius: 5px; padding: 10px; display: grid; gap: 10px; min-width: 0; }
+.player-height-limits legend { font-weight: 600; font-size: 11px; }

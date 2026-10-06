@@ -1,31 +1,33 @@
-# 编辑器 UI 组件
+# React 编辑器 UI
 
-保持原生 HTML/JavaScript，不引入框架。editor-tabs.mjs 将既有控件搬入四个面板，保留节点身份、事件绑定和字段状态，不重建控件或修改地图。
+前端采用 React 19 + Mantine 9，保留 Three.js 和 JavaScript 游戏逻辑。入口 react-entry.jsx 先同步挂载 EditorShell，再启动 app.js 场景适配；player.cjs 仍集中承载玩家状态与交互。
 
-Tab 使用单一可聚焦按钮、方向键及 Home/End 导航，aria-selected 与面板 hidden 同步。父面板隐藏子控件但不重置 details 的展开状态。dispose 清理导航监听器。
+## 组件边界
 
-组件仅协调 DOM；地图校验、编辑历史和玩家逻辑不写入此目录。虚空检视等工具行为通过调用方接入。
+react/ 包含 EditorLayout、TopBar、Sidebar、EditorPanel、MapTools、BlockEntityTools、SelectionClipboard、InspectorPanel、MapProperties、LayerVisibility、PlayPanel、Viewport、StatusBar。controls.jsx 使用 Mantine 按钮、输入框、checkbox、原生选择器、Paper/Box；EditorPanel 使用 Mantine Tabs。PropertyInspector.jsx、catalogs.jsx 管理动态属性、实体预览、实体/区域/钥匙 checklist 与机制说明。
 
-组件布局带 data-tab-layout=v1 标记；从当前 DOM 导出的独立游戏启动时复用已组织的节点，避免第二次搬动控件造成空引用。已实际导出并加载独立游戏验证持续渲染及无启动错误。
+Tab 使用 keepMountedMode="display-none"，保证所有 ID 在初始化时存在，切换不重挂载、丢失选区或折叠状态。Tab 选择通过 fold:editor-tab 通知游戏适配。宽线选区、方块实体/颜色/轮廓参数层级、标签缩略图、折纸方向条件显示保留。
 
-property-inspector.mjs 呈现实际检视实例的字段，支持布尔、数字、字符串、JSON 列表和嵌套对象折叠。readable=false 不渲染；身份及父级禁用字段只读；配置与临时值有明确状态提示。调用方校验类型、地图约束、隐藏保护和引用更新。修改刷新安排到下一帧，保留 Tab 导航及字段焦点；错误保留输入并标注 aria-invalid。
+## React 与地图适配
 
-区域标签控件位于地图编辑面板的选区与剪贴板内；与框选、复制及粘贴共用当前选区，保留原节点和事件。
+React 创建界面结构并管理 Tab 与动态列表/Inspector 的状态。Three.js canvas 只挂在 Viewport 的稳定宿主中。app.js 暂保留固定 ID 的事件/状态适配以及下拉摘要、地图状态和显示标记更新；不因此将游戏状态复制进 React。静态结构组件 memo 化，不在地图刷新时重建。动态宿主只能由对应 React renderer 写入，清空 Inspector 使用 clearPropertyInspector，禁止在其 React root 上 replaceChildren。
 
-实体选择器的 summary 始终显示当前实体名称及预览缩略图；选择或目录刷新后同步更新，折叠列表不会隐藏当前选择。
+静态放置参数为非受控输入，由适配层验证并提交。Inspector 使用 React 本地草稿，失焦或 Enter 提交，checkbox 立即提交；错误保留输入，权限和批量事务仍由原数据模块检查。
 
-选区工具位于地图工具，首次点击进入单选，再次点击进入多选（继续点击在两种模式间切换）。多选点击累加、拖拽替换、Shift 拖拽累加；单选点击替换选中格。点击虚空仍清空选区。检视读取当前选区，不独立拾取；批量显示共同类型字段，不同值显示“多个不同值”，权限取交集。选中多格实例的任一格时检视及属性修改扩展到所有占用格，隐藏/只读/类型错误整次拒绝，成功只记录一次配置历史。唯一位置标签禁止批量设置到多个冲突位置。
+## 样式与构建
 
-放置与应用合并为放置方块：空格及已有实体均按当前 prefab 与放置参数处理，保持 BaseEntity、隐藏和原有标签/折线保护。放置参数与标签控件归地图编辑；检视只呈现实际选区字段。
+MantineProvider 的主题保留纸白/墨绿配色、字号及圆角。Mantine CSS 在现有界面 CSS 之前嵌入，react-editor.css 只处理适配。editor.html 是文档/CSS 外壳，布局唯一来源为 JSX。build.cjs 服务端生成静态预览结构，并将 React、组件库、Three.js、代码和 CSS 内嵌进 outputs/index.html/game.html；没有 CDN 或运行时 UI 构建服务。
 
-选区方格与粘贴选区边框使用屏幕空间 3px 宽线（原 1px 的三倍），通过 Three.js 宽线几何渲染，避免 WebGL 原生线宽被限制为 1px。
+Node.js 仍只承担资源服务和构建。执行 npm --prefix work ci、npm --prefix work run build、npm --prefix work test。不要提交 node_modules 新依赖目录；package-lock.json 固定依赖。
 
-方块颜色是实体类型选择器的子面板，仅在实体类型展开且所选 prefab 含颜色属性时显示。实体与标签选择后保留用户的展开状态，手动点击 summary 折叠/打开。方块标签 summary 保留最后选择的标签名称和 SVG 缩略图，切换其他地图工具也不会清空预览。
+## 通用图标选择组件
 
-检视面板的方块机制根据当前选区实体的 terrain（机制类型）显示规则说明，多选去重汇总；无机制与未登记类型有明确提示。旧静态方块类型图例已移除。
+SingleSelect_icons.jsx 与 MultiSelect_icons.jsx 是不依赖游戏语义的父级组件，通过 items/value/onChange、renderIcon 和参数插槽适配业务。BlockEntityTools 将方块实体和方块标签组合为同款单选下拉栏；LayerVisibility 以显示图层为一级标题，实体和显示区域为同级二级多选下拉栏。业务规则与数据筛选留在适配层，不写入通用父组件。
 
-地图编辑的实体选择板块名称为“方块实体”；轮廓参数（高度、厚度、过渡比例）位于方块实体下拉栏内，与方块颜色同级；收起下拉栏同时隐藏这两个子板块。方块标签保留独立下拉交互，保留控件与事件。
+地图工具的清空地图为可撤销结构操作，保留地图名称、尺寸与地图级配置，清除实体、标签与折线；隐藏内容仍阻止修改。放置操作不能覆盖多格实体的实际占用格，须先删除整个实体，掩码空洞不受此限制。
 
-方块标签名称显示在选择按钮左侧，同一行排列；按钮仍保留当前标签名称及缩略图。
+游玩侧栏通过通用 TabbedSections 分成开发者选项与玩家状态，面板保持挂载。玩家属性可临时修改朝向、行列坐标与可移动高度差；行列从 1 开始，最大上移和最大下降默认各 1，仅限制行走，传送不受高度差限制。所有玩家状态修改在 player.cjs 中验证，可通过游玩撤销恢复，进入/退出游玩及重启重置；不反写地图或 prefab。
 
-折纸方向位于地图工具的放置折纸线按钮之后，仅在 fold 工具激活时显示；切换工具隐藏，所选方向保持。
+多格实体采用整体选中：直接点击/框选格为蓝线，联动占用格为红线，二者均进入实际选区与复制掩码。任一占用格隐藏时整实体不进入选区。检视分为实体整体属性与直接选中格的独立属性；颜色、高度、厚度、过渡比例、机制参数与区域按整个实体修改，位置标签及折线按直接选中格修改。同实例区域标签必须一致，放置与区域分配遵循该规则，导入及粘贴拒绝区域不一致的实例。撤销/重做保留蓝红选中来源。
+
+玩家属性的机制状态还支持过热层数、冰冻、机制行动次数和已收集钥匙 JSON 名称数组。过热/行动次数为非负安全整数，钥匙限地图内合法钥匙名并去重；hasKey 由钥匙列表派生，喷发开放状态由行动次数派生。修改不执行地形进入事件、不消耗步数，正常移动仍执行冰冻/过热等原规则；所有字段原子校验、游玩撤销与重启重置，不保存到地图或 prefab。

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import {inspectionCells,batchProperties} from './editor/batch-inspection.mjs';
+import {inspectionCells,batchProperties,selectionDetails} from './editor/batch-inspection.mjs';
 const map={height:2,width:3,tiles:[[{instance:{id:'a'}},{instance:{id:'a'}},null],[null,{instance:{id:'a'}},{instance:{id:'b'}}]]};
 assert.deepEqual(inspectionCells(map,[{r:0,c:1}]),[{r:0,c:1},{r:0,c:0},{r:1,c:1}]);
+const linked=selectionDetails(map,[{r:0,c:1}]);assert.equal(linked.direct.length,1);assert.equal(linked.cells.length,3);assert.equal(linked.linked.length,2);
+assert.equal(selectionDetails(map,[{r:0,c:1}],(r,c)=>r===1&&c===1).cells.length,0,'隐藏一个占用格时整个实体不进入选区');
+assert.equal(selectionDetails(map,[]).cells.length,0);
 const result=batchProperties([{values:{height:.1,properties:{n:1,s:'a'},color:'white',prefabId:'a'},schema:{}},{values:{height:.4,properties:{n:2,s:'b'},prefabId:'b'},schema:{height:{tempEditable:false},properties:{children:{n:{serializable:false}}}}}]);
 assert.equal(result.values.color,undefined);assert.equal(result.values.height,.1);
 assert.equal(result.schema.height.tempEditable,false);assert.equal(result.schema.properties.children.n.serializable,false);
@@ -24,3 +27,6 @@ function transactionFixture(readonly){
 const denied=transactionFixture(true);assert.throws(()=>denied.context.applyInspectedProperty(['height'],.5),/不可编辑/);assert.deepEqual(denied.context.map,denied.baseline);assert.equal(denied.records(),0);
 const accepted=transactionFixture(false);accepted.context.applyInspectedProperty(['height'],.5);assert.deepEqual(accepted.context.map.tiles[0].map(t=>t.height),[.5,.5]);assert.equal(accepted.records(),1);
 console.log('PASS: production batch adapter rejects a later readonly target without partial writes and commits valid edits once.');
+const local=transactionFixture(false);local.context.directSelectedCells=[{r:0,c:0}];local.context.map.tiles[0].forEach(t=>t.folds=[]);local.context.assertTagAttachment=()=>{};
+local.context.applyInspectedProperty(['folds'],['h'],'cell');assert.deepEqual(local.context.map.tiles[0][0].folds,['h']);assert.deepEqual(local.context.map.tiles[0][1].folds,[]);assert.equal(local.records(),1);
+console.log('PASS: per-cell tags/folds use direct cells while whole-instance attributes retain batch semantics.');

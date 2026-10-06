@@ -1,4 +1,11 @@
 import {propertyAt} from '../core/property-model.mjs';
+export function selectionDetails(map,direct,isHidden=()=>false){
+  const candidates=direct.filter(p=>p.r>=0&&p.c>=0&&p.r<map.height&&p.c<map.width);
+  const expanded=inspectionCells(map,candidates),hiddenIds=new Set(expanded.filter(p=>isHidden(p.r,p.c)).map(p=>map.tiles[p.r]?.[p.c]?.instance?.id).filter(Boolean));
+  const visible=candidates.filter(p=>!isHidden(p.r,p.c)&&!hiddenIds.has(map.tiles[p.r]?.[p.c]?.instance?.id));
+  const cells=inspectionCells(map,visible),keys=new Set(visible.map(p=>p.r+','+p.c));
+  return {direct:visible,cells,linked:cells.filter(p=>!keys.has(p.r+','+p.c))};
+}
 export function inspectionCells(map,selected){
   const ids=new Set(selected.map(p=>map.tiles[p.r]?.[p.c]?.instance?.id).filter(Boolean));
   const cells=new Map(selected.map(p=>[p.r+','+p.c,{...p}]));

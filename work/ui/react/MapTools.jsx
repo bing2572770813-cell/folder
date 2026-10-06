@@ -102,6 +102,24 @@ export const MapTools = React.memo(function MapTools() {
           {"网格"}
         </UiButton>
         <UiButton
+          className="tool-btn wide"
+          id="tableToggle"
+          aria-pressed="true"
+          data-tip="显示或隐藏承载地图的桌游桌"
+        >
+          <i data-lucide="table-2" />
+          {"桌子"}
+        </UiButton>
+        <UiButton
+          className="tool-btn wide"
+          id="creaseDashToggle"
+          aria-pressed="true"
+          data-tip="显示或隐藏折痕处的点线交替虚线"
+        >
+          <i data-lucide="minus" />
+          {"折痕虚线"}
+        </UiButton>
+        <UiButton
           className="tool-btn"
           data-tool="select"
           data-tip="选区"

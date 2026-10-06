@@ -40,6 +40,8 @@ const esbuild = require("esbuild");
   assert.equal(nodeForm.querySelector('textarea'), null);
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
+  assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');
+  assert.equal(document.getElementById('tabPhysics').textContent,'物理属性');
   for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])
     assert.equal(document.getElementById(id).closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.ok(document.querySelector('#cellPropertyInspector'));

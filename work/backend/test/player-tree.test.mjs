@@ -8,7 +8,7 @@ import {defaultComponents} from '../dist/entities/components.js';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction} from '../../special-terrain.mjs';
 import {validateRegions} from '../../regions.mjs';
 
-function fixture(extra=[]){
+function fixture(extra=[],configure=()=>{}){
  const map={width:4,height:3,tiles:Array.from({length:3},()=>Array.from({length:4},()=>({regionTag:'A',tags:{}}))),spawn:{r:1,c:0,dir:2},exit:null,maxSteps:0};
  map.tiles[1][0].tags.spawn=true;
  const transforms=new TransformManager(4,3);let world=new EntityWorld(transforms);
@@ -26,7 +26,7 @@ function fixture(extra=[]){
   clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:()=>rebuilds++,renderPlayer:noop,
   disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c,wz:r=>r,tileTop:()=>0,
   getSelectionRing:()=>ring,getPlayerGroup:()=>group,getEffectLayer:()=>group,invalidateAxes:noop};
- controller=player.createPlayerController(env);controller.setMode('play');
+ configure(env);controller=player.createPlayerController(env);controller.setMode('play');
  const move=(r,c)=>{controller.selectPlayer();controller.movePlayer(r,c);controller.tick(performance.now()+1000);};
  return {map,state,controller,move,add,registry,env,get rebuilds(){return rebuilds;},get world(){return world;},replaceWorld:()=>{const snapshot=world.snapshotRuntime();world=new EntityWorld(transforms,world.serialize());world.restoreRuntime(snapshot);}};
 }
@@ -94,6 +94,49 @@ test('registry rejects multiple or unknown arrival causes',()=>{
  const f=fixture(),input={type:'enter',nodes:[],actor:{},runtime:{}};
  assert.throws(()=>f.registry.dispatch({...input,trigger:['walk','teleport']}),/trigger/i);
  assert.throws(()=>f.registry.dispatch({...input,trigger:'hover'}),/trigger/i);
+});
+
+function physicalFixture(){
+ const group={type:'v',center:{r:1,c:1},from:{r:0,c:1},to:{r:2,c:1},cells:[{r:0,c:1},{r:1,c:1},{r:2,c:1}],radius:1};
+ const f=fixture([['key',1,2,{key:{name:'折纸钥匙'}}],['lift',2,3,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,turnsPerLeg:3}}]],env=>{
+  env.foldsAt=()=>['v'];env.foldGroupAt=()=>group;env.getFoldAxes=()=>[group];
+  env.foldView={begin:()=>{},setAngle:()=>{},reset:()=>{},footPosition:()=>[2,0,1],playerPosition:()=>[2,.018,1]};
+  env.getFoldHinge=()=>({origin:[1,0,1],direction:[0,0,1]});
+ });
+ f.controller.selectFold(1,1,'v');return f;
+}
+
+test('physical fold drop uses one canonical turn and restores key/lift runtime on undo',()=>{
+ const f=physicalFixture(),before=f.controller.snapshot(),events=[];
+ f.registry.register('arrival',{events:{enter:context=>{events.push(context.trigger);return {};}}});f.add('arrival',1,2,{arrival:{}});
+ assert.equal(f.controller.beginFoldDrag(1,0,300),true);
+ assert.equal(f.controller.testTeleport(2,3),false,'drag blocks competing turns');
+ f.controller.updateFoldDrag(70);assert.equal(f.state.foldMotion.ready,true);
+ assert.equal(f.controller.endFoldDrag(),true);
+ assert.deepEqual(events,['teleport']);assert.equal(f.state.turn.number,1);assert.equal(f.state.turn.phase,'present');
+ assert.equal(f.state.steps,1);assert.equal(f.state.teleports,1);assert.equal(f.state.terrainState.actions,1);
+ assert.equal(f.state.animation.type,'drop');assert.deepEqual(f.state.animation.from.toArray(),[2,.018,1]);
+ assert.deepEqual(f.world.runtime('key','key'),{collected:true});assert.equal(f.world.runtime('lift','lift').height,.4);
+ f.controller.tick(performance.now()+1000);assert.equal(f.state.turn.phase,'complete');
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
+});
+
+test('failed physical arrival rolls back the canonical turn, key and history',()=>{
+ const f=physicalFixture();
+ f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5}})}});
+ f.registry.register('restriction',{canEnter:context=>context.actor.overheat===5?'禁止掉落':undefined});
+ f.add('departure',1,0,{departure:{}});f.add('restriction',1,2,{restriction:{}});
+ const before=f.controller.snapshot();f.controller.beginFoldDrag(1,0,300);f.controller.updateFoldDrag(70);
+ assert.throws(()=>f.controller.endFoldDrag(),/禁止掉落/);
+ assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.state.playHistory.length,0);assert.equal(f.state.foldMotion,null);
+});
+
+test('entry-free regional exits reveal once without a second arrival or turn',()=>{
+ const f=fixture();f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';
+ f.controller.selectPlayer();f.controller.movePlayer(1,1);
+ assert.deepEqual({r:f.state.player.r,c:f.state.player.c},{r:1,c:1});assert.equal(f.state.revealedRegions.has('B'),true);
+ assert.equal(f.state.turn.number,1);assert.equal(f.state.terrainState.actions,1);assert.equal(f.state.teleports,0);
+ f.controller.tick(performance.now()+1000);f.controller.undo();assert.equal(f.state.revealedRegions.has('B'),false);
 });
 
 test('stacked fire and named keys apply once, undo restores runtime, restart isolates nodes',()=>{

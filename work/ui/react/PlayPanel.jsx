@@ -158,6 +158,11 @@ export const PlayPanel = React.memo(function PlayPanel() {
                       </label>
                     </fieldset>
                     <fieldset className="player-height-limits">
+                      <legend>折纸落点检测</legend>
+                      <label>竖直距离阈值（世界 Y）<UiInput id="playerFoldVertical" aria-label="折纸竖直距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={1}/></label>
+                      <label>水平距离阈值（世界 XZ）<UiInput id="playerFoldHorizontal" aria-label="折纸水平距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={0.35}/></label>
+                    </fieldset>
+                    <fieldset className="player-height-limits">
                       <legend>机制状态</legend>
                       <label>
                         过热层数
@@ -204,6 +209,10 @@ export const PlayPanel = React.memo(function PlayPanel() {
                 <div className="fold-state">
                   <strong id="foldTitle">{"未选择折纸线"}</strong>
                   <span id="foldDetail">{"—"}</span>
+                  <div id="foldHighlightLegend" className="fold-highlight-legend" aria-label="折叠高亮图例" hidden>
+                    <span><i className="fold-swatch fold-swatch-source" aria-hidden="true" />被折叠区域</span>
+                    <span><i className="fold-swatch fold-swatch-target" aria-hidden="true" />目标区域 · 虚线</span>
+                  </div>
                   <UiButton
                     className="teleport-btn"
                     id="teleportBtn"
@@ -217,7 +226,7 @@ export const PlayPanel = React.memo(function PlayPanel() {
                 <UiButton id="interactBtn" type="button">与当前格实体交互</UiButton>
                 <div className="play-hints" id="playHints">
                   {
-                    "点击玩家显示八方向可移动方块；点击折纸线高亮目标，再次点击目标方块传送；也可按 F 或按钮。"
+                    "点击折痕后，在玩家同侧有效方格上向上拖拽折纸；目标变蓝时松开掉落，未对齐则回弹。点击传送与 F 快捷键仍可使用。"
                   }
                 </div>
               </>

@@ -54,12 +54,13 @@ export function defaultComponents():ComponentRegistry {
     if(config.color!==undefined&&!['white','red','yellow','blue','green','purple','black'].includes(String(config.color)))throw new Error('Invalid surface color');
   }});
   registry.register('lift',{validate:config=>{
-    const values=['minHeight','maxHeight','initialHeight','durationMs'];
+    const values=['minHeight','maxHeight','initialHeight'];
     for(const key of values){const value=config[key];if(typeof value!=='number'||!Number.isFinite(value))throw new Error('Invalid lift '+key);}
-    const min=Number(config.minHeight),max=Number(config.maxHeight),initial=Number(config.initialHeight),duration=Number(config.durationMs);
+    const min=Number(config.minHeight),max=Number(config.maxHeight),initial=Number(config.initialHeight);
     if(min<.01||max>16||min>max)throw new Error('Invalid lift height range');
     if(initial<min||initial>max)throw new Error('Invalid lift initialHeight');
-    if(duration<=0)throw new Error('Invalid lift durationMs');
+    const turns=config.turnsPerLeg??(typeof config.durationMs==='number'&&Number.isFinite(config.durationMs)&&config.durationMs>0?3:undefined);
+    if(typeof turns!=='number'||!Number.isSafeInteger(turns)||turns<1||turns>100)throw new Error('Invalid lift turnsPerLeg');
   }});
   registry.register('fold',{validate:config=>{if(config.directions!==undefined&&(!Array.isArray(config.directions)||config.directions.some(value=>!['h','v','d1','d2'].includes(String(value)))))throw new Error('Invalid fold directions');}});
   registry.register('tag',{});

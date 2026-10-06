@@ -45,13 +45,13 @@ test('static event declarations restrict effects while entry restrictions always
   const staticBlocked={...node('static',{surface:{}}),static:{walkable:false}};
   assert.equal(registry.dispatch({type:'enter',nodes:[staticBlocked],actor:initial,runtime:{}}).valid,false);
 });
-test('lift configuration validates range, initial height and duration',()=>{
+test('lift configuration validates range, initial height and turn count',()=>{
  const registry=defaultComponents();
- assert.doesNotThrow(()=>registry.validate(node('lift',{surface:{height:.2},lift:{minHeight:.1,maxHeight:1,initialHeight:.3,durationMs:1000}})));
+ assert.doesNotThrow(()=>registry.validate(node('lift',{surface:{height:.2},lift:{minHeight:.1,maxHeight:1,initialHeight:.3,turnsPerLeg:3}})));
  for(const lift of [
-  {minHeight:0,maxHeight:1,initialHeight:.3,durationMs:1000},
-  {minHeight:1,maxHeight:.1,initialHeight:.3,durationMs:1000},
-  {minHeight:.1,maxHeight:1,initialHeight:2,durationMs:1000},
-  {minHeight:.1,maxHeight:1,initialHeight:.3,durationMs:0},
+  {minHeight:0,maxHeight:1,initialHeight:.3,turnsPerLeg:3},
+  {minHeight:1,maxHeight:.1,initialHeight:.3,turnsPerLeg:3},
+  {minHeight:.1,maxHeight:1,initialHeight:2,turnsPerLeg:3},
+  {minHeight:.1,maxHeight:1,initialHeight:.3,turnsPerLeg:0},
  ]) assert.throws(()=>registry.validate(node('bad',{lift})),/Invalid lift/);
 });

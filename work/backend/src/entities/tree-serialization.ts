@@ -6,6 +6,24 @@ import {migratePaperTiles} from './paper-tiles.js';
 
 export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Record<string,JsonObject>}
 
+/** Old clocks have no meaningful turn equivalent; use the new default leg length. */
+function migrateLiftConfig(config:JsonObject):JsonObject {
+  const result=jsonObject(config);
+  if(result.turnsPerLeg===undefined&&typeof result.durationMs==='number'&&result.durationMs>0)result.turnsPerLeg=3;
+  delete result.durationMs;
+  return result;
+}
+function migrateLiftSchema(schema:JsonObject):void {
+  if(schema.durationMs!==undefined){
+    schema.turnsPerLeg??={...jsonObject(schema.durationMs),label:'单程回合数'};
+    delete schema.durationMs;
+  }
+  for(const key of ['components','lift','children']){
+    const child=schema[key];
+    if(child&&typeof child==='object'&&!Array.isArray(child))migrateLiftSchema(child);
+  }
+}
+
 /** JSON boundary shared by future browser import/export adapters and backend tooling. */
 export function importTreeMap(input:unknown):ImportedTree {
   const data=jsonObject(input);
@@ -20,6 +38,15 @@ export function importTreeMap(input:unknown):ImportedTree {
     tree.legacyMetadata=jsonObject(tree.legacyMetadata??{});
   }else throw new Error('Unsupported map version');
   tree=migratePaperTiles(tree);
+  for(const node of tree.entities){
+    if(!node.components.lift&&node.configuration?.lift)node.components.lift=jsonObject(node.configuration.lift);
+    if(node.components.lift)node.components.lift=migrateLiftConfig(node.components.lift);
+    if(node.configuration?.lift)node.configuration.lift=migrateLiftConfig(jsonObject(node.configuration.lift));
+    if(node.components.lift&&node.configuration?.propertySchema){
+      const schema=jsonObject(node.configuration.propertySchema);
+      migrateLiftSchema(schema);node.configuration.propertySchema=schema;
+    }
+  }
   const world=loadTree(tree);
   const cellTags:Record<string,JsonObject>={};
   for(const [key,value] of Object.entries(jsonObject(tree.cellTags??{}))){

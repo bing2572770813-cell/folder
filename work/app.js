@@ -9,6 +9,7 @@ import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
+import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {paperSurface} from './render/paper-surface.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
@@ -182,7 +183,11 @@ function buildPaper() {
   const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),surfaceMaps=new Map();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
-    const cell={r,c,nodeId,tile},surface=paperSurface(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId)),surfaceMaps.get(nodeId))),r,c,cellHidden);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
+    const cell={r,c,nodeId,tile},surface=paperSurface(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId)),surfaceMaps.get(nodeId))),r,c,cellHidden);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else if(tile.lift){
+      const body=createLiftBlock(THREE,tile,materials[tile.color??'white']);body.position.x=wx(c);body.position.z=wz(r);body.userData.cell=cell;body.userData.surfaceCells=[cell];
+      const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));
+      marker.rotation.x=-Math.PI/2;marker.position.y=tileThickness(tile)/2+.035;marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.liftMarker=true;body.add(marker);tileLayer.add(body);
+    }else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
     const y=tileHeight(tile),x=wx(c),z=wz(r),edgeStart=edges.length;
     const styleStart=styleEdges.get(entityEdgeColor(tile))?.length??0;
     if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);staticTokenLayer.add(token);}
@@ -217,12 +222,6 @@ function buildPaper() {
     mesh.userData.cells=cells;cells.forEach(({r,c,index,total,surfaceTop},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();terrainLayer.add(mesh);
   }
-  for(const node of documentModel.world.serialize())if(node.components.lift){
-    for(const cell of documentModel.world.transforms.worldCells(node.transformId)){if(cellHidden(cell.r,cell.c)||!map.tiles[cell.r]?.[cell.c])continue;
-      const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:false,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));
-      marker.rotation.x=-Math.PI/2;marker.position.set(wx(cell.c),tileTop(cell.r,cell.c)+.035,wz(cell.r));marker.scale.setScalar(.58);marker.renderOrder=7;marker.raycast=()=>{};marker.userData.liftMarker=true;marker.userData.cell=cell;terrainLayer.add(marker);
-    }
-  }
   for(const cell of treeCells.tagCells){if(!cell.tags.entry&&!cell.tags.exitTo)continue;const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=cell.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cell.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(wx(cell.c)-.27,Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)+.045,wz(cell.r));marker.scale.setScalar(.4);marker.userData.ownedTexture=texture;marker.userData.cell=cell;tagLayer.add(marker);}
   if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));marker.userData.exitCell={...map.exit};foldLayer.add(marker);
@@ -238,7 +237,9 @@ function buildPaper() {
 // Update existing geometry only; gameplay selection and editor controls are untouched.
 function refreshLiftSurfaces(){
  const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
- for(const mesh of tileLayer.children)if(mesh.isInstancedMesh){
+ for(const mesh of tileLayer.children){
+  if(mesh.userData.liftThickness!==undefined){const {r,c}=mesh.userData.cell;setLiftBlockHeight(mesh,tileTop(r,c));continue;}
+  if(!mesh.isInstancedMesh)continue;
   mesh.userData.cells.forEach(({r,c,tile},i)=>{const height=tileTop(r,c),thickness=tileThickness(tile);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
   mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();
  }
@@ -250,7 +251,6 @@ function refreshLiftSurfaces(){
  const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
  for(const mesh of terrainLayer.children){
   if(mesh.isInstancedMesh){mesh.userData.cells.forEach(({r,c,index,total},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),tileTop(r,c)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();}
-  else if(mesh.userData.liftMarker){const {r,c}=mesh.userData.cell;mesh.position.y=tileTop(r,c)+.035;}
  }
  for(const mesh of tagLayer.children){const {r,c}=mesh.userData.cell;mesh.position.y=tileTop(r,c)+.045;}
  for(const mesh of foldLayer.children)if(mesh.userData.exitCell){const {r,c}=mesh.userData.exitCell;mesh.position.y=tileTop(r,c)+.012;}

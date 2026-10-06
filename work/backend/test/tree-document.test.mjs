@@ -107,3 +107,21 @@ test('collectible key selector includes overlays and mixed nodes on separate pap
  let doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),['铜','银'].sort());
  base.static={...base.static,walkable:false};overlay.static={...overlay.static,walkable:false};doc=new TreeDocument(snapshot);assert.deepEqual(legalKeyNames(doc.view(),doc.world),[]);
  });
+
+test('old lift duration maps import as turn-based configuration without modifying input',()=>{
+ const input=legacy();input.tiles[1][1].lift={minHeight:.09,maxHeight:1,initialHeight:.09,durationMs:1800};
+ const before=structuredClone(input),doc=new TreeDocument(input),node=doc.serialize().entities[0];
+ assert.equal(node.components.lift.turnsPerLeg,3);assert.equal(node.components.lift.durationMs,undefined);
+ assert.equal(doc.view().tiles[1][1].lift.turnsPerLeg,3);assert.deepEqual(input,before);
+ const v2=doc.serialize();v2.entities[0].components.lift={minHeight:.09,maxHeight:1,initialHeight:.09,durationMs:1800};
+ v2.entities[0].configuration.propertySchema={durationMs:{tempEditable:false},components:{children:{lift:{children:{durationMs:{serializable:false}}}}}};
+ const migrated=new TreeDocument(v2).serialize().entities[0];
+ assert.equal(migrated.components.lift.turnsPerLeg,3);assert.equal(migrated.components.lift.durationMs,undefined);
+ assert.deepEqual(migrated.configuration.propertySchema.turnsPerLeg,{tempEditable:false,label:'单程回合数'});
+ assert.deepEqual(migrated.configuration.propertySchema.components.children.lift.children.turnsPerLeg,{serializable:false,label:'单程回合数'});
+ assert.equal(migrated.configuration.propertySchema.durationMs,undefined);
+ for(const durationMs of [0,-1,'1800']){
+  const invalid=structuredClone(v2);invalid.entities[0].components.lift.durationMs=durationMs;
+  assert.throws(()=>new TreeDocument(invalid),/Invalid lift|单程回合数/);
+ }
+});

@@ -14,7 +14,7 @@
       "minHeight": 0.09,
       "maxHeight": 0.75,
       "initialHeight": 0.09,
-      "durationMs": 1800
+      "turnsPerLeg": 3
     }
   },
   "components": {
@@ -22,19 +22,19 @@
       "minHeight": 0.09,
       "maxHeight": 0.75,
       "initialHeight": 0.09,
-      "durationMs": 1800
+      "turnsPerLeg": 3
     }
   },
   "propertySchema": {
     "minHeight": {"label": "最低高度", "tempEditable": true},
     "maxHeight": {"label": "最高高度", "tempEditable": true},
     "initialHeight": {"label": "初始高度", "tempEditable": true},
-    "durationMs": {"label": "升降时长（毫秒）", "tempEditable": true},
+    "turnsPerLeg": {"label": "单程回合数", "tempEditable": true},
     "components": {"children": {"lift": {"children": {
       "minHeight": {"label": "最低高度", "tempEditable": true},
       "maxHeight": {"label": "最高高度", "tempEditable": true},
       "initialHeight": {"label": "初始高度", "tempEditable": true},
-      "durationMs": {"label": "升降时长（毫秒）", "tempEditable": true}
+      "turnsPerLeg": {"label": "单程回合数", "tempEditable": true}
     }}}}
   }
 }

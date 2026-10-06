@@ -41,15 +41,22 @@ test('stacked fire and named keys apply once, undo restores runtime, restart iso
  f.move(1,1);f.controller.restart();assert.deepEqual(f.state.terrainState.collectedKeys,[]);assert.deepEqual(f.world.snapshotRuntime(),{});assert.equal(f.state.terrainState.actions,0);
 });
 
-test('lift runtime follows the player without counting movement or terrain actions',()=>{
- const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,durationMs:1000}}]]);
- assert.equal(f.world.runtime('lift','lift').height,.1);
- f.controller.tick(0);f.controller.tick(500);assert.ok(f.map.tiles[1][1].height>.1);
- const before=f.state.terrainState.actions;f.move(1,1);f.controller.updateLifts(501);
- assert.equal(f.state.terrainState.actions,before+1);
- const occupied=f.world.runtime('lift','lift');assert.equal(occupied.occupied,true);assert.equal(occupied.direction,-1);
- f.world.setRuntime('lift','lift',{height:.5,direction:1,occupied:true,lastTime:0});f.controller.updateLifts(1);assert.ok(f.map.tiles[1][1].height<.5);
- f.controller.restart();assert.equal(f.map.tiles[1][1].height,.1);assert.equal(f.world.runtime('lift','lift').height,.1);
+test('lift advances once per successful move, never from render frames, and undo restores height',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,turnsPerLeg:3}}]]);
+ for(let i=0;i<200;i++)f.controller.tick(i*100);
+ assert.equal(f.map.tiles[1][1].height,.1);
+ f.move(0,0);assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
+ f.move(0,1);assert.ok(Math.abs(f.map.tiles[1][1].height-.7)<1e-9);
+ f.controller.undo();assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
+ f.controller.tick(100000);assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
+ f.controller.selectPlayer();f.controller.movePlayer(99,99);assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
+ f.controller.restart();assert.equal(f.map.tiles[1][1].height,.1);
+});
+test('arrival on a lift descends once without extra terrain actions',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.7,turnsPerLeg:3}}]]);
+ f.move(1,1);assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
+ assert.equal(f.state.steps,1);assert.equal(f.state.terrainState.actions,1);
+ f.controller.tick(100000);assert.ok(Math.abs(f.map.tiles[1][1].height-.4)<1e-9);
 });
 
 test('stacked collision rejects movement atomically before leave, hazards or history',()=>{
@@ -151,13 +158,10 @@ test('region arrival commits destination effects once and counts only the origin
 });
 
 
-test('lift frame updates keep selection and never rebuild the scene or repeat entry effects',()=>{
- const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,durationMs:1000}}]]);
- const rebuilds=f.rebuilds;let refreshes=0;f.env.refreshLiftSurfaces=()=>refreshes++;
- f.controller.selectPlayer();const before=f.controller.snapshot();
- const base=f.world.runtime('lift','lift').lastTime;
- for(let i=1;i<=100;i++)f.controller.tick(base+i*10);
- assert.ok(refreshes>0);assert.equal(f.rebuilds,rebuilds);assert.ok(f.state.legalMoves.length>0);
- assert.equal(f.state.steps,before.steps);assert.equal(f.state.terrainState.actions,before.terrainState.actions);
- assert.equal(f.map.tiles[1][1].height,1);
+test('idle render frames keep player selection without rebuilding the scene',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,turnsPerLeg:3}}]]);
+ f.controller.selectPlayer();const rebuilds=f.rebuilds,before=f.controller.snapshot();
+ for(let i=0;i<100;i++)f.controller.tick(i*100);
+ assert.equal(f.rebuilds,rebuilds);assert.ok(f.state.legalMoves.length>0);
+ assert.deepEqual(f.controller.snapshot(),before);
 });

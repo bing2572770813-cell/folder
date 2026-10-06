@@ -17,3 +17,5 @@ debug-state.mjs 将非序列化字段修改保存在独立覆盖表，不进入�
 旧 Inspector 与树节点 JSON 表单共用 primary node.configuration 的有效权限；原生 components 与兼容属性的限制取交集。批量属性的 readable/tempEditable 对每个目标均须满足，事务在全部目标校验通过后提交，拒绝不得增加历史。
 
 单击选区按 canonical world.at 判断实体占用，独立 key 等无 surface 节点仍可选择和复制。真正虚空与独立虚空折线保持原有选区规则。
+
+`node-edit-permissions.mjs` 将旧 Inspector 的 tags/folds 权限与所有实际贡献节点取交集。属性工具提交前检查 canonical 候选中每个已有节点的 components、tags 和自定义 configuration，包含跨格唯一标签清除、区域改名出口重写及钥匙引用更新；全部验证通过后才记录历史。普通放置、删除、粘贴的结构操作仍走各自校验。

@@ -16,6 +16,8 @@ const names = {
   height: "高度",
   thickness: "厚度",
   gradualRate: "过渡比例",
+  connected: "连接相邻纸面",
+  surfaceConnected: "连接相邻纸面",
   blocked: "阻挡",
   prefabId: "实体 ID",
   instance: "实例身份",

@@ -21,7 +21,7 @@ export function assertNodePropertyChanges(before,after,schemaFor){
   for(const field of ['components','tags'])if(JSON.stringify(node[field])!==JSON.stringify(next[field]))updateProperty(node,schema,[field],next[field]);
   // The legacy adapter materializes these component/identity mirrors on first edit.
   // Components and tags above validate their actual owners, including removals.
-  const mirrors=new Set(['height','thickness','gradualRate','color','edgeColor','blocked','folds','fold','tags','terrain','terrainConfig','lift','minHeight','maxHeight','initialHeight','turnsPerLeg','keyName','prefabId','instance','propertySchema','kind']);
+  const mirrors=new Set(['height','thickness','gradualRate','surfaceConnected','color','edgeColor','blocked','folds','fold','tags','terrain','terrainConfig','lift','minHeight','maxHeight','initialHeight','turnsPerLeg','keyName','prefabId','instance','propertySchema','kind']);
   const configuration=Object.fromEntries(Object.entries(node.configuration??{}).filter(([key])=>!mirrors.has(key))),updated=Object.fromEntries(Object.entries(next.configuration??{}).filter(([key])=>!mirrors.has(key)));
   if(JSON.stringify(configuration)!==JSON.stringify(updated))updateProperty({configuration},{configuration:{children:schema}},['configuration'],updated);
  }

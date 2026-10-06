@@ -12,6 +12,7 @@ function surfaceTile(document,node,r,c,runtime=false){
  const terrain=terrainTypes.find(type=>Object.hasOwn(node.components,type));
  if(terrain){tile.terrain=terrain;tile.terrainConfig=structuredClone(node.components[terrain]);if(terrain==='key')tile.keyName=node.components.key.name??'钥匙';}
  tile.folds=structuredClone(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
+ tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
  return tile;
 }
 

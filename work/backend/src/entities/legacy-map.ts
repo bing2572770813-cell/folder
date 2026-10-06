@@ -5,7 +5,7 @@ import {jsonObject,type EntityNode,type JsonObject} from './entity-model.js';
 
 export interface TreeMap {version:2;width:number;height:number;entities:EntityNode[];transforms:TransformNode[];cellTags:Record<string,JsonObject>;legacyMetadata:JsonObject}
 interface LegacyTile {
-  prefabId?:string;instance?:{id:string};height?:number;thickness?:number;gradualRate?:number;color?:string;edgeColor?:string;
+  prefabId?:string;instance?:{id:string};height?:number;thickness?:number;gradualRate?:number;color?:string;edgeColor?:string;surfaceConnected?:boolean;
   blocked?:boolean;terrain?:string;terrainConfig?:JsonObject;keyName?:string;regionTag?:string;tags?:JsonObject;folds?:string[];fold?:string|null;lift?:JsonObject;
 }
 interface LegacyMap {width:number;height:number;tiles:(LegacyTile|null)[][];foldCells?:{r:number;c:number;type:string}[];[key:string]:unknown}
@@ -22,6 +22,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:structuredClone(footprint)});
     const surface:JsonObject={height:tile.height??.09,thickness:tile.thickness??tile.height??.09,gradualRate:tile.gradualRate??2/3};
     if(tile.color!==undefined)surface.color=tile.color;if(tile.edgeColor!==undefined)surface.edgeColor=tile.edgeColor;
+    if(tile.surfaceConnected!==undefined)surface.connected=tile.surfaceConnected;
     const components:Record<string,JsonObject>={surface,collision:{blocked:tile.blocked??tile.color==='black'}};
     if(tile.lift)components.lift=jsonObject(tile.lift);
     if(tile.terrain==='fire')components.fire={...tile.terrainConfig,damage:tile.terrainConfig?.damage??1};

@@ -23,6 +23,7 @@ function tileOf(node){
   delete tile.terrain;delete tile.terrainConfig;delete tile.keyName;
   for(const id of terrainIds)if(node.components[id]){tile.terrain=id;tile.terrainConfig=copy(node.components[id]);if(id==='key')tile.keyName=node.components[id].name??'钥匙';break;}
   tile.folds=copy(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
+  tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
   return normalizeTile(tile);
 }
 function configure(node,tile,folds,previous){
@@ -30,6 +31,7 @@ function configure(node,tile,folds,previous){
   node.configuration=configuration;node.tags=copy(tile.tags??{});
   // Preserve absent native defaults when only unrelated legacy fields changed.
   for(const field of ['height','thickness','gradualRate','color','edgeColor'])if(!equal(previous[field],tile[field])){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
+  if(!equal(previous.surfaceConnected,tile.surfaceConnected))node.components.surface.connected=tile.surfaceConnected;
   if(!equal(previous.lift,tile.lift)){if(tile.lift)node.components.lift=copy(tile.lift);else delete node.components.lift;}
   if(!equal(previous.blocked,tile.blocked))node.components.collision={...node.components.collision,blocked:tile.blocked};
   const represented=terrainIds.find(id=>node.components[id]);if(represented&&represented!==tile.terrain)delete node.components[represented];

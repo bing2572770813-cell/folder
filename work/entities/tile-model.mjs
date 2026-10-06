@@ -41,6 +41,7 @@ export function normalizeTile(tile) {
   if(typeof height!=='number'||!Number.isFinite(height)||height<.01||height>16)throw new Error('方块高度须为 0.01–16');
   if(!Array.isArray(folds)||folds.some(f=>!FOLD_TYPES.includes(f))||(tile.fold!=null&&!FOLD_TYPES.includes(tile.fold)))throw new Error('折纸方向无效');
   if(tile.blocked!==undefined&&typeof tile.blocked!=='boolean')throw new Error('通行属性无效');
+  if(tile.surfaceConnected!==undefined&&typeof tile.surfaceConnected!=='boolean')throw new Error('纸面连接属性须为布尔值');
   if(tile.prefabId!=null&&(typeof tile.prefabId!=='string'||!tile.prefabId||tile.prefabId.length>80))throw new Error('实体类型无效');
   const terrain=tile.terrain??null;
   if(terrain!==null&&!TERRAIN_TYPES.includes(terrain))throw new Error('方块机制类型无效');
@@ -63,7 +64,7 @@ export function normalizeTile(tile) {
   const propertyExtras={...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
   const lift=normalizeLift(tile.lift);
-  return {...propertyExtras,...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(lift?{lift}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...propertyExtras,...(tile.surfaceConnected!==undefined?{surfaceConnected:tile.surfaceConnected}:{}),...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(lift?{lift}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||(!data.tile&&!data.components))throw new Error('实体需要 version:1、id、name 和 tile 或 components');

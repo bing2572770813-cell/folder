@@ -14,6 +14,8 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 升降方块放置工具中的高度表示 initialHeight，叠层放置不能被 prefab 的重复 lift 默认值覆盖。升降实体检视不提供无效的 surface.height/gradualRate 编辑入口；视口在编辑时报告初始高度，游玩时报告 runtime 当前高度和单程回合数。
 
+纸面连接由 surface.connected 能力控制，兼容视图使用 surfaceConnected，权限双向同步。缺省时可通行的普通纸面连接相邻纸面，阻挡、地形及静态 token 默认保持独立；升降平台始终独立。自定义 prefab 名称不改变表面连接能力。
+
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。
 
 节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。

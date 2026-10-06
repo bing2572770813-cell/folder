@@ -1,5 +1,5 @@
 import {tileHeight,tileThickness,tileGradualRate} from '../entities/tile-model.mjs';import {entityType} from '../entities/visibility-model.mjs';
-export const isPaper=tile=>!!tile&&!tile.lift&&entityType(tile)==='paper_ai';
+export const isPaper=tile=>!!tile&&!tile.lift&&(tile.surfaceConnected??entityType(tile)==='paper_ai');
 // Shared top boundaries join flat centers; thickness offsets the underside along surface normals.
 export function paperSurface(map,r,c,hidden=()=>false){
  const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;const height=tileHeight(tile);

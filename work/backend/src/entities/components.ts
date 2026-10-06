@@ -54,6 +54,7 @@ export class ComponentRegistry {
 export function defaultComponents():ComponentRegistry {
   const registry=new ComponentRegistry();
   registry.register('surface',{validate:config=>{
+    if(config.connected!==undefined&&typeof config.connected!=='boolean')throw new Error('Invalid surface connected');
     for(const [key,min,max] of [['height',.01,16],['thickness',.001,16],['gradualRate',0,100]] as const){const value=config[key];if(value!==undefined&&(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max))throw new Error('Invalid surface '+key);}
     if(config.color!==undefined&&!['white','red','yellow','blue','green','purple','black'].includes(String(config.color)))throw new Error('Invalid surface color');
   }});

@@ -36,12 +36,11 @@ test('walk and teleport carry exclusive causes through leave and enter',()=>{
  f.registry.register('observer',{events:Object.fromEntries(['enter','leave'].map(type=>[type,context=>{events.push([type,context.trigger]);return {};}]))});
  for(const [r,c] of [[1,0],[1,1],[2,3]])f.add(`observer-${r}-${c}`,r,c,{observer:{}});
  f.controller.selectPlayer();events.length=0;f.controller.movePlayer(1,1);
- // Validation invokes pure handlers too; committed arrival is the final enter.
- assert.deepEqual(events.slice(-2),[['leave','walk'],['enter','walk']]);
+ assert.deepEqual(events,[['leave','walk'],['enter','walk']]);
  assert.equal(f.state.turn.phase,'present');assert.equal(f.state.turn.number,1);
  f.controller.tick(performance.now()+1000);assert.equal(f.state.turn.phase,'complete');
  f.controller.setFreeTeleport(true);events.length=0;f.controller.testTeleport(2,3);
- assert.deepEqual(events.slice(-2),[['leave','teleport'],['enter','teleport']]);
+ assert.deepEqual(events,[['leave','teleport'],['enter','teleport']]);
  assert.equal(f.state.turn.number,2);assert.equal(f.state.terrainState.actions,2);
  f.controller.tick(performance.now()+1000);f.controller.undo();
  assert.equal(f.state.turn.number,1);assert.equal(f.state.turn.trigger,'walk');

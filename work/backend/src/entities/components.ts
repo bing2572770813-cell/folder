@@ -26,6 +26,13 @@ export class ComponentRegistry {
     }
   }
   dispatch(input:EventContext):EventResult {
+    return this.evaluate(input,true);
+  }
+  /** Validate an arrival without evaluating any event effects. */
+  checkEntry(input:Omit<EventContext,'type'>):EventResult {
+    return this.evaluate({...input,type:'enter'},false);
+  }
+  private evaluate(input:EventContext,applyEffects:boolean):EventResult {
     if(!['enter','leave','interact'].includes(input.type))throw new Error('Unknown entity event');
     if(input.trigger!==undefined&&!['walk','teleport'].includes(input.trigger))throw new Error('Unknown arrival trigger');
     const nodes=structuredClone(input.nodes).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
@@ -38,6 +45,7 @@ export class ComponentRegistry {
       if(reason)return {valid:false,reason,actor:jsonObject(input.actor),runtime:structuredClone(input.runtime),messages:[]};
       }
     }
+    if(!applyEffects)return {valid:true,reason:'',actor:context.actor,runtime:context.runtime,messages:[]};
     const messages:string[]=[];
     const effects=nodes.flatMap(node=>Object.entries(node.components).map(([id,config])=>({node,id,config})));
     effects.sort((a,b)=>(this.handlers.get(a.id)!.effectOrder??0)-(this.handlers.get(b.id)!.effectOrder??0)||(a.id<b.id?-1:a.id>b.id?1:0)||(a.node.id<b.node.id?-1:a.node.id>b.node.id?1:0));

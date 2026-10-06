@@ -79,11 +79,14 @@ function structuralEntryCheck(r,c){
 function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRuntime(),nodes=world().at(position.r,position.c),trigger){
  return env.componentRegistry.dispatch({type,trigger,nodes,actor,runtime});
 }
+function treeEntryCheck(position,actor=P.terrainState,trigger){
+ return env.componentRegistry.checkEntry({trigger,nodes:world().at(position.r,position.c),actor,runtime:world().snapshotRuntime()});
+}
 function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)return canEnterTerrain(env.getMap(),{r,c},P.terrainState);
  if(!inside(r,c)||(!ignoreHidden&&env.isHidden(r,c)))return {valid:false,reason:'目标为空格或未揭示区域'};
  const nodes=tree.at(r,c);if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false))return {valid:false,reason:'目标是阻挡方块'};
- return treeEvent('enter',{r,c},P.terrainState,tree.snapshotRuntime(),nodes,trigger);
+ return treeEntryCheck({r,c},P.terrainState,trigger);
 }
 function canMoveTo(r,c){const map=env.getMap();const delta=(map.tiles[r]?.[c]?.height??.09)-(map.tiles[P.player.r]?.[P.player.c]?.height??.09);return (world()?true:walkable(r,c))&&delta<=P.moveHeight.maxUp+1e-9&&-delta<=P.moveHeight.maxDown+1e-9&&entryCheck(r,c,false,Trigger.Walk).valid;}
 function commitTreeEvent(type,position,nodes,trigger){const tree=world(),result=treeEvent(type,position,P.terrainState,tree.snapshotRuntime(),nodes,trigger);if(result.valid){P.terrainState={...result.actor,message:result.messages.join('；')};tree.restoreRuntime(result.runtime);}return result;}
@@ -98,7 +101,7 @@ function setPlayerProperties({r,c,dir,maxUp,maxDown,overheat=P.terrainState.over
  const keys=new Set(env.legalKeyNames?.(env.getMap(),world())??env.getMap().tiles.flat().filter(t=>t?.terrain==='key'&&!blocked(t)).map(t=>t.keyName?.trim()||'钥匙'));
  if(!Array.isArray(collectedKeys)||collectedKeys.some(k=>typeof k!=='string'||!keys.has(k)))throw new Error('已收集钥匙须为地图中合法钥匙名的 JSON 数组');
  const terrainState={...P.terrainState,overheat,frozen,actions,collectedKeys:[...new Set(collectedKeys)],hasKey:collectedKeys.length>0,eruptionOpen:actions>0&&actions%3===2};
- const tile=env.getMap().tiles[r]?.[c];if(!tile||(world()?!treeEvent('enter',{r,c},terrainState).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
+ const tile=env.getMap().tiles[r]?.[c];if(!tile||(world()?!treeEntryCheck({r,c},terrainState).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
  record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.terrainState=terrainState;P.revealedRegions.add(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
 }
 function validateForPlay() {const map=env.getMap();

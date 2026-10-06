@@ -42,3 +42,13 @@ canonical.context.inspectedPropertySchema=(r,c,tile)=>canonical.context.nodeSche
 assert.throws(()=>canonical.context.applyInspectedProperty(['height'],.8),/不可编辑/);
 assert.deepEqual(canonical.context.map,canonical.baseline);assert.equal(canonical.records(),0);
 console.log('PASS: canonical native restrictions reject legacy batch edits atomically.');
+
+// Use the actual Inspector adapter as well as the actual batch transaction.
+const inspectorContext={documentModel:canonical.context.documentModel,nodeSchema:canonical.context.nodeSchema,entityPropertySchema,tagCatalog:[]};
+runInNewContext(source.slice(source.indexOf('function inspectedPropertySchema('),source.indexOf('function inspectSelection(){')),inspectorContext);
+const effective=inspectorContext.inspectedPropertySchema(0,1,{height:.2});
+assert.equal(batchProperties([{values:{height:.2},schema:effective}]).schema.height.readable,false);
+assert.equal(batchProperties([{values:{height:.2},schema:effective}]).schema.height.tempEditable,false);
+const legacyLocked={configuration:{propertySchema:{height:{tempEditable:false},components:{children:{surface:{children:{height:{tempEditable:true}}}}}}}};
+assert.equal(nodePermissions(legacyLocked,entityPropertySchema(legacyLocked.configuration,[])).components.children.surface.children.height.tempEditable,false);
+console.log('PASS: Inspector display and editing use intersected native/legacy permissions in both directions.');

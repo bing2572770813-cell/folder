@@ -1,6 +1,6 @@
 import {validateMap as normalizeMap} from './core/map-model.mjs';
 import {paperSurface} from './render/paper-surface.mjs';
-import {squareViewSpan,followTarget} from './render/follow-camera.mjs';
+import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -116,6 +116,8 @@ controls.touches={ONE:null,TWO:THREE.TOUCH.DOLLY_PAN};
 let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
 let cameraMode='edit',editorCameraSnapshot=null;
 const cameraFollowTarget=new THREE.Vector3();
+const lastFollowPosition=new THREE.Vector3();let lastFollowSteps=0;
+function correctFollowCamera(){const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;playerGroup.getWorldPosition(lastFollowPosition);lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
 const paper=new THREE.Group(); scene.add(paper);
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
 const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(-9,18,8); sunlight.castShadow=true;
@@ -221,7 +223,9 @@ for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['pla
 
 function fitCamera(resetZoom=true) {
   if(P.mode==='play'){
-    playerGroup.getWorldPosition(cameraFollowTarget);
+    playerGroup.getWorldPosition(lastFollowPosition);lastFollowSteps=P.steps;
+    if(resetZoom)camera.zoom=1;
+    cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));
     cameraOffset.set(view==='top'?0:12,view==='top'?24:17.04,view==='top'?.001:15);
     followTarget(camera,controls,cameraFollowTarget,cameraOffset);
     const rect=viewport.getBoundingClientRect();baseSpan=squareViewSpan(camera,cameraFollowTarget,9,rect.width/Math.max(1,rect.height));
@@ -239,7 +243,7 @@ function updateCameraMode(){
   cameraMode=P.mode;
   if(P.mode==='play'){
     editorCameraSnapshot={position:camera.position.clone(),target:controls.target.clone(),zoom:camera.zoom,span:baseSpan,view};
-    controls.enablePan=false;const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;fitCamera();
+    controls.enablePan=true;const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;fitCamera();
   }else{
     controls.enablePan=true;
     if(editorCameraSnapshot){const saved=editorCameraSnapshot;changeView(saved.view);camera.position.copy(saved.position);controls.target.copy(saved.target);camera.zoom=saved.zoom;baseSpan=saved.span;resize();controls.update();editorCameraSnapshot=null;}else fitCamera();
@@ -486,7 +490,7 @@ function screenPoints(){
 }
 function tick(now){requestAnimationFrame(tick);controls.update();updateFoldAxes();
   controller.tick(now);
-  if(P.mode==='play'){playerGroup.getWorldPosition(cameraFollowTarget);followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
+  if(P.mode==='play'&&!manualPan){playerGroup.getWorldPosition(cameraFollowTarget);if(P.moving||cameraFollowTarget.distanceToSquared(lastFollowPosition)>1e-12||P.steps!==lastFollowSteps)correctFollowCamera();}
   $('zoomLabel').textContent=Math.round(camera.zoom*100)+'%';renderer.render(scene,camera);renderedFrames++;if(renderedFrames%10===0){screenPoints();}
 }
 resetRegions();setupPrefabs();setTool(tool);buildPaper();fitCamera();if(P.mode==='play')checkRunEnd();requestAnimationFrame(tick);

@@ -15,3 +15,8 @@ export function squareViewSpan(camera,center,size=9,aspect=1){
 export function followTarget(camera,controls,target,offset){
   controls.target.copy(target);camera.position.copy(target).add(offset);camera.lookAt(target);camera.updateMatrixWorld(true);
 }
+
+export function boundedFollowTarget(position,width,height,size=9){
+  const xLimit=Math.max(0,(width-size)/2),zLimit=Math.max(0,(height-size)/2);
+  return new Vector3(Math.max(-xLimit,Math.min(xLimit,position.x))||0,position.y,Math.max(-zLimit,Math.min(zLimit,position.z))||0);
+}

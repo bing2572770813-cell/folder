@@ -327,3 +327,9 @@ npm --prefix work start
 
 实体事件的 `enter`、`leave`、`interact` 表示事件阶段。`trigger` 是独立的互斥到达/离开原因：`walk`（行走）或 `teleport`（传送）。处理器的进入限制与效果均收到同一个原因；初始化和原地交互不伪造行走或传送原因。禁止传入多个原因或未知值。
 
+## 回合管理器
+
+`work/player.cjs` 导出 `createTurnManager`、`Trigger`、`TurnPhase`。管理器通过同步生命周期钩子驱动 `validate → snapshot → leave → action → enter → settle → outcome → present → complete`。`onPhase` 收到独立的阶段状态副本；逻辑结算与表现完成分开。
+
+校验失败不记录历史、不消耗回合。逻辑处理中及等待表现完成时拒绝新行动；结算异常恢复先前快照。`complete(id)` 只接受当前表现标识且只能成功一次；重置不复用标识，避免旧动画回调结束新回合。`reset(turn)` 用于重开与恢复快照。
+

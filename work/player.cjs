@@ -1,4 +1,43 @@
 // Player state and all gameplay interaction live here; rendering is supplied by the scene adapter.
+const Trigger=Object.freeze({Walk:'walk',Teleport:'teleport'});
+const TurnPhase=Object.freeze({Idle:'idle',Validate:'validate',Snapshot:'snapshot',Leave:'leave',Action:'action',Enter:'enter',Settle:'settle',Outcome:'outcome',Present:'present',Complete:'complete'});
+function initialTurn(){return {number:0,phase:TurnPhase.Idle,trigger:null,source:null,outcome:null};}
+
+/** Synchronous simulation followed by explicitly acknowledged presentation. */
+function createTurnManager(hooks){
+ const state=hooks.state;state.turn??=initialTurn();
+ let executing=false,serial=0,pending=null;
+ function phase(value){state.turn={...state.turn,phase:value};hooks.onPhase?.(structuredClone(state.turn));}
+ function execute(input){
+  if(!input||!Object.values(Trigger).includes(input.trigger))throw new Error('Unknown turn trigger');
+  if(executing||pending!==null||!hooks.canExecute())return false;
+  const previous=structuredClone(state.turn),context={action:structuredClone(input),id:++serial};
+  let captured;
+  executing=true;
+  try{
+   state.turn={number:previous.number+1,phase:TurnPhase.Validate,trigger:input.trigger,source:input.source??null,outcome:null};
+   phase(TurnPhase.Validate);
+   if(!hooks.validate(context.action)){state.turn=previous;return false;}
+   // Capture the completed prior turn, never an in-progress lifecycle phase.
+   state.turn=previous;captured=hooks.snapshot();hooks.record();
+   state.turn={number:previous.number+1,phase:TurnPhase.Snapshot,trigger:input.trigger,source:input.source??null,outcome:null};
+   phase(TurnPhase.Snapshot);
+   for(const [value,hook] of [[TurnPhase.Leave,'leave'],[TurnPhase.Action,'act'],[TurnPhase.Enter,'enter'],[TurnPhase.Settle,'settle']]){
+    phase(value);hooks[hook](context);
+   }
+   phase(TurnPhase.Outcome);state.turn.outcome=hooks.outcome(context)??null;
+   pending=context.id;phase(TurnPhase.Present);hooks.present(context);
+   return true;
+  }catch(error){
+   pending=null;state.turn=previous;
+   if(captured!==undefined)hooks.restore(captured);
+   throw error;
+  }finally{executing=false;}
+ }
+ function complete(id){if(executing||pending===null||id!==pending)return false;pending=null;phase(TurnPhase.Complete);return true;}
+ function reset(turn=initialTurn()){pending=null;state.turn=structuredClone(turn);}
+ return Object.freeze({execute,complete,reset});
+}
 function createPlayerState(spawn,mode='edit'){return {player:{...spawn},moveHeight:{maxUp:1,maxDown:1},mode,steps:0,teleports:0,moving:false,levelWon:false,stepLimitHit:false,legalMoves:[],legalFoldMoves:[],chosenFold:null,foldHints:true,freeTeleport:false,playHistory:[],animation:null,terrainState:null,revealedRegions:new Set()};}
 function liftInitial(config){return {height:Number(config.initialHeight),direction:Number(config.maxHeight)>Number(config.minHeight)?1:0,occupied:false};}
 function advanceLift(state,config,occupied=state.occupied){
@@ -146,4 +185,4 @@ function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150
 function undo(){if(P.moving||P.mode!=='play')return;const previous=P.playHistory.pop();if(previous)restore(previous);}
 return {setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
 }
-module.exports={createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift};
+module.exports={Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift};

@@ -8,14 +8,7 @@ const catalog=await require('./prefab-catalog.cjs').readCatalog();
 if(catalog.errors.length)console.warn('Prefab warnings:',catalog.errors);
 const result = await esbuild.build({
   stdin: { contents: fs.readFileSync(path.join(root, 'app.js'), 'utf8'), loader: 'js', sourcefile: path.join(root, 'app.js'), resolveDir: root },
-  plugins: [{ name: 'workspace-files', setup(build) {
-    build.onResolve({filter:/.*/}, args => {
-      const packages = { three:'three/build/three.module.js', lucide:'lucide/dist/esm/lucide.js' };
-      const file = packages[args.path] ? path.join(root,'node_modules',packages[args.path]) : args.path.startsWith('three/') ? path.join(root,'node_modules',args.path) : path.resolve(args.importer ? path.dirname(args.importer) : root,args.path);
-      return {path:file,namespace:'workspace'};
-    });
-    build.onLoad({filter:/.*/,namespace:'workspace'}, args => ({contents:fs.readFileSync(args.path,'utf8'),loader:args.path.endsWith('.json')?'json':'js'}));
-  }}],
+  plugins: [require('./build-support.cjs').workspaceFiles(root)],
   bundle: true,
   format: 'iife',
   minify: true,

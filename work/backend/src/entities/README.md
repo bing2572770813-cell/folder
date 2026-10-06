@@ -25,3 +25,5 @@
 `importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 基础配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。当前 version:2 是内部迁移合同，未切换编辑器导入/导出 UI；生产输出的 serializable 权限过滤尚未接入。
 
 区域归属已由用户明确为方格属性。`TreeMap.cellTags["r,c"].regionTag` 保存该格区域；同格实体共享区域，移动 Transform 不移动方格区域。旧 tile 转换时从实体配置移出 regionTag，保存在 cellTags，实体 tags 只保留实体附着标记。
+
+浏览器使用 `work/entities/tree-runtime.mjs` 导出同一份 TS 纯模型。构建插件支持 TS 与 NodeNext 的 .js→.ts 源码解析，并拒绝 Node 内置模块进入浏览器包。后端 tests/browser-models.test.mjs 使用实际构建插件打包并执行纯模型。app.js 尚未切换地图状态，打包入口已就绪不代表 UI 已接入。

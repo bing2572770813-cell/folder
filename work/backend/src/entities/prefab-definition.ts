@@ -17,6 +17,19 @@ function merge(base:JsonObject,next:JsonObject):JsonObject {
   return result;
 }
 
+/** Resolves disk prefab records using the same merge contract, preserving legacy tile fields. */
+export function resolvePrefabRecord(id:string,definitions:Map<string,JsonObject>,visited=new Set<string>()):JsonObject {
+  if(visited.has(id))throw new Error('Prefab inheritance cycle');visited.add(id);
+  const raw=definitions.get(id);if(!raw)throw new Error('Unknown prefab: '+id);
+  if(['transformId','parentId','state'].some(key=>Object.hasOwn(raw,key)))throw new Error('Prefab cannot override instance identity');
+  const tile=raw.tile;
+  if(tile&&typeof tile==='object'&&!Array.isArray(tile)&&Object.hasOwn(tile,'instance'))throw new Error('Prefab cannot define instance identity');
+  if(raw.extends!==undefined&&(typeof raw.extends!=='string'||!raw.extends))throw new Error('Invalid prefab parent');
+  const base=raw.extends?resolvePrefabRecord(raw.extends as string,definitions,visited):{};
+  const resolved=merge(base,raw);delete resolved.extends;resolved.id=id;
+  return resolved;
+}
+
 /** Resolves JSON inheritance; instance identity and runtime state never come from defaults. */
 export class PrefabRegistry {
   private definitions=new Map<string,TreePrefab>();

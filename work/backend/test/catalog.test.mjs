@@ -47,3 +47,17 @@ test('writes tags only with generated ids', async () => {
     behavior: {scriptId: 'tag-region', parameters: {}, state: {}},
   }), /_ai/);
 });
+test('disk catalog resolves inheritance before normalization and isolates broken chains',async()=>{
+  const root=await fixture();
+  try{
+    await fs.writeFile(path.join(root,'entity','a-child.json'),JSON.stringify({version:1,id:'fire_ai',name:'火焰',extends:'paper_ai',tile:{color:'red'},components:{fire:{damage:1}},static:{events:['enter']}}));
+    await fs.writeFile(path.join(root,'entity','missing.json'),JSON.stringify({version:1,id:'missing_ai',name:'坏模板',extends:'absent_ai'}));
+    const catalog=await readCatalog(root);const child=catalog.prefabs.find(p=>p.id==='fire_ai');
+    assert.equal(child.tile.height,.09);assert.equal(child.tile.color,'red');
+    assert.deepEqual(child.components,{fire:{damage:1}});assert.deepEqual(child.static.events,['enter']);
+    assert.equal(catalog.prefabs.length,2);assert.ok(catalog.errors.some(e=>e.file==='entity/missing.json'));
+    await savePrefab(root,{version:1,id:'child_ai',name:'继承写入',extends:'paper_ai',tile:{height:.5},components:{ice:{}}});
+    assert.equal(JSON.parse(await fs.readFile(path.join(root,'entity','child_ai.json'),'utf8')).extends,'paper_ai');
+    const reread=await readCatalog(root);assert.equal(reread.prefabs.find(p=>p.id==='child_ai').tile.color,'white');
+  }finally{await fs.rm(root,{recursive:true,force:true});}
+});

@@ -11,7 +11,7 @@
 | FR-05 动态引用 | transformId / parentId 及 retain/release | 全部生产调用方使用 manager |
 | FR-06 重挂载 | 保持局部或世界位置及原子失败测试 | 编辑器命令和历史接入 |
 | FR-07 组件组合 | ComponentRegistry 基础处理器及同格分发测试 | 完整字段校验、邻近机制、运行时接入 |
-| FR-08 继承 | PrefabRegistry 递归合并、数组替换、循环检测 | 磁盘加载、编辑权限覆盖、组合子模板 |
+| FR-08 继承 | PrefabRegistry 递归合并、数组替换、循环检测；磁盘/API/构建目录继承解析及写入测试 | 编辑权限覆盖、组合子模板 |
 | FR-09 静态标记 | 静态 JSON 深冻结 | 能力和事件声明接入交互、渲染 |
 | FR-10 状态隔离 | EntityWorld 隔离状态测试 | 玩家历史、撤销、重启、调试覆盖 |
 | FR-11 交互入口 | enter/leave/interact 分发及原子拒绝测试 | player.cjs 提交与实际游玩入口 |

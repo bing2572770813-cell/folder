@@ -58,7 +58,13 @@ export function normalizePrefab(data) {
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
   const propertySchema=normalizePropertySchema(data.propertySchema??data.tile.propertySchema??{});
-  return {version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})};
+  const extras={};
+  for(const key of ['components','static'])if(data[key]!==undefined){
+    const value=copyJson(data[key]);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error(key+' 须为 JSON 对象');
+    if(key==='components')for(const config of Object.values(value))if(!config||typeof config!=='object'||Array.isArray(config))throw new Error('组件配置须为 JSON 对象');
+    extras[key]=value;
+  }
+  return {...extras,version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})};
 }
 export function columnLabel(c) {
   let label='';for(let n=c+1;n>0;n=Math.floor((n-1)/26))label=String.fromCharCode(65+(n-1)%26)+label;return label;

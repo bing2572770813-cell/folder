@@ -33,3 +33,15 @@ assert.throws(()=>pasteRegion(base,sparse,1,1,(r,c)=>r===3&&c===3),/隐藏/);
 assert.doesNotThrow(()=>pasteRegion(base,sparse,1,1,(r,c)=>r===1&&c===2));
 assert.throws(()=>pasteRegion(base,[[null]],0,0),/起点/);
 console.log('PASS: additive sparse selections, untouched gaps/folds, independent pasted instances, unique start tags and hidden-cell guards.');
+
+// Exercise the production pointer-up selection guard for surface-free canonical nodes.
+const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
+const pointerSource=readFileSync(new URL('./app.js',import.meta.url),'utf8').split('\n').find(line=>line.startsWith("renderer.domElement.addEventListener('pointerup'"));
+function pointerSelection(nodes){
+ let handler,selected=[{r:9,c:9}];
+ const context={renderer:{domElement:{addEventListener:(event,fn)=>handler=fn}},finishGesture:()=>{},activePointers:new Set([1]),pointerDown:{button:0,x:10,y:10},manualPan:false,multiTouch:false,dragEdited:false,lastEditKey:null,syncState:()=>{},P:{mode:'edit'},hitAt:()=>({r:0,c:0,nodeId:nodes[0]?.id}),documentModel:{primaryAt:()=>null,world:{at:()=>nodes}},refreshTreePanel:()=>{},map:{tiles:[[null]]},tool:'select',setSelectedCells:value=>selected=value,drawEditSelection:()=>{},editAt:(r,c)=>selected=[{r,c}]};
+ runInNewContext(pointerSource,context);handler({pointerId:1,clientX:10,clientY:10});return selected;
+}
+assert.deepEqual(pointerSelection([{id:'key',components:{key:{name:'only'}}}]),[{r:0,c:0}]);
+assert.deepEqual(pointerSelection([]),[],'真正虚空保留原有清空单选规则');
+console.log('PASS: surface-free canonical occupancy remains selectable; genuine void clears selection.');

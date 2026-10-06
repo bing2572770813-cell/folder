@@ -132,6 +132,9 @@ details[open] > .icon-select-summary::before {
   min-height: 40px;
 }
 .play-panel .editor-tabs { margin-bottom: 16px; }
+.play-panel .editor-tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.play-panel .editor-tabs [role="tab"] { min-width: 0; padding: 8px 4px; white-space: normal; }
+.play-panel .editor-tabs .mantine-Tabs-tabLabel { white-space: normal; overflow-wrap: anywhere; text-align: center; font-size: 11px; line-height: 1.4; }
 .entity-context-row { min-width: 0; overflow-wrap: anywhere; text-align: left; padding: 6px; border-left: 2px solid var(--line); }
 .entity-context-row[aria-pressed="true"] { border-left-color: var(--green); background: #edf3ee; }
 .entity-context-row { display: grid; gap: 3px; }
@@ -149,6 +152,13 @@ details[open] > .icon-select-summary::before {
 .inspector-list-row { display: grid; grid-template-columns: minmax(0,1fr) 28px; gap: 4px; align-items: center; }
 #nodeConfiguration details { padding: 6px 0; }
 #nodeConfiguration summary { font-weight: 600; cursor: pointer; margin-bottom: 6px; }
+.placement-options { border: 0; margin: 0 0 10px; padding: 0; display: flex; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.placement-options legend { margin-bottom: 7px; }
+.placement-options label span { display: flex; gap: 4px; align-items: center; }
+.test-modifiers { display: grid; gap: 12px; padding: 8px 0; }
+.test-modifiers label { overflow-wrap: anywhere; }
+.player-key-choices { display: grid; gap: 7px; }
+.player-key-choices label { overflow-wrap: anywhere; }
 .player-properties .studio-fields { display: grid; gap: 10px; padding: 10px 0; }
 .player-properties label { display: grid; gap: 5px; }
 .player-height-limits { border: 1px solid #dce3d9; border-radius: 5px; padding: 10px; display: grid; gap: 10px; min-width: 0; }

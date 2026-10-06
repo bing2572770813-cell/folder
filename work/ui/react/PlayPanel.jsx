@@ -5,9 +5,24 @@ import {
   UiInput,
   UiSelect,
   UiCheckbox,
-  UiTextarea,
+  UiSwitch,
+  UiIcon,
 } from "./controls.jsx";
 import { TabbedSections } from "./TabbedSections.jsx";
+import { Check } from "lucide";
+import { renderIsland } from "./catalogs.jsx";
+
+function TestModifiers({ freeTeleport = false, foldHints = true, onChange = () => {} }) {
+  return <>
+    <UiSwitch id="freeTeleportToggle" role="switch" checked={freeTeleport}
+      label="任意位置传送" aria-label="任意位置传送" onChange={e => onChange('teleport', e.currentTarget.checked)} />
+    <UiSwitch id="foldHintsToggle" role="switch" checked={foldHints}
+      label="折纸位移提示" aria-label="折纸位移提示" onChange={e => onChange('hints', e.currentTarget.checked)} />
+  </>;
+}
+export function renderTestModifiers(container, state, onChange) {
+  renderIsland(container, <TestModifiers {...state} onChange={onChange} />);
+}
 
 export const PlayPanel = React.memo(function PlayPanel() {
   return (
@@ -25,13 +40,8 @@ export const PlayPanel = React.memo(function PlayPanel() {
               <>
                 <UiDisclosure className="studio-section test-options" open>
                   <summary>测试用选项</summary>
-                  <div className="test-modifiers">
-                    <UiButton id="freeTeleportToggle" aria-pressed="false">
-                      任意位置传送<span>关闭</span>
-                    </UiButton>
-                    <UiButton id="foldHintsToggle" aria-pressed="true">
-                      折纸位移提示<span>开启</span>
-                    </UiButton>
+                  <div id="testModifierControls" className="test-modifiers">
+                    <TestModifiers />
                   </div>
                   <div className="orientation-row">
                     <span id="playFacingLabel">朝向：北</span>
@@ -176,18 +186,12 @@ export const PlayPanel = React.memo(function PlayPanel() {
                         />
                       </label>
                       <label>
-                        已收集钥匙（JSON 名称数组）
-                        <UiTextarea
-                          id="playerCollectedKeys"
-                          aria-label="已收集钥匙"
-                          defaultValue="[]"
-                        />
+                        已收集钥匙
+                        <UiInput id="playerCollectedKeys" type="hidden" defaultValue="[]" />
                       </label>
-                      <p className="studio-readout">
-                        持有钥匙状态由名称列表决定；修改机制行动次数会同步喷发周期。
-                      </p>
+                      <div id="playerKeyChoices" className="player-key-choices" role="group" aria-label="已收集钥匙" />
                     </fieldset>
-                    <UiButton id="applyPlayerProperties">应用玩家属性</UiButton>
+                    <UiButton id="applyPlayerProperties" className="node-command"><UiIcon icon={Check} />应用玩家状态</UiButton>
                     <p
                       id="playerPropertyStatus"
                       className="studio-readout"

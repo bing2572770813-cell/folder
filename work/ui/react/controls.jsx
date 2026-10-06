@@ -7,6 +7,8 @@ import {
   NativeSelect,
   Checkbox,
   Textarea,
+  Switch,
+  Radio,
 } from "@mantine/core";
 // Inputs remain uncontrolled: the game adapter validates and commits their values.
 export const UiButton = React.forwardRef(function UiButton(props, ref) {
@@ -50,6 +52,12 @@ export const UiSelect = React.forwardRef(function UiSelect(
 export const UiTextarea = React.forwardRef(function UiTextarea(props, ref) {
   return <Textarea {...props} ref={ref} />;
 });
+export const UiSwitch = React.forwardRef(function UiSwitch(props, ref) {
+  return <Switch {...props} ref={ref} />;
+});
+export const UiRadio = React.forwardRef(function UiRadio(props, ref) {
+  return <Radio {...props} ref={ref} />;
+});
 export function UiDisclosure(props) {
   return <Paper component="details" {...props} />;
 }
@@ -57,7 +65,7 @@ export function UiSection(props) {
   return <Box component="section" {...props} />;
 }
 export function UiIcon({ icon, size = 16 }) {
-  const render = ([tag, attrs, children = []], key) => React.createElement(tag,
+  const render = ([tag, attrs, children = []]) => React.createElement(tag,
     Object.fromEntries(Object.entries(attrs).map(([name, value]) => [name.replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value])),
     ...children.map((child, index) => React.cloneElement(render(child), { key: index })));
   return React.cloneElement(render(icon), { width: size, height: size, 'aria-hidden': true });

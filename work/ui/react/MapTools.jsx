@@ -1,5 +1,6 @@
 import React from "react";
-import { UiButton, UiSection, UiCheckbox } from "./controls.jsx";
+import { UiButton, UiSection, UiRadio, UiIcon } from "./controls.jsx";
+import { Replace, Layers2 } from "lucide";
 
 export const MapTools = React.memo(function MapTools() {
   return (
@@ -8,7 +9,13 @@ export const MapTools = React.memo(function MapTools() {
         {"地图工具"}
         <small>{"TOOLS"}</small>
       </h2>
-      <label><UiCheckbox id="stackPlacement" aria-label="叠加放置" />叠加放置（保留同格实体）</label>
+      <fieldset className="placement-options">
+        <legend>放置方式</legend>
+        <UiRadio id="replacePlacement" name="placementMode" value="replace" defaultChecked
+          label={<span><UiIcon icon={Replace} />替换</span>} aria-label="替换放置" />
+        <UiRadio id="stackPlacement" name="placementMode" value="stack"
+          label={<span><UiIcon icon={Layers2} />叠加</span>} aria-label="叠加放置" />
+      </fieldset>
       <div className="tool-grid">
         <UiButton id="clearMap" className="tool-btn" data-tip="清空地图" aria-label="清空地图">
           <i data-lucide="trash-2" />

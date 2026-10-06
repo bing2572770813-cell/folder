@@ -23,17 +23,20 @@ function fixture(type='h'){
  controller=runtime.createPlayerController(env);controller.setMode('play');renderPlayer();controller.selectFold(3,3,type);
  return {P,map,controller,view,layer,player,mesh};
 }
+// The rendered angle eases toward the pointer under a bounded angular speed,
+// so tests advance the clock instead of expecting an instantaneous pose.
+const settle=(f,seconds=1)=>{const start=performance.now();for(let elapsed=0;elapsed<=seconds*1000;elapsed+=16)f.controller.tick(start+elapsed);};
 for(const type of ['h','v','d1','d2']){
  const f=fixture(type),before=JSON.stringify(f.map),source={...f.P.player};
  assert.equal(f.controller.beginFoldDrag(source.r,source.c,300),true);
  assert.ok(f.P.foldMotion.creaseCells.length,'crease cells must have mixed halves');
- assert.equal(f.controller.updateFoldDrag(180,240),false,'90 degrees is not above target');
+ assert.equal(f.controller.updateFoldDrag(180,240),false,'90 degrees is not above target');settle(f);
  assert.ok(f.view.playerPosition()[1]>.5,'player lifts with paper');
  assert.equal(f.P.steps,0);assert.deepEqual(f.P.player,source);
  f.controller.endFoldDrag();assert.equal(f.P.foldMotion.phase,'return');f.controller.tick(performance.now()+1000);
  assert.equal(f.view.active(),false);assert.equal(f.mesh.visible,true);assert.equal(JSON.stringify(f.map),before);
  f.controller.selectFold(3,3,type);f.controller.beginFoldDrag(source.r,source.c,300);
- assert.equal(f.controller.updateFoldDrag(300-240*170/180,240),true,'170 degrees aligns with reflected cell');
+ f.controller.updateFoldDrag(300-240*170/180,240);settle(f);assert.equal(f.P.foldMotion.ready,true,'170 degrees aligns with reflected cell');
  const target={...f.P.foldMotion.target};assert.equal(f.controller.endFoldDrag(),true);
  assert.equal(f.P.player.r,target.r);assert.equal(f.P.player.c,target.c);assert.equal(f.P.animation.type,'drop');assert.equal(f.P.steps,1);assert.equal(f.P.teleports,1);assert.equal(f.P.playHistory.length,1);
  assert.equal(JSON.stringify(f.map),before,'fold never writes map coordinates');
@@ -43,7 +46,7 @@ const blockedTarget=fixture();blockedTarget.controller.beginFoldDrag(2,3,300);bl
 assert.equal(blockedTarget.controller.endFoldDrag(),false,'release rechecks changed target');assert.equal(blockedTarget.P.steps,0);
 blockedTarget.controller.setMode('edit');assert.equal(blockedTarget.view.active(),false);assert.equal(blockedTarget.P.foldMotion,null);
 const cancelled=fixture();cancelled.controller.beginFoldDrag(2,3,300);cancelled.controller.updateFoldDrag(73);cancelled.controller.endFoldDrag(true);assert.equal(cancelled.P.foldMotion.phase,'return');assert.equal(cancelled.P.steps,0);
-const full=fixture();full.controller.beginFoldDrag(2,3,300);assert.equal(full.controller.updateFoldDrag(60),true,'180-degree fold aligns surface feet with target');full.controller.cancelFoldMotion();
+const full=fixture();full.controller.beginFoldDrag(2,3,300);full.controller.updateFoldDrag(60);settle(full);assert.equal(full.P.foldMotion.ready,true,'180-degree fold aligns surface feet with target');full.controller.cancelFoldMotion();
 const debug=fixture();debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:.25,foldHorizontal:.1});assert.deepEqual(debug.P.foldDrop,{vertical:.25,horizontal:.1});debug.controller.undo();assert.deepEqual(debug.P.foldDrop,{vertical:1,horizontal:.35});assert.throws(()=>debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:0}),/阈值/);
 const polygon=[{position:[-1,0,0],uv:[0,0]},{position:[1,0,0],uv:[1,0]},{position:[0,0,1],uv:[.5,1]}];
 for(const positive of [false,true]){const half=clipFoldPolygon(polygon,v=>v.position[0],positive);assert.ok(half.length>=3);assert.ok(half.every(v=>positive?v.position[0]>=0:v.position[0]<=0));}

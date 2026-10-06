@@ -23,7 +23,7 @@ function fixture(type = 'h', { hollow = false } = {}) {
     spawn: { r: 2, c: 3, dir: 0 },
     tiles: Array.from({ length: 7 }, () =>
       Array.from({ length: 7 }, () =>
-        normalizeTile({ prefabId: 'paper_ai', height: HEIGHT, thickness: 0.025, folds: [] }),
+        normalizeTile({ prefabId: 'paper_ai', height: HEIGHT, thickness: 0.09, folds: [] }),
       ),
     ),
     foldCells: [],

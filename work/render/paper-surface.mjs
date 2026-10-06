@@ -1,8 +1,11 @@
 import {tileHeight,tileThickness,tileGradualRate,foldsAt} from '../entities/tile-model.mjs';import {entityType} from '../entities/visibility-model.mjs';
 export const isPaper=tile=>!!tile&&entityType(tile)==='paper_ai';
+// 折痕深度: 1 为完全不下压, 0 为把折纸线处压穿整层厚度, 该处不再渲染实体。
+export const DEFAULT_CREASE_DEPTH=.6;
+export const creaseRatio=value=>Math.min(1,Math.max(0,Number.isFinite(value)?value:DEFAULT_CREASE_DEPTH));
 // Shared top boundaries join flat centers; thickness offsets the underside along surface normals.
-export function paperSurface(map,r,c,hidden=()=>false,showFolds=true){
- const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;const height=tileHeight(tile),folds=showFolds?foldsAt(map,r,c):[];
+export function paperSurface(map,r,c,hidden=()=>false,showFolds=true,creaseDepth=DEFAULT_CREASE_DEPTH){
+ const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;const height=tileHeight(tile),thickness=tileThickness(tile),folds=showFolds?foldsAt(map,r,c):[];
  const paper=(y,x)=>isPaper(map.tiles[y]?.[x])&&!hidden(y,x),average=cells=>{const values=cells.filter(([y,x])=>paper(y,x)).map(([y,x])=>tileHeight(map.tiles[y][x]));return values.reduce((a,b)=>a+b,0)/values.length;};
  let changed=false;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(paper(r+dr,c+dc)&&tileHeight(map.tiles[r+dr][c+dc])!==height)changed=true;if((!changed||tileGradualRate(tile)===0)&&!folds.length)return null;
  const corners=[average([[r,c],[r-1,c],[r,c-1],[r-1,c-1]]),average([[r,c],[r-1,c],[r,c+1],[r-1,c+1]]),average([[r,c],[r+1,c],[r,c+1],[r+1,c+1]]),average([[r,c],[r+1,c],[r,c-1],[r+1,c-1]])];
@@ -22,23 +25,23 @@ export function paperSurface(map,r,c,hidden=()=>false,showFolds=true){
    points.push([px,y,pz]);
   }
  }
- const faces=[];for(let z=0;z<size-1;z++)for(let x=0;x<size-1;x++){const a=z*size+x,b=a+1,d=a+size,e=d+1;faces.push([a,d,b],[b,d,e]);}
+ const faces=[];let visibleFaces=faces;for(let z=0;z<size-1;z++)for(let x=0;x<size-1;x++){const a=z*size+x,b=a+1,d=a+size,e=d+1;faces.push([a,d,b],[b,d,e]);}
  const vertexNormals=()=>{
   const result=points.map(()=>[0,0,0]);
   for(const [a,b,c] of faces){const u=points[b].map((v,i)=>v-points[a][i]),v=points[c].map((v,i)=>v-points[a][i]);const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];for(const index of [a,b,c])for(let i=0;i<3;i++)result[index][i]+=n[i];}
   for(const n of result){const length=Math.hypot(...n);for(let i=0;i<3;i++)n[i]/=length;}
   return result;
  };
- if(folds.length){const baseNormals=vertexNormals();points=points.map((p,index)=>{
+ if(folds.length){const press=thickness*(1-creaseRatio(creaseDepth)),offsets=[];const baseNormals=vertexNormals();points=points.map((p,index)=>{
   const distance=Math.min(...folds.map(type=>type==='h'?Math.abs(p[2]):type==='v'?Math.abs(p[0]):Math.abs(type==='d1'?p[2]-p[0]:p[2]+p[0])/Math.SQRT2));
-  const depth=.035*Math.max(0,1-distance/.065);
+  const depth=press*Math.max(0,1-distance/.065);offsets[index]=depth;
   return p.map((v,i)=>v-baseNormals[index][i]*depth);
- });}
+ });visibleFaces=faces.filter(face=>face.every(index=>offsets[index]<thickness-1e-9));}
  // Preserve thickness along the normals of the deformed surface.
  const normals=vertexNormals();
- const thickness=tileThickness(tile),bottomPoints=points.map((p,index)=>p.map((value,i)=>value-normals[index][i]*thickness));
+ const bottomPoints=points.map((p,index)=>p.map((value,i)=>value-normals[index][i]*thickness));
  const positions=[],tri=(a,b,c)=>positions.push(...a,...b,...c);
- for(const [a,b,c] of faces){tri(points[a],points[b],points[c]);tri(bottomPoints[c],bottomPoints[b],bottomPoints[a]);}
+ for(const [a,b,c] of visibleFaces){tri(points[a],points[b],points[c]);tri(bottomPoints[c],bottomPoints[b],bottomPoints[a]);}
  const ring=[];for(let x=0;x<size;x++)ring.push(x);for(let z=1;z<size;z++)ring.push(z*size+size-1);for(let x=size-2;x>=0;x--)ring.push((size-1)*size+x);for(let z=size-2;z>0;z--)ring.push(z*size);const boundary=ring.map(i=>points[i]),boundarySegments=[];
  // Close each shell, including neighbours with different thicknesses.
  for(let i=0;i<ring.length;i++){const a=ring[i],b=ring[(i+1)%ring.length];tri(points[a],points[b],bottomPoints[a]);tri(points[b],bottomPoints[b],bottomPoints[a]);boundarySegments.push([points[a],points[b]]);}

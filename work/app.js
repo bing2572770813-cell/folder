@@ -137,8 +137,8 @@ sunlight.shadow.mapSize.set(2048,2048); sunlight.shadow.camera.left=-20;sunlight
 const fill=new THREE.DirectionalLight('#d1e8ee',1.1); fill.position.set(12,5,-8); scene.add(fill);
 let lighting={...lightingDefaults};
 function updateLighting(){lighting=applyLighting({sunlight,ambient,fill,renderer},lighting,map.width,map.height);}
-for(const [key] of lightingFields)$('lighting-'+key).oninput=()=>{try{const proposal={...lighting,[key]:Number($('lighting-'+key).value)};applyLighting({sunlight,ambient,fill,renderer},proposal,map.width,map.height);lighting=proposal;$('lightingStatus').textContent='光照预览已更新';}catch(e){$('lightingStatus').textContent=e.message;}};
-$('resetLighting').onclick=()=>{lighting={...lightingDefaults};for(const [key] of lightingFields)$('lighting-'+key).value=lighting[key];updateLighting();$('lightingStatus').textContent='已恢复默认光照';};
+for(const [key] of lightingFields)$('lighting-'+key).oninput=()=>{try{const proposal={...lighting,[key]:Number($('lighting-'+key).value)};applyLighting({sunlight,ambient,fill,renderer},proposal,map.width,map.height);lighting=proposal;if(key==='creaseDepth')buildPaper();$('lightingStatus').textContent='光照预览已更新';}catch(e){$('lightingStatus').textContent=e.message;}};
+$('resetLighting').onclick=()=>{const previousDepth=lighting.creaseDepth;lighting={...lightingDefaults};for(const [key] of lightingFields)$('lighting-'+key).value=lighting[key];updateLighting();if(previousDepth!==lighting.creaseDepth)buildPaper();$('lightingStatus').textContent='已恢复默认光照';};
 const tileGeo=new THREE.BoxGeometry(1,1,1);
 const markerGeo=new THREE.PlaneGeometry(.94,.94);
 const materials=Object.fromEntries(Object.entries(COLORS).map(([k,v])=>[k,new THREE.MeshStandardMaterial({color:v,roughness:.86,flatShading:true})]));
@@ -190,7 +190,7 @@ function buildPaper() {
   const surfaces=new Map(),buckets=new Map(),edges=[],styleEdges=new Map(),terrains=new Map();
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r][c];if(!tile||cellHidden(r,c))continue;
-    const cell={r,c},surface=paperSurface(map,r,c,cellHidden,P.mode!=='edit'||visibility.folds);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
+    const cell={r,c},surface=paperSurface(map,r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
     const y=tileTop(r,c),x=wx(c),z=wz(r);
     if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);staticTokenLayer.add(token);}
     if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.04,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
@@ -570,7 +570,7 @@ function rebuildFoldAxes(){
 // Dash/dot hints ride the crease surface and fold together with the paper.
 function buildCreaseGuides(){
  disposableClear(creaseGuideLayer);
- const guides=creaseGuides(map,foldAxes,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,voidPlane:(r,c)=>voidPlaneTop(r,c),selected:selectedFold()});
+ const guides=creaseGuides(map,foldAxes,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>voidPlaneTop(r,c),selected:selectedFold()});
  if(guides.positions.length){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));
@@ -595,7 +595,7 @@ function buildFoldSelection(){
  if(!chosen)return;
  const group=foldGroupAt(foldAxes,chosen.r,chosen.c,chosen.type);
  if(!group)return;
- const guides=creaseSelection(map,group,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,voidPlane:(r,c)=>voidPlaneTop(r,c)});
+ const guides=creaseSelection(map,group,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>voidPlaneTop(r,c)});
  if(!guides.positions.length)return;
  const geometry=new THREE.BufferGeometry();
  geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));

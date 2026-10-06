@@ -6,6 +6,7 @@ import {createFoldMotionView,hingeFor} from './render/fold-motion.mjs';
 import {createTableScene} from './render/table-scene.mjs';
 import {creaseGuides} from './render/crease-guides.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
+import {foldCollisionLimit} from './entities/fold-collision.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
 import playerRuntime from './player.cjs';
@@ -80,7 +81,7 @@ const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer)
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,foldView:{begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz),syncFoldState:()=>syncState(),resetDebugState:()=>{debugOverrides.clear();clearInspection();},getPlayerPrefab,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,foldView:{begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz),project:(x,y,z)=>{const p=paper.localToWorld(new THREE.Vector3(x,y,z)).project(camera);const b=renderer.domElement.getBoundingClientRect();return [b.left+(p.x+1)*b.width/2,b.top+(1-p.y)*b.height/2];},foldLimit:(selection,hinge)=>foldCollisionLimit({hinge,flap:[...selection.cells,...selection.creaseCells.map(cell=>({...cell,partial:true}))],colliders:foldColliders(selection),wx:c=>wx(c),wz:r=>wz(r),top:tileTop,depth:(r,c)=>tileThickness(map.tiles[r][c]??{}),groundY:tableSurface()-paper.position.y}),syncFoldState:()=>syncState(),resetDebugState:()=>{debugOverrides.clear();clearInspection();},getPlayerPrefab,getMap:()=>map,getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { map = validateMap(typeof saved === 'string' ? JSON.parse(saved) : saved,true); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -129,6 +130,8 @@ function paperUnderside(){let lowest=null;for(let r=0;r<map.height;r++)for(let c
 // The tabletop always rests under the lowest visible paper underside.
 let sceneryTop=0;
 function layoutScenery(){sceneryTop=showTable?paperUnderside():0;tableScenery.layout(map.width,map.height,sceneryTop);}
+// The tabletop always blocks a folding flap, even while its surface is hidden.
+function tableSurface(){return paperUnderside();}
 // Void-plane overlays sit on the tabletop while the table is visible.
 const voidY=offset=>sceneryTop+offset;
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
@@ -174,6 +177,20 @@ const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.Mesh
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
 const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,gridLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldAxisLayer,creaseGuideLayer,spawnMarkerGroup],playerGroup,wx,wz});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
+// Static cells keep a folding flap out whenever they carry a collision box.
+function foldColliders(selection){
+ const taken=new Set([...selection.cells,...selection.creaseCells].map(p=>p.r+','+p.c));
+ const reach=Math.ceil(selection.radius??0)+2,list=[];
+ const center=selection.center??{r:0,c:0};
+ const from=Math.max(0,center.r-reach),to=Math.min(map.height-1,center.r+reach);
+ const left=Math.max(0,center.c-reach),right=Math.min(map.width-1,center.c+reach);
+ for(let r=from;r<=to;r++)for(let c=left;c<=right;c++){
+  if(taken.has(r+','+c))continue;const tile=map.tiles[r][c];
+  if(!tile||cellHidden(r,c))continue;
+  list.push({r,c});
+ }
+ return list;
+}
 function renderPlayer() {const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.y=-P.player.dir*Math.PI/4;}
 
 function entityEdgeColor(tile){return tile.edgeColor??(!tile.prefabId&&!blocked(tile)?prefabs.find(p=>p.id==='paper_ai')?.tile.edgeColor:undefined);}
@@ -483,8 +500,9 @@ function hitAt(clientX,clientY){
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.pointerId);if(activePointers.size>1)multiTouch=true;selectionBase=e.shiftKey?clone(directSelectedCells):[];pointerDown={x:e.clientX,y:e.clientY,button:e.button,pointerType:e.pointerType,shift:e.shiftKey};lastEditKey=null;dragEdited=false;manualPan=e.button===2;renderer.domElement.setPointerCapture(e.pointerId);});
 renderer.domElement.addEventListener('pointermove',e=>{
-  if(P.foldMotion?.phase==='drag'){hoverOutline.visible=false;controller.updateFoldDrag(e.clientY,Math.min(300,viewport.clientHeight*.45));return;}
-  if(P.mode==='play'&&P.chosenFold&&pointerDown?.button===0&&!multiTouch&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start&&controller.beginFoldDrag(start.r,start.c,pointerDown.y)){controller.updateFoldDrag(e.clientY,Math.min(300,viewport.clientHeight*.45));return;}}
+  const foldSpan=Math.min(300,viewport.clientHeight*.45);
+  if(P.foldMotion?.phase==='drag'){hoverOutline.visible=false;controller.updateFoldDrag(e.clientX,e.clientY,foldSpan);return;}
+  if(P.mode==='play'&&P.chosenFold&&pointerDown?.button===0&&!multiTouch&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start&&controller.beginFoldDrag(start.r,start.c,pointerDown.x,pointerDown.y)){controller.updateFoldDrag(e.clientX,e.clientY,foldSpan);return;}}
   if(manualPan){hoverOutline.visible=false;disposableClear(placementLayer);return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
   if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));const groups=P.mode==='edit'&&visibility.folds?foldAxes.filter(g=>g.cells.some(p=>p.r===hit.r&&p.c===hit.c)):[];$('foldRadiusHint').hidden=!groups.length;$('foldRadiusHint').textContent=groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / ');$('hoverCoord').textContent=groups.length?groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / '):coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?(COLOR_NAMES[map.tiles[hit.r][hit.c].color]||'无颜色属性')+' · '+regionOf(map.tiles[hit.r][hit.c])+(map.tiles[hit.r][hit.c].tags?.exitTo?' → '+map.tiles[hit.r][hit.c].tags.exitTo:''):'空格');}else{hoverOutline.visible=false;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';}
   drawPlacementPreview(hit);

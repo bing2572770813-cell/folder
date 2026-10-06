@@ -9,3 +9,6 @@
 assertTagAttachment 校验目标实体 ID，虚空使用 void_ai。可附着不替代可通行、隐藏、唯一起点/入口或区域约束；调用者必须继续执行既有规则。前端目录只读，写入使用 node work/write-tag-prefab.cjs。
 
 entityPropertySchema 将标签字段权限与实体描述合并，任一来源禁止则最终禁止。区域、折线、起点/入口/出口参数在 Inspector 和三个配置输出中共用此合同；非序列化折线同时排除实体 folds、兼容 fold 和虚空 foldCells。
+# 固定区域标签
+
+编辑器区域列表、可见性和区域选择均读取 canonical `cellTags`，包括无 surface 节点所在格及空格上保留的区域。未标记的已有方块属于默认区域；旧地图未提供 `cellTags` 时继续扫描 tile.regionTag。加入已有区域与新建重名校验使用同一名称来源，出口仍须通过唯一合法入口校验。

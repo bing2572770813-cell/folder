@@ -342,7 +342,7 @@ function applyInspectedProperty(path,value,scope='entity'){
   if(JSON.stringify(merged)!==JSON.stringify(tile)){
     let next=clone(candidate);next.tiles[r][c]=normalizeTile(merged);
     if(path[0]==='keyName'){next=renameKeyCells(candidate,[{r,c}],merged.keyName,cellHidden);next.tiles[r][c]=normalizeTile(merged);}
-    if(path[0]==='regionTag'){assertTagAttachment(tagCatalog,'tag-region',candidate,r,c);next=assignRegion(candidate,[{r,c}],merged.regionTag,regionNames(candidate).includes(merged.regionTag));}
+    if(path[0]==='regionTag'){assertTagAttachment(tagCatalog,'tag-region',candidate,r,c);next=assignRegion(candidate,[{r,c}],merged.regionTag,regionNames(candidate,documentModel.cellTags).includes(merged.regionTag),documentModel.cellTags);}
     if(path[0]==='tags'){
       const tag=path[1];if(['spawn','entry','exitTo'].includes(tag)&&merged.tags[tag]){assertTagAttachment(tagCatalog,tag==='spawn'?'tag-spawn':tag==='entry'?'tag-entry':'tag-exit',candidate,r,c);tagCell(next,r,c,tag,merged.tags[tag]);}
       const checkedTree=forkTreeDocument(documentModel);checkedTree.applyLegacy(next);const errors=validateRegions(next,checkedTree.world).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
@@ -547,13 +547,14 @@ function updateFoldAxes(){}
 
 function renderRegionControls(){
  const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));renderNameChecklist(keyList,legalKeyNames(map,documentModel.world),chosenKeys,'所需钥匙 ',null,'地图上没有可收集的钥匙');
- const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of regionNames(map))regionChoice.add(new Option(name,name));if(regionNames(map).includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;
- const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;$('exitRegion').replaceChildren();
+ const names=regionNames(map,documentModel.cellTags);
+ const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of names)regionChoice.add(new Option(name,name));if(names.includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;
+ const container=$('regionVisibility'),current=$('exitRegion').value;$('exitRegion').replaceChildren();
  for(const name of names)$('exitRegion').add(new Option(name,name));
  renderRegionChecklist(container,names,new Set(names.filter(name=>!hiddenRegions.has(name))),(name,checked)=>{if(checked)hiddenRegions.delete(name);else hiddenRegions.add(name);setSelectedCells(directSelectedCells);buildPaper();});
  if(names.includes(current))$('exitRegion').value=current;
 }
-$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value,documentModel.cellTags);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}};
 function prefabPreview(prefab){
  const key=JSON.stringify(prefab);if(previewCache.has(key))return previewCache.get(key);
  previewRenderer??=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});previewRenderer.setSize(100,80);previewRenderer.setClearColor('#e1e8e0',1);

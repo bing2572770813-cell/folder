@@ -65,3 +65,25 @@ test('disk catalog resolves inheritance before normalization and isolates broken
 test('native disk prefabs inherit component and child defaults without fabricating a tile',async()=>{
  const root=await fixture();try{await savePrefab(root,{version:1,id:'native_ai',name:'原生',components:{key:{name:'铜'}},children:[{prefabId:'paper_ai',local:{r:0,c:1,dir:0}}]});await savePrefab(root,{version:1,id:'native_child_ai',name:'继承',extends:'native_ai',components:{fire:{damage:2}}});const catalog=await readCatalog(root),child=catalog.prefabs.find(p=>p.id==='native_child_ai');assert.equal(child.tile,undefined);assert.deepEqual(child.components,{key:{name:'铜'},fire:{damage:2}});assert.equal(child.children[0].prefabId,'paper_ai');assert.equal(JSON.parse(await fs.readFile(path.join(root,'entity','native_ai.json'),'utf8')).tile,undefined);}finally{await fs.rm(root,{recursive:true,force:true});}
  });
+test('catalog rejects invalid static fields on save and reports their source files on read',async()=>{
+ const root=await fixture();
+ try{
+  for(const [index,statics] of [{events:'enter'},{walkable:'false'},{render:1},{transparent:null},{placeable:0},{events:['unknown']},{events:[['enter']]},{events:[{type:'enter'}]},{events:[1]}].entries()){
+   const definition={version:1,id:'invalid_'+index+'_ai',name:'invalid',components:{tag:{}},static:statics};
+   await assert.rejects(()=>savePrefab(root,definition),/Invalid static/);
+   await assert.rejects(()=>fs.stat(path.join(root,'entity',definition.id+'.json')),/ENOENT/);
+   await fs.writeFile(path.join(root,'entity',definition.id+'.json'),JSON.stringify(definition));
+  }
+  const catalog=await readCatalog(root);
+  assert.equal(catalog.prefabs.length,1);
+  for(let index=0;index<9;index++)assert.ok(catalog.errors.some(error=>error.file==='entity/invalid_'+index+'_ai.json'&&/Invalid static/.test(error.message)));
+ }finally{await fs.rm(root,{recursive:true,force:true});}
+});
+test('catalog preserves valid inherited static fields accepted by entity worlds',async()=>{
+ const root=await fixture();try{
+  const statics={events:['enter','leave','interact'],walkable:false,render:true,transparent:false,placeable:true,custom:{value:1}};
+  await savePrefab(root,{version:1,id:'base_static_ai',name:'base',components:{tag:{}},static:statics});
+  await savePrefab(root,{version:1,id:'child_static_ai',name:'child',extends:'base_static_ai',components:{key:{}}});
+  const catalog=await readCatalog(root);assert.deepEqual(catalog.prefabs.find(value=>value.id==='child_static_ai').static,statics);
+ }finally{await fs.rm(root,{recursive:true,force:true});}
+});

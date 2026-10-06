@@ -15,6 +15,24 @@ test('view and no-op updates preserve stacked IDs and hierarchy',()=>{
   const edit=doc.view();edit.tiles[1][1].height=.3;doc.applyLegacy(edit);
   assert.equal(doc.serialize().entities.length,2);assert.deepEqual(doc.serialize().transforms,before.transforms);assert.equal(doc.serialize().entities.find(n=>n.id==='secondary').components.fold.directions[0],'v');
 });
+test('legacy fold removal updates every surface-free owner independently',()=>{
+ const doc=new TreeDocument(legacy()),tree=doc.serialize();
+ tree.entities[0].components={fold:{directions:['h','v']},fire:{damage:2}};
+ tree.entities.push({id:'fold-b',prefabId:'void_ai',transformId:'fold-b-t',components:{collision:{blocked:true},fold:{directions:['v','d1']},key:{name:'keep'}},tags:{custom:true},static:{transparent:true}});
+ tree.transforms.push({id:'fold-b-t',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ const stacked=new TreeDocument(tree),before=stacked.serialize(),next=stacked.view();next.foldCells=next.foldCells.filter(fold=>fold.type==='v');
+ stacked.applyLegacy(next);
+ assert.deepEqual(stacked.view().foldCells,[{r:1,c:1,type:'v'}]);
+ assert.deepEqual(stacked.world.get(tree.entities[0].id).components.fire,{damage:2});
+ assert.deepEqual(stacked.world.get(tree.entities[0].id).components.fold.directions,['v']);
+ assert.deepEqual(stacked.world.get('fold-b').components.key,{name:'keep'});
+ assert.deepEqual(stacked.world.get('fold-b').components.fold.directions,['v']);
+ assert.deepEqual(stacked.world.get('fold-b').tags,{custom:true});
+ assert.deepEqual(stacked.serialize().transforms,before.transforms);
+ const cleared=stacked.view();cleared.foldCells=[];stacked.applyLegacy(cleared);
+ assert.equal(stacked.world.get('fold-b').components.fold,undefined);
+ assert.deepEqual(stacked.world.get('fold-b').components.key,{name:'keep'});
+});
 test('projection follows parent movement while regions stay on cells',()=>{
   const doc=new TreeDocument(legacy()),tree=doc.serialize();tree.transforms.push({id:'parent',parentId:null,local:{r:0,c:0,dir:0},footprint:{width:1,height:1,occupied:[true]}});tree.transforms[0].parentId='parent';
   const moved=new TreeDocument(tree);moved.world.transforms.setLocal('parent',{r:1,c:0,dir:0});assert.equal(moved.view().tiles[1][1],null);assert.equal(moved.view().tiles[2][1].regionTag,'默认区域');assert.equal(moved.serialize().cellTags['1,1'].regionTag,'A');

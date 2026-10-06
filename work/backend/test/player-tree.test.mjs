@@ -107,3 +107,34 @@ test('play validation checks overlays and exit uses stable structural walkabilit
 test('invalid spawn components return a validation failure before any event or runtime change',()=>{
  for(const components of [{unknown:{}},{fire:{damage:-1}}]){const f=fixture();f.add('invalid-start',1,0,components);const before=structuredClone(f.state),runtime=f.world.snapshotRuntime();assert.doesNotThrow(()=>f.controller.validateForPlay());assert.equal(f.controller.validateForPlay().valid,false);assert.deepEqual(f.state,before);assert.deepEqual(f.world.snapshotRuntime(),runtime);}
  });
+
+test('play preflight rejects every structural region entry blocker before starting',()=>{
+ for(const [components,staticData] of [[{collision:{blocked:true}},{}],[{campfire:{}},{}],[{key:{name:'铜'}},{walkable:false}],[null,{}]]){
+  const f=fixture();f.state.mode='edit';f.env.validateRegions=validateRegions;
+  f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+  if(components)f.add('entry-blocker',2,3,components,staticData);else f.world.remove('surface-2-3');
+  const controller=player.createPlayerController(f.env),before=controller.snapshot();
+  const result=controller.validateForPlay();assert.equal(result.valid,false);assert.ok(result.errors.some(error=>error.includes('入口')));
+  controller.setMode('play');assert.equal(f.state.mode,'edit');assert.deepEqual(controller.snapshot(),before);
+ }
+});
+
+test('closed eruption entry stays structurally valid and reports an atomic runtime refusal',()=>{
+ const f=fixture([['cycle',2,3,{eruption:{}}],['destination-key',2,3,{key:{name:'铜'}}]]);
+ f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+ assert.equal(f.controller.validateForPlay().valid,true,'temporary eruption closure must not invalidate the map');
+ f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5}})}});f.add('departure',1,1,{departure:{}});
+ f.state.player={r:1,c:1,dir:2};const before=f.controller.snapshot();
+ assert.equal(f.controller.transitionRegion(),false);assert.match(f.state.terrainState.message,/喷发/);
+ assert.deepEqual({...f.controller.snapshot(),terrainState:{...f.state.terrainState,message:before.terrainState.message}},before);
+ f.state.terrainState.actions=2;assert.equal(f.controller.transitionRegion(),true);
+ assert.deepEqual(f.state.player,{r:2,c:3,dir:2});assert.ok(f.state.revealedRegions.has('B'));
+});
+
+test('region arrival commits destination effects once and counts only the original action',()=>{
+ const f=fixture([['destination-fire',2,3,{fire:{}}],['destination-key',2,3,{key:{name:'铜'}}]]);
+ f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+ f.move(1,1);assert.deepEqual(f.state.player,{r:2,c:3,dir:2});assert.equal(f.state.steps,1);
+ assert.equal(f.state.terrainState.actions,1);assert.equal(f.state.terrainState.overheat,1);
+ assert.deepEqual(f.state.terrainState.collectedKeys,['铜']);assert.deepEqual(f.world.runtime('destination-key','key'),{collected:true});
+});

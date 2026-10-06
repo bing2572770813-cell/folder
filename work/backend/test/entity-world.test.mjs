@@ -9,6 +9,15 @@ function fixture(){
   const registry=new PrefabRegistry([{id:'paper_ai',components:{surface:{height:.09},ice:{}}}]);
   return {m,registry,world:new EntityWorld(m)};
 }
+test('static events reject non-string values without registering entities',()=>{
+  for(const event of [['enter'],{type:'enter'},1]){
+    const {m,registry,world}=fixture(),node=registry.instantiate('paper_ai','a','t1');
+    node.static={events:[event]};
+    assert.throws(()=>world.add(node),/Invalid static events/);
+    assert.deepEqual(world.serialize(),[]);
+    assert.deepEqual(m.referenceOwners('t1'),[]);
+  }
+});
 test('entity query delegates to transform index and protects identity references',()=>{
   const {m,registry,world}=fixture();world.add(registry.instantiate('paper_ai','a','t1'));world.add(registry.instantiate('paper_ai','b','t2'));
   assert.deepEqual(world.at(2,2).map(n=>n.id),['a','b']);

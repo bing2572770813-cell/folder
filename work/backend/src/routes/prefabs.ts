@@ -14,12 +14,13 @@ export async function registerPrefabRoutes(
     url: '/api/prefabs',
     handler: async (request, reply) => {
       reply.header('Cache-Control', 'no-store');
-      if (request.method !== 'GET') return reply.code(405).send({error: '方法无效'});
+      if (request.method !== 'GET') return reply.header('Allow', 'GET').code(405).send({error: '方法无效'});
       try {
         return await readCatalog(config.prefabRoot);
       } catch (error) {
+        request.log.error({err: error}, 'Catalog read failed');
         const message = error instanceof Error ? error.message : String(error);
-        return reply.code(400).send({error: message});
+        return reply.code(500).send({error: message});
       }
     },
   });

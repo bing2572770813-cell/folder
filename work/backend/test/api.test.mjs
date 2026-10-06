@@ -23,10 +23,18 @@ test('non-GET /api/prefabs returns 405', async () => {
   await app.close();
 });
 
-test('catalog failures return a JSON 400 error', async () => {
+test('catalog failures return a JSON 500 error', async () => {
   const app = await createApp(config, {readCatalog: async () => { throw new Error('目录不可读'); }});
   const response = await app.inject({method: 'GET', url: '/api/prefabs'});
-  assert.equal(response.statusCode, 400);
+  assert.equal(response.statusCode, 500);
   assert.deepEqual(response.json(), {error: '目录不可读'});
   await app.close();
+});
+
+test('unsupported methods declare allowed method and damaged definitions remain a successful catalog',async()=>{
+ const app=await createApp(config,{readCatalog:async()=>({prefabs:[],tags:[],errors:[{file:'broken.json',message:'无效 JSON'}]})});
+ try{
+  const rejected=await app.inject({method:'DELETE',url:'/api/prefabs'});assert.equal(rejected.statusCode,405);assert.equal(rejected.headers.allow,'GET');
+  const response=await app.inject('/api/prefabs');assert.equal(response.statusCode,200);assert.equal(response.json().errors.length,1);
+ }finally{await app.close();}
 });

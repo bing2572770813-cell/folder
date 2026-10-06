@@ -1,7 +1,7 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import type {FastifyInstance} from 'fastify';
 import type {BackendConfig} from '../config.js';
+import {readStaticFile, isMissingFile, type StaticFileReader} from '../resources/static-files.js';
 
 function contentType(file: string): string {
   if (file.endsWith('.html')) return 'text/html; charset=utf-8';
@@ -18,7 +18,7 @@ function insideRoot(root: string, file: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-export async function registerStaticRoutes(app: FastifyInstance, config: BackendConfig): Promise<void> {
+export async function registerStaticRoutes(app: FastifyInstance, config: BackendConfig, readFile: StaticFileReader = readStaticFile): Promise<void> {
   app.get('/*', async (request, reply) => {
     let pathname: string;
     try {
@@ -31,13 +31,14 @@ export async function registerStaticRoutes(app: FastifyInstance, config: Backend
     const target = path.resolve(root, relative);
     if (!insideRoot(root, target)) return reply.code(403).send();
     try {
-      const stat = await fs.stat(target);
-      if (!stat.isFile()) return reply.code(404).send('Not found');
+      const contents = await readFile(target);
       reply.type(contentType(target));
       reply.header('Cache-Control', 'no-store');
-      return reply.send(await fs.readFile(target));
-    } catch {
-      return reply.code(404).send('Not found');
+      return reply.send(contents);
+    } catch (error) {
+      if (isMissingFile(error)) return reply.code(404).send('Not found');
+      request.log.error({err: error}, 'Static file read failed');
+      return reply.code(500).send({error: '文件读取失败'});
     }
   });
 }

@@ -24,3 +24,6 @@ const output=serializeMapConfiguration(map);assert.equal(output.tiles[0][0].prop
 assert.equal(map.tiles[0][0].properties.debug,3);assert.equal(output.tiles[0][0].prefabId,'test_ai');
 assert.deepEqual(serializeMapConfiguration(JSON.parse(JSON.stringify(output))),output);
 console.log('PASS: nested permission inheritance, readonly identities, safe updates, complex prefab properties and nonserializable output isolation.');
+const deletable={components:{lift:{minHeight:.09,initialHeight:.4}}};
+assert.deepEqual(updateProperty(deletable,{},['components'],{}),{components:{}});
+assert.throws(()=>updateProperty(deletable,{components:{children:{lift:{children:{initialHeight:{tempEditable:false}}}}}},['components'],{}),/不可编辑/);

@@ -40,6 +40,10 @@ export function updateProperty(values,schema,path,nextValue){
     const permissions=fieldPermissions(definition,parent);
     if(JSON.stringify(before)===JSON.stringify(after))return;
     if(!permissions.readable||!permissions.tempEditable)throw new Error('嵌套属性不可编辑');
+    if(after===undefined&&before&&typeof before==='object'){
+      for(const [key,item] of Object.entries(before))check(item,undefined,Array.isArray(before)?definition.items??{}:definition.children?.[key]??{},permissions);
+      return;
+    }
     if(Array.isArray(before)){if(!Array.isArray(after))throw new Error('属性类型不匹配');for(let i=0;i<Math.max(before.length,after.length);i++)check(before[i],after[i],definition.items??{},permissions);}
     else if(before&&typeof before==='object'){if(!after||typeof after!=='object'||Array.isArray(after))throw new Error('属性类型不匹配');for(const key of new Set([...Object.keys(before),...Object.keys(after)]))check(before[key],after[key],definition.children?.[key]??{},permissions);}
     else if(before!==undefined&&after!==undefined&&before!==null&&typeof before!==typeof after)throw new Error('属性类型不匹配');

@@ -30,3 +30,12 @@ test('invalid additions and protected removal leave entities intact',()=>{
   m.retain('t1','outside');assert.throws(()=>world.remove('a',true),/references/);
   assert.equal(world.get('a').transformId,'t1');assert.throws(()=>m.remove('t1'),/references/);
 });
+test('runtime snapshots restore atomically and stay separate from map configuration',()=>{
+  const {registry,world}=fixture();world.add(registry.instantiate('paper_ai','a','t1'));
+  world.setRuntime('a','ice',{frozen:true});const snapshot=world.snapshotRuntime();
+  world.resetRuntime();world.restoreRuntime(snapshot);
+  snapshot.a.ice.frozen=false;assert.equal(world.runtime('a','ice').frozen,true);
+  assert.throws(()=>world.restoreRuntime({a:{surface:{height:1},missing:{}}}),/Unknown entity component/);
+  assert.deepEqual(world.snapshotRuntime(),{a:{ice:{frozen:true}}});
+  assert.equal(world.serialize()[0].runtime,undefined);
+});

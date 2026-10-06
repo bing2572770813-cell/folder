@@ -39,3 +39,11 @@ test('sparse footprints and notification failure isolation', () => {
   assert.deepEqual(m.at(1,2),[]);assert.deepEqual(m.at(2,2),['shape']);assert.equal(notified,1);
   assert.equal(m.notificationErrors.length,1);
 });
+test('deletion preflight and reference copies do not release protection',()=>{
+  const m=new TransformManager(5,5);m.create(node('a',1,1));
+  m.retain('a','entity:a');m.retain('a','editor:selection');
+  const owners=m.referenceOwners('a');owners.length=0;
+  assert.throws(()=>m.assertRemovable('a',['entity:a']),/references/);
+  m.release('a','editor:selection');m.assertRemovable('a',['entity:a']);
+  assert.throws(()=>m.remove('a'),/references/);
+});

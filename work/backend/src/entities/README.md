@@ -16,6 +16,8 @@
 
 `EntityWorld` 管理实体身份、标签配置与隔离的组件运行时状态。空间查询委托 TransformManager；实体注册会 retain Transform 引用，实体移除会 release。删除实体及其 Transform 时若空间删除失败会恢复引用，实体配置不变。序列化不含运行时状态。
 
+`snapshotRuntime` / `restoreRuntime` 为游玩历史提供独立组件状态快照，恢复先校验完整输入再替换状态。Transform 的 `referenceOwners` 返回副本，`assertRemovable` 提供不释放引用的删除预检，供编辑事务保留外部引用保护。
+
 `legacyMapToTree` 提供尚未接入导入 UI 的旧地图转换：每个剩余实体格保留自己的表面、通行、地形和标签配置，同一旧实例的格使用父子引用组合；孔洞不产生节点。虚空折线生成透明不可通行节点。地图名称、起点、出口等旧元数据保存为独立配置。当前只是迁移基础，完整字段权限、复制粘贴、导出往返和 UI 还需接入，不能把此转换器视为生产导入路径已完成。
 
 `ComponentRegistry` 注册受控组件处理器，分发 enter/leave/interact。事件先检查全部组件和进入限制，再返回独立的 actor/runtime/messages 结果；不在处理器中计步、切换区域或提交玩家状态。碰撞、火焰、冰、喷发和钥匙已有基本效果；邻近篝火解冻、完整标签触发和 player.cjs 协调仍需接入。

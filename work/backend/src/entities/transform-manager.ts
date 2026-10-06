@@ -25,6 +25,12 @@ export class TransformManager {
   onChange(listener:(event:TransformChange)=>void):()=>void{this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};}
   retain(id:string,owner:string):void{this.get(id);if(!owner)throw new Error('Empty reference owner');const refs=this.references.get(id)??new Set();refs.add(owner);this.references.set(id,refs);}
   release(id:string,owner:string):void{this.references.get(id)?.delete(owner);}
+  referenceOwners(id:string):string[]{this.get(id);return [...(this.references.get(id)??[])];}
+  assertRemovable(id:string,ignoredOwners:string[]=[]):void{
+    this.get(id);if(this.childrenOf(id).length)throw new Error('Transform has children');
+    const ignored=new Set(ignoredOwners);
+    if(this.referenceOwners(id).some(owner=>!ignored.has(owner)))throw new Error('Transform has external references');
+  }
   create(node:TransformNode):void{if(this.nodes.has(node.id))throw new Error('Duplicate transform ID');this.commit(next=>{next.set(node.id,copy(node));});}
   setLocal(id:string,local:GridTransform):void{const node=this.get(id);node.local=copy(local);this.commit(next=>{next.set(id,node);});}
   setParent(id:string,parentId:string|null,preserveWorld=false):void{
@@ -33,8 +39,7 @@ export class TransformManager {
     this.commit(next=>{next.set(id,node);});
   }
   remove(id:string):void{
-    this.get(id);if(this.childrenOf(id).length)throw new Error('Transform has children');
-    if(this.references.get(id)?.size)throw new Error('Transform has external references');
+    this.assertRemovable(id);
     this.commit(next=>{next.delete(id);});this.references.delete(id);
   }
   private commit(mutate:(next:Map<string,TransformNode>)=>void):void{

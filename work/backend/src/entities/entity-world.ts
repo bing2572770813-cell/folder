@@ -1,5 +1,5 @@
 import {TransformManager} from './transform-manager.js';
-import {jsonObject,freezeJson,type EntityNode,type JsonObject} from './entity-model.js';
+import {jsonObject,freezeJson,type EntityNode,type JsonObject,type ComponentRuntime} from './entity-model.js';
 
 /** Entity identity and state registry. Spatial lookup belongs exclusively to TransformManager. */
 export class EntityWorld {
@@ -45,5 +45,20 @@ export class EntityWorld {
     const cloned=jsonObject(state);const states=this.states.get(id)??new Map<string,JsonObject>();states.set(component,cloned);this.states.set(id,states);
   }
   resetRuntime():void{this.states.clear();}
+  snapshotRuntime():ComponentRuntime {
+    return Object.fromEntries([...this.states].map(([id,states])=>[id,Object.fromEntries([...states].map(([component,state])=>[component,jsonObject(state)]))]));
+  }
+  restoreRuntime(snapshot:ComponentRuntime):void {
+    const states=new Map<string,Map<string,JsonObject>>();
+    for(const [id,components] of Object.entries(jsonObject(snapshot))){
+      const node=this.get(id),entries=new Map<string,JsonObject>();
+      for(const [component,state] of Object.entries(jsonObject(components))){
+        if(!Object.hasOwn(node.components,component))throw new Error('Unknown entity component');
+        entries.set(component,jsonObject(state));
+      }
+      states.set(id,entries);
+    }
+    this.states=states;
+  }
   serialize():EntityNode[]{return [...this.entities.keys()].map(id=>this.get(id));}
 }

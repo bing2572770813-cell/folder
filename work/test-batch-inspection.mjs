@@ -18,7 +18,7 @@ const body=source.slice(source.indexOf('function applyInspectedProperty('),sourc
 function transactionFixture(readonly){
  const baseline={height:1,width:2,tiles:[[{height:.1},{height:.2,...(readonly?{propertySchema:{height:{tempEditable:false}}}:{})}]]};let records=0;
  const context={map:structuredClone(baseline),selectedCells:[{r:0,c:0},{r:0,c:1}],P:{mode:'edit'},clone:structuredClone,inspectionCells,cellHidden:()=>false,entityPropertySchema:t=>t.propertySchema??{},inspectionKey:(r,c)=>r+','+c,debugOverrides:{values:(k,t)=>t,set:()=>{}},updateProperty,mergeSerializableProperties,debugChanges,blocked:()=>false,normalizeTile:t=>t,assertHiddenContentUnchanged:()=>{},tagCatalog:[],visibility:{},validateMap:t=>t,record:()=>records++,controller:{resetPosition:()=>{}},buildPaper:()=>{},persist:()=>{},$:()=>({textContent:''}),updateUI:()=>{},scheduleInspection:()=>{}};
- context.applyMap=next=>{context.map=next;};
+ context.applyMap=(next,saveHistory)=>{if(saveHistory)context.record();context.map=next;};
  runInNewContext(body,context);return {context,baseline,records:()=>records};
 }
 const denied=transactionFixture(true);assert.throws(()=>denied.context.applyInspectedProperty(['height'],.5),/不可编辑/);assert.deepEqual(denied.context.map,denied.baseline);assert.equal(denied.records(),0);

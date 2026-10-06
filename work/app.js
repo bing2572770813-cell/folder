@@ -1,4 +1,8 @@
+import {nodePermissions} from './entities/node-permissions.mjs';
+import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
+import {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode,forkTreeDocument} from './entities/tree-commands.mjs';
+import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {paperSurface} from './render/paper-surface.mjs';
@@ -64,15 +68,15 @@ let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectionMode='single';
 let selectedCells=[],selectionBase=[],hiddenRegions=new Set();
 let redoHistory=[], editRect=null, clipboard=null, pendingRegion=null, gestureBefore=null;
-let inspectedCell=null;
+let inspectedCell=null,selectedNodeId=null,lastClickTile=null;
 let inspectionFrame=0;
-const debugOverrides=new DebugState();
+const debugOverrides=new DebugState(),nodeDebug=new DebugState();
 const editorBus=new EventBus();
 const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer);$('saveState').textContent='保存中';saveTimer=setTimeout(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(savedMap()));$('saveState').textContent='本地已保存';}catch{$('saveState').textContent='仅当前会话';}},120);});
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();clearInspection();},getMap:()=>map,getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},getMap:()=>map,getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -80,15 +84,16 @@ function defaultMap() {
   return validateMap(clone(demoMap),true);
 }
 function inside(r,c) { return Number.isInteger(r) && Number.isInteger(c) && r>=0 && c>=0 && r<map.height && c<map.width; }
-function cellHidden(r,c){const tile=map.tiles[r]?.[c];return !!tile&&(P.mode==='edit'?(hiddenRegions.has(regionOf(tile))||entityHidden(tile,hiddenEntities)):!P.revealedRegions.has(regionOf(tile)));}
+function cellHidden(r,c){const name=documentModel.cellTags[r+','+c]?.regionTag??'默认区域';return P.mode==='edit'?hiddenRegions.has(name):!P.revealedRegions.has(name);}
+function nodeHidden(node){return P.mode==='edit'&&hiddenEntities.has(node.prefabId);}
 function walkable(r,c) { return inside(r,c)&&!cellHidden(r,c) && map.tiles[r][c] !== null && !blocked(map.tiles[r][c]) && map.tiles[r][c].terrain!=='campfire'; }
 
 function coord(r,c) { return columnLabel(c)+(r+1); }
 function validateMap(data,allowDraft=false){return normalizeMap(data,allowDraft);}
 
-function applyMap(next){documentModel.applyLegacy(next);map=documentModel.view();}
+function applyMap(next,saveHistory=false){if(P?.mode==='edit')assertHiddenContentUnchanged(documentModel.view(),next,visibility);if(P?.mode==='edit'){const before=documentModel.view();for(let r=0;r<before.height;r++)for(let c=0;c<before.width;c++)if(JSON.stringify(before.tiles[r][c])!==JSON.stringify(next.tiles[r]?.[c]??null)||JSON.stringify(foldsAt(before,r,c))!==JSON.stringify(r<next.height&&c<next.width?foldsAt(next,r,c):[])){if(cellHidden(r,c)||documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能间接修改隐藏实体或区域');}}const candidate=forkTreeDocument(documentModel);candidate.applyLegacy(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
-function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
+function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
 function persist() {applyMap(map);for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
@@ -160,12 +165,13 @@ function makeToken(color){
 function buildPaper() {
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=new Map(),buckets=new Map(),edges=[],styleEdges=new Map(),terrains=new Map();
-  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
-    const tile=map.tiles[r][c];if(!tile||cellHidden(r,c))continue;
-    const cell={r,c},surface=paperSurface(map,r,c,cellHidden);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
-    const y=tileTop(r,c),x=wx(c),z=wz(r);
+  const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden}),surfaceMaps=new Map();
+  for(const projection of treeCells.surfaceCells){
+    const {r,c,tile,nodeId}=projection;
+    const cell={r,c,nodeId,tile},surface=paperSurface(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId)),surfaceMaps.get(nodeId))),r,c,cellHidden);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
+    const y=tileHeight(tile),x=wx(c),z=wz(r);
     if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);staticTokenLayer.add(token);}
-    if(tile.tags?.entry||tile.tags?.exitTo){const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=tile.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(tile.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(x,y+.04,z);marker.scale.setScalar(.52);marker.userData.ownedTexture=texture;tagLayer.add(marker);}
+
 
     const edgeColor=entityEdgeColor(tile);
     if(edgeColor&&surface){if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);for(const segment of surface.boundarySegments)for(const p of segment)lines.push(x+p[0],p[1]+.004,z+p[2]);}
@@ -174,23 +180,25 @@ function buildPaper() {
       const bottom=y-tileThickness(tile);const corners=[[x-.5,bottom,z-.5],[x+.5,bottom,z-.5],[x+.5,bottom,z+.5],[x-.5,bottom,z+.5],[x-.5,y+.004,z-.5],[x+.5,y+.004,z-.5],[x+.5,y+.004,z+.5],[x-.5,y+.004,z+.5]];
       for(const [a,b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])lines.push(...corners[a],...corners[b]);
     }
-    if(tile.terrain){if(!terrains.has(tile.terrain))terrains.set(tile.terrain,[]);terrains.get(tile.terrain).push(cell);}
+
     if(surface){for(const segment of surface.boundarySegments)for(const p of segment)edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
   }
+  for(const marker of treeCells.terrainCells){if(!terrains.has(marker.type))terrains.set(marker.type,[]);terrains.get(marker.type).push(marker);}
   for(const [color,bucket] of surfaces){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(bucket.positions,3));geometry.computeVertexNormals();const mesh=new THREE.Mesh(geometry,materials[color??'white']);mesh.userData.triangleCells=bucket.triangleCells;mesh.userData.surfaceCells=bucket.cells;tileLayer.add(mesh);}
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
   for(const [color,cells] of buckets){
     const mesh=new THREE.InstancedMesh(tileGeo,materials[color??'white'],cells.length);mesh.userData.cells=cells;
-    cells.forEach(({r,c},i)=>{const height=tileTop(r,c);const thickness=tileThickness(map.tiles[r][c]);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
+    cells.forEach(({r,c,tile},i)=>{const height=tileHeight(tile);const thickness=tileThickness(tile);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();tileLayer.add(mesh);
   }
   for(const [type,cells] of terrains){
     const material=new THREE.MeshBasicMaterial({map:terrainTextures[type],transparent:true,depthWrite:false,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2});
     const mesh=new THREE.InstancedMesh(markerGeo,material,cells.length);
     const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
-    cells.forEach(({r,c},i)=>{position.set(wx(c),tileTop(r,c)+.012,wz(r));matrix.compose(position,tilt,new THREE.Vector3(.72,.72,1));mesh.setMatrixAt(i,matrix);});
+    mesh.userData.cells=cells;cells.forEach(({r,c,index,total,surfaceTop},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();terrainLayer.add(mesh);
   }
+  for(const cell of treeCells.tagCells){if(!cell.tags.entry&&!cell.tags.exitTo)continue;const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=cell.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cell.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(wx(cell.c)-.27,Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)+.045,wz(cell.r));marker.scale.setScalar(.4);marker.userData.ownedTexture=texture;marker.userData.cell=cell;tagLayer.add(marker);}
   if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);
   }
@@ -198,7 +206,7 @@ function buildPaper() {
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z+.5,x+.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
   rebuildFoldAxes();
-  renderRegionControls();renderEntityVisibility();
+  renderRegionControls();renderEntityVisibility();refreshTreePanel();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
 }
 function addAxisLabels(maxHeight){
@@ -241,7 +249,7 @@ function tileOutline(r,c,hex){const line=new THREE.LineSegments(new THREE.EdgesG
 
 
 
-$('teleportBtn').onclick=()=>teleport();
+$('teleportBtn').onclick=()=>teleport();$('interactBtn').onclick=()=>controller.interact();
 for(const id of ['blockThickness','blockGradualRate'])$(id).onchange=()=>{try{brushTile();if(tool!=='place')setTool('place');syncState();}catch(e){toast(e.message,true);}};
 $('blockHeight').oninput=()=>{const n=Number($('blockHeight').value);if(Number.isFinite(n)&&n>=.01&&n<=16){brushHeight=n;syncState();}};
 $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number.isFinite(n)||n<.01||n>16){toast('方块高度须为 0.01–16',true);$('blockHeight').value=brushHeight;return;}brushHeight=n;if(tool!=='place')setTool('place');};
@@ -265,7 +273,7 @@ function editAt(r,c){
       if(tool!=='clear-tags')assertTagAttachment(tagCatalog,tool==='player'?'tag-spawn':tool==='entry'?'tag-entry':'tag-exit',map,r,c);
       if(tool==='player'&&taggedCells(map,'spawn').some(p=>cellHidden(p.r,p.c))||tool==='entry'&&taggedCells(map,'entry').some(p=>regionOf(p.tile)===regionOf(map.tiles[r][c])&&cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域标签');
       const next=clone(map);if(tool==='clear-tags')next.tiles[r][c].tags={};else {tagCell(next,r,c,tag,tool==='region-exit'?$('exitRegion').value:true);if(tool==='region-exit')next.tiles[r][c].tags.requiredKeys=[...document.querySelectorAll('#requiredKeyList input:checked')].map(i=>i.value);}
-      record();applyMap(next);controller.resetPosition();buildPaper();persist();
+      applyMap(next,true);controller.resetPosition();buildPaper();persist();
     }catch(e){toast(e.message,true);}return;
   }
   if(tool==='paste'){pasteAt(r,c);return;}
@@ -277,9 +285,9 @@ function editAt(r,c){
   
 
   
-  if(tool==='place'){try{const prefab=prefabs.find(p=>p.id===selectedPrefabId),result=placeEntity(map,prefab,brushTile(),r,c,cellHidden);record();applyMap(result.map);buildPaper();persist();}catch(e){toast(e.message,true);}return;}
-  if(tool==='fold'){try{if(!visibility.folds)throw new Error('隐藏折线禁止编辑');if(foldType)assertTagAttachment(tagCatalog,'tag-fold',map,r,c);const next=clone(map);if(!applyFoldLine(next,r,c,foldType))return;validateMap(next,true);record();applyMap(next);buildPaper();persist();}catch(error){toast(error.message,true);}return;}
-  if(tool==='erase'){try{const cells=removeEntity(map,r,c,cellHidden);if(!visibility.player&&cells.some(p=>Object.keys(map.tiles[p.r][p.c]?.tags??{}).length))throw new Error('删除实体会改变隐藏标签');if(cells.some(p=>map.tiles[p.r][p.c]?.tags?.spawn))throw new Error('先移动玩家起点标签');const next=clone(map);record();for(const p of cells){const tile=next.tiles[p.r][p.c];next.foldCells.push(...foldsOf(tile).map(type=>({...p,type})));next.tiles[p.r][p.c]=null;}applyMap(next);buildPaper();persist();}catch(e){toast(e.message,true);}return;}
+  if(tool==='place'){try{const prefab=prefabs.find(p=>p.id===selectedPrefabId);if($('stackPlacement').checked){commitTree(placeTreePrefab(documentModel,prefab,brushTile(),r,c,{stack:true,isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)}));}else{if(documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能覆盖隐藏实体');const result=placeEntity(map,prefab,brushTile(),r,c,cellHidden);applyMap(result.map,true);buildPaper();persist();}}catch(e){toast(e.message,true);}return;}
+  if(tool==='fold'){try{if(!visibility.folds)throw new Error('隐藏折线禁止编辑');if(foldType)assertTagAttachment(tagCatalog,'tag-fold',map,r,c);const next=clone(map);if(!applyFoldLine(next,r,c,foldType))return;validateMap(next,true);applyMap(next,true);buildPaper();persist();}catch(error){toast(error.message,true);}return;}
+  if(tool==='erase'){try{const cells=removeEntity(map,r,c,cellHidden);if(!visibility.player&&cells.some(p=>Object.keys(map.tiles[p.r][p.c]?.tags??{}).length))throw new Error('删除实体会改变隐藏标签');if(cells.some(p=>map.tiles[p.r][p.c]?.tags?.spawn))throw new Error('先移动玩家起点标签');const next=clone(map);for(const p of cells){const tile=next.tiles[p.r][p.c];next.foldCells.push(...foldsOf(tile).map(type=>({...p,type})));next.tiles[p.r][p.c]=null;}applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}return;}
   buildPaper();persist();updateUI();
 }
 
@@ -330,7 +338,7 @@ function applyInspectedProperty(path,value){
   for(const change of debugChanges(source,edited,schema))pendingDebug.push({key,...change});
 
   }
-  if(JSON.stringify(candidate)!==JSON.stringify(map)){record();applyMap(candidate);controller.resetPosition();buildPaper();persist();}
+  if(JSON.stringify(candidate)!==JSON.stringify(map)){applyMap(candidate,true);controller.resetPosition();buildPaper();persist();}
   for(const change of pendingDebug)debugOverrides.set(change.key,change.path,change.value);
   $('propertyEditStatus').textContent='属性已应用 · 批量修改可一次撤销';updateUI();scheduleInspection();
 }
@@ -361,9 +369,9 @@ function drawEditSelection(){
   $('regionStatus').textContent=pendingRegion?'点击粘贴落点 · Esc 取消':editRect?coord(editRect.r,editRect.c)+' · '+editRect.w+' × '+editRect.h:'左键拖拽框选';
   $('copyRegion').disabled=!selectedCells.length;$('pasteRegion').disabled=!clipboard;scheduleInspection();
 }
-$('copyRegion').onclick=()=>{if(!editRect)return;clipboard=selectionRegion(map,selectedCells);drawEditSelection();toast('选区已复制');};
-$('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.length,w:clipboard[0].length};drawEditSelection();};
-function pasteAt(r,c){try{if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);assertHiddenContentUnchanged(map,result.map,visibility);record();applyMap(result.map);editRect=result.rect;selectedCells=unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
+$('copyRegion').onclick=()=>{if(!editRect)return;try{clipboard=copyTree(documentModel,selectedCells,{isHidden:cellHidden,nodeHidden});}catch(error){toast(error.message,true);return;}drawEditSelection();toast('选区已复制');};
+$('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();};
+function pasteAt(r,c){try{if(clipboard.kind==='tree'){commitTree(pasteTree(documentModel,clipboard,r,c,{isHidden:cellHidden,nodeHidden}));pendingRegion=null;setTool('select');return;}if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);assertHiddenContentUnchanged(map,result.map,visibility);applyMap(result.map,true);editRect=result.rect;selectedCells=unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
 function updateUI(){
   if(document.activeElement!==$('mapName'))$('mapName').value=map.name;
@@ -383,13 +391,13 @@ function updateUI(){
   syncState();
 }
 
-function replaceMap(next,save=true){const validated=new TreeDocument(next);record();debugOverrides.clear();clearInspection();editRect=null;selectedCells=[];pendingRegion=null;hiddenRegions.clear();documentModel=validated;map=validated.view();controller.resetPosition();controller.resetProgress();buildPaper();fitCamera();if(save)persist();updateUI();}
+function replaceMap(next,save=true){const validated=new TreeDocument(next);record();debugOverrides.clear();nodeDebug.clear();clearInspection();editRect=null;selectedCells=[];pendingRegion=null;hiddenRegions.clear();documentModel=validated;map=validated.view();controller.resetPosition();controller.resetProgress();buildPaper();fitCamera();if(save)persist();updateUI();}
 let renaming=false;
 $('mapName').oninput=()=>{if(!renaming){editHistory.push(editSnapshot());trimHistory(editHistory);redoHistory=[];renaming=true;}map.name=normalizeMapName($('mapName').value);persist();updateUI();};
 $('mapName').onblur=()=>{renaming=false;$('mapName').value=map.name;};
 $('mapName').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('mapName').blur();}};
 $('newMap').onclick=()=>{setMode('edit');const tiles=Array.from({length:map.height},()=>Array.from({length:map.width},blankTile));replaceMap({version:1,width:map.width,height:map.height,tiles,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null});toast('已新建空白地图');};
-$('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>128||height>128){toast('宽度和高度须为 3–128 的整数',true);return;}if(width===map.width&&height===map.height)return;for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if((r>=height||c>=width)&&cellHidden(r,c)){toast('缩小地图会删除隐藏区域，请先显示该区域',true);return;}const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||blocked(tiles[spawn.r][spawn.c]))tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;try{record();applyMap({...map,version:1,width,height,tiles,foldCells:(map.foldCells??[]).filter(p=>p.r<height&&p.c<width),spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps});controller.resetPosition();buildPaper();fitCamera();persist();updateUI();toast('地图尺寸已更新');}catch(error){toast(error.message,true);}};
+$('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>128||height>128){toast('宽度和高度须为 3–128 的整数',true);return;}if(width===map.width&&height===map.height)return;for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if((r>=height||c>=width)&&cellHidden(r,c)){toast('缩小地图会删除隐藏区域，请先显示该区域',true);return;}const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||blocked(tiles[spawn.r][spawn.c]))tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;try{applyMap({...map,version:1,width,height,tiles,foldCells:(map.foldCells??[]).filter(p=>p.r<height&&p.c<width),spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps},true);controller.resetPosition();buildPaper();fitCamera();persist();updateUI();toast('地图尺寸已更新');}catch(error){toast(error.message,true);}};
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(savedMap(),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=mapFilename(map.name);a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=JSON.parse(await file.text());new TreeDocument(next);setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
 
@@ -408,10 +416,11 @@ function exportGameHtml(){
 }
 $('exportGame').onclick=exportGameHtml;
 
-const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=null,lastClickTile=null,lastEditKey=null,dragEdited=false,multiTouch=false;const activePointers=new Set();
+const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=null,lastEditKey=null,dragEdited=false,multiTouch=false;const activePointers=new Set();
 function hitAt(clientX,clientY){
   const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);
-  const surface=raycaster.intersectObjects(tileLayer.children,false)[0];
+  const surface=raycaster.intersectObjects([...tagLayer.children,...terrainLayer.children,...tileLayer.children],false)[0];
+  if(surface?.object.userData.cell)return surface.object.userData.cell;
   if(surface?.object.userData.triangleCells)return surface.object.userData.triangleCells[surface.faceIndex];
   if(surface?.instanceId!==undefined)return surface.object.userData.cells[surface.instanceId];
   const point=raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());if(!point)return null;
@@ -423,7 +432,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
   if(manualPan){hoverOutline.visible=false;disposableClear(placementLayer);return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
   if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));const groups=P.mode==='edit'&&visibility.folds?foldAxes.filter(g=>g.cells.some(p=>p.r===hit.r&&p.c===hit.c)):[];$('foldRadiusHint').hidden=!groups.length;$('foldRadiusHint').textContent=groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / ');$('hoverCoord').textContent=groups.length?groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / '):coord(hit.r,hit.c)+' · '+(map.tiles[hit.r][hit.c]?(COLOR_NAMES[map.tiles[hit.r][hit.c].color]||'无颜色属性')+' · '+regionOf(map.tiles[hit.r][hit.c])+(map.tiles[hit.r][hit.c].tags?.exitTo?' → '+map.tiles[hit.r][hit.c].tags.exitTo:''):'空格');}else{hoverOutline.visible=false;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';}
   drawPlacementPreview(hit);
-  if(P.mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.length,w:clipboard[0].length};drawEditSelection();}
+  if(P.mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();}
   if(P.mode==='edit'&&tool==='select'&&selectionMode==='multi'&&pointerDown?.button===0&&!multiTouch&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start){const rect=rectangle(start,hit);selectedCells=unionCells(selectionBase,rect,(r,c)=>!cellHidden(r,c));editRect=cellBounds(selectedCells);dragEdited=true;drawEditSelection();}return;}
   const dragTools=new Set(['place','erase']);
   if(P.mode==='edit'&&pointerDown?.button===0&&!multiTouch&&!dragEdited&&dragTools.has(tool)&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){
@@ -438,8 +447,8 @@ renderer.domElement.addEventListener('pointermove',e=>{
 });
 renderer.domElement.addEventListener('pointerleave',()=>{disposableClear(placementLayer);hoverOutline.visible=false;hovered=null;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';});
 renderer.domElement.addEventListener('pointercancel',e=>{finishGesture();activePointers.delete(e.pointerId);if(!activePointers.size)multiTouch=false;pointerDown=null;lastEditKey=null;dragEdited=false;manualPan=false;});
-renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;syncState();if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||P.moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){selectedCells=[];editRect=null;clearSelection();drawEditSelection();syncState();return;}const {r,c}=hit;lastClickTile={r,c};if(P.mode==='edit'){if(!map.tiles[r][c]&&tool!=='inspect'){selectedCells=[];editRect=null;drawEditSelection();syncState();if(tool==='select')return;}editAt(r,c);return;}controller.click(r,c);});
-window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape'){pendingRegion=null;editRect=null;selectedCells=[];clearSelection();drawEditSelection();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
+renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;syncState();if(!activePointers.size)multiTouch=false;if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||P.moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){selectedCells=[];editRect=null;clearSelection();drawEditSelection();syncState();return;}const {r,c}=hit;selectedNodeId=hit.nodeId??documentModel.primaryAt(r,c)?.id??null;refreshTreePanel();lastClickTile={r,c};if(P.mode==='edit'){if(!map.tiles[r][c]&&tool!=='inspect'){selectedCells=[];editRect=null;drawEditSelection();syncState();if(tool==='select')return;}editAt(r,c);return;}controller.click(r,c);});
+window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLTextAreaElement||e.target.isContentEditable||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape'){pendingRegion=null;editRect=null;selectedCells=[];clearSelection();drawEditSelection();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
 
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 
@@ -520,7 +529,7 @@ function renderRegionControls(){
  for(const name of names){$('exitRegion').add(new Option(name,name));const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=!hiddenRegions.has(name);input.setAttribute('aria-label','显示区域 '+name);input.onchange=()=>{if(input.checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();};label.append(input,document.createTextNode(name));container.append(label);}
  if(names.includes(current))$('exitRegion').value=current;
 }
-$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');record();applyMap(next);buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}};
 function prefabPreview(prefab){
  const key=JSON.stringify(prefab);if(previewCache.has(key))return previewCache.get(key);
  previewRenderer??=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});previewRenderer.setSize(100,80);previewRenderer.setClearColor('#e1e8e0',1);
@@ -546,15 +555,29 @@ function drawPlacementPreview(hit){
  $('hoverCoord').textContent=(invalid?'无法放置 · ':'占格预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
 
-$('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$('keyName').value,cellHidden);record();applyMap(next);buildPaper();persist();}catch(e){toast(e.message,true);}};
+$('applyKeyName').onclick=()=>{try{const next=renameKeyCells(map,selectedCells,$('keyName').value,cellHidden);applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}};
 
 $('regionChoice').onchange=()=>{$('newRegionPanel').hidden=!!$('regionChoice').value;};
 
-function renderEntityVisibility(){const container=$('entityVisibility');container.replaceChildren();for(const prefab of entityChoices(prefabs,map)){const label=document.createElement('label'),input=document.createElement('input'),img=document.createElement('img');label.className='prefab-preview';label.title=prefab.name;label.dataset.name=prefab.name;input.type='checkbox';input.checked=!hiddenEntities.has(prefab.id);input.setAttribute('aria-label','显示实体 '+prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;input.onchange=()=>{if(input.checked)hiddenEntities.delete(prefab.id);else hiddenEntities.add(prefab.id);refreshEntityVisibility();};label.append(input,img);container.append(label);}}
+function treeEntityChoices(){const choices=entityChoices(prefabs,map),ids=new Set(choices.map(p=>p.id));for(const node of documentModel.world.serialize())if(!ids.has(node.prefabId)){ids.add(node.prefabId);choices.push(normalizePrefab({version:1,id:node.prefabId,name:node.prefabId,tile:node.configuration??{color:"white"}}));}return choices;}
+function renderEntityVisibility(){const container=$('entityVisibility');container.replaceChildren();for(const prefab of treeEntityChoices()){const label=document.createElement('label'),input=document.createElement('input'),img=document.createElement('img');label.className='prefab-preview';label.title=prefab.name;label.dataset.name=prefab.name;input.type='checkbox';input.checked=!hiddenEntities.has(prefab.id);input.setAttribute('aria-label','显示实体 '+prefab.name);img.src=prefabPreview(prefab);img.alt=prefab.name;input.onchange=()=>{if(input.checked)hiddenEntities.delete(prefab.id);else hiddenEntities.add(prefab.id);refreshEntityVisibility();};label.append(input,img);container.append(label);}}
 function refreshEntityVisibility(){selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();syncState();}
 $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility();};
-$('hideAllEntities').onclick=()=>{for(const prefab of entityChoices(prefabs,map))hiddenEntities.add(prefab.id);refreshEntityVisibility();};
+$('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
 $('foldHintsToggle').onclick=()=>controller.setFoldHints(!P.foldHints);
 
 $('freeTeleportToggle').onclick=()=>controller.setFreeTeleport(!P.freeTeleport);
+
+function commitTree(next){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(documentModel,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(documentModel,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');if(JSON.stringify(next.serialize())===JSON.stringify(documentModel.serialize())){refreshTreePanel();return;}record();documentModel=next;map=next.view();if(selectedNodeId&&!next.world.serialize().some(node=>node.id===selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();updateUI();}
+function refreshTreePanel(){
+ const panel=$('treeNodes');if(!panel)return;panel.replaceChildren();const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
+ for(const node of nodes){const transform=documentModel.world.transforms.get(node.transformId),world=documentModel.world.transforms.world(node.transformId);const button=document.createElement('button');button.type='button';button.textContent=(transform.parentId?'↳ ':'')+node.prefabId+' · '+coord(world.r,world.c)+(point&&documentModel.world.at(point.r,point.c).some(item=>item.id===node.id)?' · 同格':'');button.title=node.id;button.dataset.nodeId=node.id;button.disabled=nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c));button.setAttribute('aria-pressed',String(selectedNodeId===node.id));button.onclick=()=>{selectedNodeId=node.id;refreshTreePanel();};panel.append(button);}
+ const node=nodes.find(item=>item.id===selectedNodeId);$('treeFields').hidden=!node;if(!node)return;const transform=documentModel.world.transforms.get(node.transformId);$('nodeLocalR').value=transform.local.r;$('nodeLocalC').value=transform.local.c;$('nodeLocalDir').value=transform.local.dir;$('nodeParent').replaceChildren(new Option('地图根节点',''));for(const other of nodes)if(other.id!==node.id)$('nodeParent').add(new Option(other.prefabId+' · '+other.id,other.id));$('nodeParent').value=nodes.find(item=>item.transformId===transform.parentId)?.id??'';const readable=projectProperties(nodeDebug.values(node.id,node,nodeSchema(node)),nodeSchema(node),'readable');$('nodeComponents').value=JSON.stringify(readable.components??{},null,2);$('nodeTags').value=JSON.stringify(readable.tags??{},null,2);$('nodeIdentity').textContent=node.id;
+}
+function treeAction(action){try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');commitTree(action());}catch(error){toast(error.message,true);}}
+$('moveNode').onclick=()=>treeAction(()=>moveNode(documentModel,selectedNodeId,{r:Number($('nodeLocalR').value),c:Number($('nodeLocalC').value),dir:Number($('nodeLocalDir').value)},cellHidden,nodeHidden));
+$('reparentNode').onclick=()=>treeAction(()=>reparentNode(documentModel,selectedNodeId,$('nodeParent').value||null,$('preserveWorld').checked,cellHidden,nodeHidden));
+$('deleteNode').onclick=()=>treeAction(()=>deleteNode(documentModel,selectedNodeId,cellHidden,nodeHidden));
+function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
+$('applyNodeConfig').onclick=()=>treeAction(()=>{const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable'),after={...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)};if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,selectedNodeId,after.components,after.tags,cellHidden,nodeHidden,schema);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);return next;});

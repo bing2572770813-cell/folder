@@ -113,3 +113,6 @@ npm --prefix work test
 纸张方块不同高度时使用平坦中心与三角斜面：中心 0.6×0.6 保留自身高度，外围宽度 0.2；共边中点取两侧纸块平均高度，共角取接触该角的可见纸块平均高度（含斜向）。仅纸张相连，虚空/其他实体保留外壁；属性高度与玩家中心高度不变。合并每种颜色的网格，并记录三角面所属格子以保证拾取准确，网格与自带勾线跟随斜面边界。
 
 Paper tile properties: `thickness` (0.001–16) is physical shell thickness: bottom vertices offset along unit surface normals, with reversed bottom faces and closed side walls. Top faces and outlines are never clipped by world height. Flat surfaces offset vertically; sloping surfaces offset sideways as well. Missing thickness defaults to height for old maps. `gradualRate` (0–100) is total transition width / flat width: flat width = 1/(1+rate), each rim = rate/(2*(1+rate)); default 2/3 preserves the former 0.6 center, 0 disables slopes. Properties are edited alongside height and persist in map/prefab JSON; gameplay elevation remains height (Three.js Y is vertical).
+
+
+Transform 树编辑器使用 v2 TreeDocument 作为唯一地图数据源，旧 tile 地图是兼容投影。检视页可选择同格节点、编辑局部位置和组件 JSON、重挂载父节点或执行受保护删除；放置页的显式叠加开关可新增同格节点。复制保存完整子树和稀疏占格，粘贴生成独立 ID，regionTag 留在地图 tile。方向沿父链叠加，不旋转偏移或 footprint。非持久权限字段只在检视调试覆盖中修改；保存、导出和剪贴板使用 canonical 配置。

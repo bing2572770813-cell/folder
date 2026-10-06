@@ -57,6 +57,8 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id,...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})};delete node.configuration.regionTag;registry.validate(node);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});
+    // Legacy terrain/item prefabs include a paper surface; stacking reuses the destination paper.
+    if(record.tile?.terrain&&candidate.world.transforms.worldCells(transformId).some(cell=>candidate.world.at(cell.r,cell.c).some(other=>Object.hasOwn(other.components,'surface'))))delete node.components.surface;
     check(candidate.world,[transformId],options.isHidden,options.nodeHidden);
     const bases=normalizeBaseEntity(record.BaseEntity);createEntityBehavior(record.behavior);
     for(const cell of candidate.world.transforms.worldCells(transformId)){

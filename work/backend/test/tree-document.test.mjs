@@ -8,7 +8,7 @@ import {validateRegions,taggedCells} from '../../tags/regions.mjs';
 const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tree-document.mjs',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
-function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components.fold={directions:['v']};tree.entities.push(node);return new TreeDocument(tree);}
+function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components={fold:{directions:['v']}};tree.entities.push(node);return new TreeDocument(tree);}
 test('view and no-op updates preserve stacked IDs and hierarchy',()=>{
   const doc=stacked(),before=doc.serialize();const view=doc.view();view.tiles[1][1].color='red';assert.equal(doc.view().tiles[1][1].color,'white');
   doc.applyLegacy(doc.view());assert.deepEqual(doc.serialize(),before);
@@ -17,13 +17,13 @@ test('view and no-op updates preserve stacked IDs and hierarchy',()=>{
 });
 test('legacy fold removal updates every surface-free owner independently',()=>{
  const doc=new TreeDocument(legacy()),tree=doc.serialize();
- tree.entities[0].components={fold:{directions:['h','v']},fire:{damage:2}};
+ tree.entities[0].components={fold:{directions:['h','v']},tag:{retained:true}};
  tree.entities.push({id:'fold-b',prefabId:'void_ai',transformId:'fold-b-t',components:{collision:{blocked:true},fold:{directions:['v','d1']},key:{name:'keep'}},tags:{custom:true},static:{transparent:true}});
  tree.transforms.push({id:'fold-b-t',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}});
  const stacked=new TreeDocument(tree),before=stacked.serialize(),next=stacked.view();next.foldCells=next.foldCells.filter(fold=>fold.type==='v');
  stacked.applyLegacy(next);
  assert.deepEqual(stacked.view().foldCells,[{r:1,c:1,type:'v'}]);
- assert.deepEqual(stacked.world.get(tree.entities[0].id).components.fire,{damage:2});
+ assert.deepEqual(stacked.world.get(tree.entities[0].id).components.tag,{retained:true});
  assert.deepEqual(stacked.world.get(tree.entities[0].id).components.fold.directions,['v']);
  assert.deepEqual(stacked.world.get('fold-b').components.key,{name:'keep'});
  assert.deepEqual(stacked.world.get('fold-b').components.fold.directions,['v']);
@@ -83,12 +83,12 @@ test('key-only overlays keep ground geometry and contribute tags without copying
 test('transparent and key-only nodes do not fabricate ground; conflicting tags reject',()=>{
   const tree=structuredClone(new TreeDocument(legacy()).serialize());tree.entities[0].static.transparent=true;const doc=new TreeDocument(tree);assert.equal(doc.primaryAt(1,1),null);assert.equal(doc.view().tiles[1][1],null);
   tree.entities[0].static={render:false};assert.equal(new TreeDocument(tree).view().tiles[1][1].color,'white');
-  tree.entities[0].tags.exitTo='A';tree.entities.push({...structuredClone(tree.entities[0]),id:'other',tags:{exitTo:'B'}});assert.throws(()=>new TreeDocument(tree),/Conflicting/);
+  tree.entities[0].tags.exitTo='A';tree.entities.push({...structuredClone(tree.entities[0]),id:'other',components:{tag:{}},tags:{exitTo:'B'}});assert.throws(()=>new TreeDocument(tree),/Conflicting/);
 });
 
 test('legacy height and fixed cell region edits preserve additional mixed components',()=>{
- const snapshot=new TreeDocument(legacy()).serialize();snapshot.entities[0].components={...snapshot.entities[0].components,ice:{},fire:{damage:3},key:{name:'铜'}};const doc=new TreeDocument(snapshot);
- for(const edit of [tile=>tile.height=.4,tile=>tile.regionTag='B']){const next=doc.view();edit(next.tiles[1][1]);doc.applyLegacy(next);const node=doc.world.serialize()[0];assert.deepEqual(node.components.fire,{damage:3});assert.deepEqual(node.components.key,{name:'铜'});assert.deepEqual(node.components.ice,{});}
+ const snapshot=new TreeDocument(legacy()).serialize();snapshot.entities[0].components={...snapshot.entities[0].components,tag:{retained:true},fire:{damage:3},key:{name:'铜'}};const doc=new TreeDocument(snapshot);
+ for(const edit of [tile=>tile.height=.4,tile=>tile.regionTag='B']){const next=doc.view();edit(next.tiles[1][1]);doc.applyLegacy(next);const node=doc.world.serialize()[0];assert.deepEqual(node.components.fire,{damage:3});assert.deepEqual(node.components.key,{name:'铜'});assert.deepEqual(node.components.tag,{retained:true});}
  });
 
 test('moved spawn and overlay spawn tags update compatibility and saved spawn coordinates',async()=>{

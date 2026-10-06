@@ -6,10 +6,10 @@ import {importTreeMap,serializeTreeMap} from '../dist/entities/tree-serializatio
 import {loadTree} from '../dist/entities/legacy-map.js';
 
 const bundled = await build({
-  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,configureNode,placeTreePrefab} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
+  stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},
   bundle:true,platform:'node',format:'esm',write:false,
 });
-const {TreeDocument,moveNode,reparentNode,configureNode,placeTreePrefab,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
+const {TreeDocument,moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,copyTree,pasteTree} = await import('data:text/javascript;base64,'+Buffer.from(bundled.outputFiles[0].text).toString('base64'));
 const entity = (id, components) => ({id,prefabId:id,transformId:id,components,tags:{},static:{}});
 function fixture() {
   return {version:2,width:6,height:6,
@@ -32,7 +32,7 @@ test('same-cell terrain is rejected regardless of roots, descendants or shared t
     const before=structuredClone(input);assert.throws(()=>importTreeMap(input),error);assert.throws(()=>loadTree(input),error);assert.deepEqual(input,before);
   }
   const world=importTreeMap(fixture()).world;
-  world.add({...entity('second',{key:{name:'铜'}}),transformId:'other'});
+  world.add({...entity('second',{ice:{}}),transformId:'other'});
   assert.throws(()=>serializeTreeMap(world),error);
 });
 test('different tiles on one multi-cell paper can each have terrain; sparse holes do not count',()=>{
@@ -40,24 +40,26 @@ test('different tiles on one multi-cell paper can each have terrain; sparse hole
   input.entities[2].components={ice:{}};input.transforms[2].local.c=2;
   assert.doesNotThrow(()=>importTreeMap(input));
   input.transforms[1].local.c=1;input.transforms[2].local.c=1;
-  assert.doesNotThrow(()=>importTreeMap(input));
+  assert.throws(()=>importTreeMap(input),/承载/);
   input.transforms[0].footprint.occupied[1]=true;assert.throws(()=>importTreeMap(input),error);
 });
-test('inline terrain consumes one slot; multiple components on one entity count once',()=>{
+test('inline terrain consumes one slot; terrain types are exclusive and keys can coexist',()=>{
   const input=fixture();input.entities[0].components.fire={};assert.throws(()=>importTreeMap(input),error);
   input.entities[0].components={surface:{}};input.entities[1].components={fire:{},ice:{},key:{name:'铜'}};
+  assert.throws(()=>importTreeMap(input),/多种地形/);
+  input.entities[1].components={fire:{},key:{name:'铜'}};
+  input.entities[2].components={key:{name:'银'}};
   assert.doesNotThrow(()=>importTreeMap(input));
 });
 test('moving terrain or paper into a conflicting stack is atomic; preserve-world reparent is valid',()=>{
-  const input=fixture();input.entities[2].components={key:{name:'铜'}};input.transforms[2].parentId=null;input.transforms[2].local={r:0,c:0,dir:0};
+  const input=fixture();input.entities[2].components={ice:{}};input.transforms[2].parentId=null;input.transforms[2].local={r:0,c:0,dir:0};
+  input.entities.push(entity('support',{surface:{}}));input.transforms.push({...structuredClone(input.transforms[2]),id:'support'});
   const doc=new TreeDocument(input),before=doc.serialize();
   const attached=reparentNode(doc,'other','paper',true);
   assert.deepEqual(attached.world.transforms.world('other'),doc.world.transforms.world('other'));
   assert.throws(()=>reparentNode(doc,'other','paper',false),error);
   assert.throws(()=>moveNode(doc,'other',{r:1,c:1,dir:0}),error);assert.deepEqual(doc.serialize(),before);
-  input.transforms[1].parentId=null;input.transforms[1].local={r:2,c:2,dir:0};input.transforms[2].local={r:2,c:2,dir:0};
-  const floating=new TreeDocument(input),snapshot=floating.serialize();
-  assert.throws(()=>moveNode(floating,'paper',{r:2,c:2,dir:0}),error);assert.deepEqual(floating.serialize(),snapshot);
+  assert.throws(()=>moveNode(doc,'paper',{r:0,c:0,dir:0}),/多个纸张/);assert.deepEqual(doc.serialize(),before);
 });
 test('component edits, stacked placement, prefab children and clipboard reject conflicts atomically',()=>{
   const doc=new TreeDocument(fixture()),before=doc.serialize();
@@ -65,13 +67,39 @@ test('component edits, stacked placement, prefab children and clipboard reject c
   assert.throws(()=>placeTreePrefab(doc,{id:'cold',components:{ice:{}}},{},1,1,{stack:true}),error);
   const prefab={id:'custom-paper',components:{surface:{color:'white'}},children:[{id:'hot',components:{fire:{}}},{id:'cold',components:{ice:{}}}]};
   assert.throws(()=>placeTreePrefab(doc,prefab,{},3,3,{stack:true}),error);
-  const clipboard=copyTree(doc,[{r:1,c:1}]);assert.throws(()=>pasteTree(doc,clipboard,1,1),error);
+  const clipboard=copyTree(doc,[{r:1,c:1}]);assert.throws(()=>pasteTree(doc,clipboard,1,1),/多个纸张/);
   clipboard.entities.find(node=>node.id==='other').components={ice:{}};
   assert.throws(()=>pasteTree(doc,clipboard,3,3),error);assert.deepEqual(doc.serialize(),before);
 });
-test('adding a paper surface under two floating terrains is rejected atomically',()=>{
-  const input=fixture();input.entities[0].components={tag:{}};input.entities[2].components={ice:{}};
+test('terrain cannot exist without paper even if hidden or render-disabled',()=>{
+  for(const staticData of [{},{transparent:true},{render:false}]){
+    const input=fixture();input.entities[0].components={tag:{}};input.entities[1].static=staticData;
+    assert.throws(()=>importTreeMap(input),/承载/);
+  }
+});
+test('removing, moving or deconfiguring paper cannot leave independent terrain unsupported',()=>{
+  const input=fixture();input.transforms[1].parentId=null;input.transforms[1].local={r:1,c:1,dir:0};
+  input.transforms[2].parentId=null;input.transforms[2].local={r:1,c:1,dir:0};
   const doc=new TreeDocument(input),before=doc.serialize();
-  assert.throws(()=>configureNode(doc,'paper',{surface:{color:'white'}},{}),error);
+  assert.throws(()=>deleteNode(doc,'paper'),/承载/);
+  assert.throws(()=>moveNode(doc,'paper',{r:3,c:3,dir:0}),/承载/);
+  assert.throws(()=>configureNode(doc,'paper',{tag:{}},{}),/承载/);
+  assert.deepEqual(doc.serialize(),before);
+});
+test('duplicate paper is forbidden even when transparent or sharing the same Transform',()=>{
+  for(const staticData of [{},{transparent:true},{render:false}]){
+    const input=fixture();input.entities.push({...entity('duplicate',{surface:{}}),transformId:'paper',static:staticData});
+    assert.throws(()=>importTreeMap(input),/多个纸张/);
+  }
+});
+test('legacy key and terrain prefabs reuse paper when stacked, but paper prefabs cannot stack',()=>{
+  const input=fixture();input.entities[1].components={tag:{}};
+  const doc=new TreeDocument(input),before=doc.serialize();
+  const fire=placeTreePrefab(doc,{id:'fire_ai',tile:{color:'red',terrain:'fire'}},{},1,1,{stack:true});
+  const withKey=placeTreePrefab(fire,{id:'key_ai',tile:{color:'yellow',terrain:'key',keyName:'铜'}},{},1,1,{stack:true});
+  assert.equal(withKey.world.at(1,1).filter(node=>node.components.surface).length,1);
+  assert.equal(withKey.world.at(1,1).filter(node=>node.components.fire).length,1);
+  assert.equal(withKey.world.at(1,1).find(node=>node.prefabId==='key_ai').components.key.name,'铜');
+  assert.throws(()=>placeTreePrefab(doc,{id:'paper_ai',tile:{color:'white'}},{},1,1,{stack:true}),/多个纸张/);
   assert.deepEqual(doc.serialize(),before);
 });

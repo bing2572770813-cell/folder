@@ -2,7 +2,9 @@
 
 产品范围依据 `docs/entity-transform-tree-product-design.md`。纯模型已接入生产编辑器、玩家、渲染和保存边界；实际 FR 证据见产品进度表。
 
-每个有 surface 纸张表面的 tile 上最多叠加一个 terrain 实体，允许没有。terrain 根据 campfire、ice、fire、eruption、key 组件识别，每个实体计一次；共享 Transform 的不同 terrain 实体分别计数。这里的“子实体”指纸张方格上方的叠加实体，与 Transform 父子关系无关；同一多格纸张的不同实际占格可分别叠加 terrain，掩码空洞不算纸张格。旧实体自身的内联地形计入该格的 terrain 数量，一个实体含多个地形组件仍只计一次。导入、导出、组合 prefab 放置、移动、重挂载、组件编辑与粘贴共用校验；违规操作拒绝且保留源文档。保持世界位置的重挂载不会改变叠加数量，不能根据父节点名额禁用候选。
+每个 tile 最多一个 surface 纸张表面，可以叠加其他实体。terrain 是 campfire、ice、fire、eruption 地形，必须在每个实际占格都有纸张承载，同格最多一个地形实体，同一实体也不能同时包含多种地形。key 是收集物，不属于 terrain，可以与地形共存。规则依据 TransformManager 实际占格而非父子关系，隐藏/透明不豁免，掩码空洞不提供承载。旧实体内联地形同样计数；旧版带纸面的地形/钥匙 prefab 叠加到已有纸张时复用承载面，不再创建第二张纸。
+
+导入、导出、组合 prefab 放置、移动、重挂载、组件编辑与粘贴共用校验；违规操作拒绝且保留源文档。移动或删除纸张也不能留下悬空地形。保持世界位置的重挂载不改变叠加关系；同一多格纸张不同格子可分别放地形。
 
 `TransformManager` 是空间引用的唯一管理入口。`create`、`setLocal`、`setParent` 在候选状态校验全部父引用、循环和实际占格，成功后提交并通知；失败不修改状态或索引。读取返回独立副本。`at` 返回同一世界格全部 Transform ID，不增加 layer 或 CellStack。
 

@@ -7,11 +7,11 @@ const {TreeDocument}=await bundle('../../entities/tree-document.mjs');
 const {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode}=await bundle('../../entities/tree-commands.mjs');
 const document=()=>new TreeDocument({version:1,width:6,height:6,spawn:{r:1,c:1,dir:0},tiles:Array.from({length:6},(_,r)=>Array.from({length:6},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null))});
 const prefab={id:'hot',tile:{color:'red'},components:{fire:{damage:2}},static:{walkable:true}};
-test('stacking preserves surface and snapshots inherited mixed component configuration',()=>{
+test('placement preserves existing surface and snapshots inherited terrain and collection configuration',()=>{
   const doc=document(),original=doc.serialize();doc.world.setRuntime(original.entities[0].id,'surface',{visited:true});doc.world.transforms.retain(original.transforms[0].id,'player');
-  const placed=placeTreePrefab(doc,{id:'mixed',extends:'base',components:{fire:{damage:3},ice:{}}},{color:'blue'},1,1,{stack:true,resolve:()=>prefab});
-  assert.equal(placed.world.at(1,1).length,2);assert.deepEqual(doc.serialize(),original);
-  const mixed=placed.world.at(1,1).find(n=>n.prefabId==='mixed');assert.equal(mixed.components.surface.color,'blue');assert.equal(mixed.components.fire.damage,3);assert.ok(mixed.components.ice);assert.equal(mixed.static.walkable,true);assert.equal(placed.cellTags['1,1'].regionTag,'A');
+  const placed=placeTreePrefab(doc,{id:'mixed',extends:'base',components:{fire:{damage:3},key:{name:'铜'}}},{color:'blue'},2,2,{stack:true,resolve:()=>prefab});
+  assert.equal(placed.world.at(1,1).length,1);assert.deepEqual(doc.serialize(),original);
+  const mixed=placed.world.at(2,2).find(n=>n.prefabId==='mixed');assert.equal(mixed.components.surface.color,'blue');assert.equal(mixed.components.fire.damage,3);assert.equal(mixed.components.key.name,'铜');assert.equal(mixed.static.walkable,true);assert.equal(placed.cellTags['1,1'].regionTag,'A');
   assert.deepEqual(placed.world.runtime(original.entities[0].id,'surface'),{visited:true});assert.ok(placed.world.transforms.referenceOwners(original.transforms[0].id).includes('player'));
 });
 test('native overlay has no ground and unique tags reject atomically',()=>{

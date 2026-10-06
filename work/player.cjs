@@ -366,11 +366,19 @@ function beginFoldDrag(r, c, startY) {
       (p.r - group.center.r) * direction.c;
     const playerSide = Math.sign(side(P.player)),
       map = env.getMap();
+    // The drag may start inside the flap or directly on a crease cell.
+    const creaseKeys = new Set(group.cells.map((p) => p.r + "," + p.c));
+    const movable = (p) => {
+      const value = side(p);
+      return (
+        value * playerSide > 0 || (creaseKeys.has(p.r + "," + p.c) && !value)
+      );
+    };
     if (
       !playerSide ||
       !map.tiles[r]?.[c] ||
       env.isHidden(r, c) ||
-      side({ r, c }) * playerSide <= 0 ||
+      !movable({ r, c }) ||
       !inFoldRange(group, { r, c })
     )
       return false;
@@ -412,7 +420,7 @@ function beginFoldDrag(r, c, startY) {
       ready: false,
     };
     $("toolStatus").textContent =
-      "向上拖拽折叠 · 松开落到蓝色目标，未对齐则回弹";
+      "在折痕或玩家同侧方块上在折痕或玩家同侧方块上向上拖拽折叠 · 松开落到蓝色目标，未对齐则回弹";
     updateUI();
     return true;
   }

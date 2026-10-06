@@ -47,4 +47,16 @@ const full=fixture();full.controller.beginFoldDrag(2,3,300);assert.equal(full.co
 const debug=fixture();debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:.25,foldHorizontal:.1});assert.deepEqual(debug.P.foldDrop,{vertical:.25,horizontal:.1});debug.controller.undo();assert.deepEqual(debug.P.foldDrop,{vertical:1,horizontal:.35});assert.throws(()=>debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:0}),/阈值/);
 const polygon=[{position:[-1,0,0],uv:[0,0]},{position:[1,0,0],uv:[1,0]},{position:[0,0,1],uv:[.5,1]}];
 for(const positive of [false,true]){const half=clipFoldPolygon(polygon,v=>v.position[0],positive);assert.ok(half.length>=3);assert.ok(half.every(v=>positive?v.position[0]>=0:v.position[0]<=0));}
+const grab = fixture('h');
+grab.controller.selectFold(3, 3, 'h');
+assert.equal(
+  grab.controller.beginFoldDrag(3, 3, 300),
+  true,
+  'drag may start directly on a crease cell',
+);
+assert.ok(
+  grab.P.foldMotion.creaseCells.some((p) => p.r === 3 && p.c === 3),
+  'crease cells still take the split animation',
+);
+grab.controller.cancelFoldMotion();
 console.log('PASS: four physical fold axes, mixed crease halves, player attachment, aligned drop, rebound, stale gates, undo and immutable maps.');

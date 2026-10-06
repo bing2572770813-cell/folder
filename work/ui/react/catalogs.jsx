@@ -1,5 +1,7 @@
 import React from "react";
-import { UiButton, UiCheckbox } from "./controls.jsx";
+import { SingleSelectIconOptions } from "./SingleSelect_icons.jsx";
+import { MultiSelectIconOptions } from "./MultiSelect_icons.jsx";
+import { UiCheckbox } from "./controls.jsx";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { MantineProvider } from "@mantine/core";
@@ -21,22 +23,16 @@ export function renderIsland(container, node) {
 }
 export function EntityGrid({ items, selected, onSelect }) {
   return (
-    <>
-      {items.map((item) => (
-        <UiButton
-          key={item.id}
-          className={"prefab-preview" + (item.id === selected ? " active" : "")}
-          data-prefab={item.id}
-          data-name={item.name}
-          title={item.name}
-          aria-label={item.name}
-          aria-pressed={item.id === selected}
-          onClick={() => onSelect(item.id)}
-        >
-          <img src={item.preview} alt={item.name} />
-        </UiButton>
-      ))}
-    </>
+    <SingleSelectIconOptions
+      items={items}
+      value={selected}
+      onChange={onSelect}
+      renderIcon={(item) => <img src={item.preview} alt={item.name} />}
+      optionProps={(item) => ({
+        "data-prefab": item.id,
+        "data-name": item.name,
+      })}
+    />
   );
 }
 export function renderEntityGrid(container, items, selected, onSelect) {
@@ -47,23 +43,17 @@ export function renderEntityGrid(container, items, selected, onSelect) {
 }
 export function EntityChecklist({ items, hidden, onChange }) {
   return (
-    <>
-      {items.map((item) => (
-        <label
-          key={item.id}
-          className="prefab-preview"
-          title={item.name}
-          data-name={item.name}
-        >
-          <UiCheckbox
-            aria-label={"显示实体 " + item.name}
-            checked={!hidden.has(item.id)}
-            onChange={(e) => onChange(item.id, e.currentTarget.checked)}
-          />
-          <img src={item.preview} alt={item.name} />
-        </label>
-      ))}
-    </>
+    <MultiSelectIconOptions
+      items={items}
+      value={
+        new Set(
+          items.filter((item) => !hidden.has(item.id)).map((item) => item.id),
+        )
+      }
+      onChange={onChange}
+      ariaPrefix="显示实体 "
+      renderIcon={(item) => <img src={item.preview} alt={item.name} />}
+    />
   );
 }
 export function renderEntityChecklist(container, items, hidden, onChange) {
@@ -125,5 +115,23 @@ export function renderMechanismText(container, texts) {
         <p key={text}>{text}</p>
       ))}
     </>,
+  );
+}
+
+export function renderRegionChecklist(container, names, selected, onChange) {
+  renderIsland(
+    container,
+    <MultiSelectIconOptions
+      items={names.map((name) => ({ id: name, name }))}
+      value={selected}
+      ariaPrefix="显示区域 "
+      onChange={onChange}
+      renderIcon={(item) => (
+        <span className="icon-select-letter" aria-hidden="true">
+          {item.name.slice(0, 1)}
+        </span>
+      )}
+      empty="暂无区域"
+    />,
   );
 }

@@ -75,6 +75,61 @@ const esbuild = require("esbuild");
     inspector.querySelector('[aria-label="secret (properties.secret)"]'),
     null,
   );
+
+  const entityPicker = document
+    .querySelector("#prefabSummary")
+    .closest(".icon-select-row");
+  const tagPicker = document
+    .querySelector("#tagSummary")
+    .closest(".icon-select-row");
+  assert.ok(entityPicker && tagPicker);
+  assert.equal(
+    document.querySelector("#prefabSummary").className,
+    document.querySelector("#tagSummary").className,
+  );
+  const entityLayer = document
+    .querySelector("#entityVisibility")
+    .closest("details");
+  const regionLayer = document
+    .querySelector("#regionVisibility")
+    .closest("details");
+  assert.equal(entityLayer.parentElement, regionLayer.parentElement);
+  assert.equal(entityLayer.className, regionLayer.className);
+  assert.equal(
+    entityLayer.closest("section").querySelector("h2").textContent,
+    "显示图层",
+  );
+  const items = [
+    { id: "alpha", name: "图标 A", icon: "A" },
+    { id: "beta", name: "图标 B", icon: "B", disabled: true },
+  ];
+  const single = parseHTML(
+    module.exports.renderSelectionMarkup(false, {
+      label: "任意单选",
+      items,
+      value: "alpha",
+      summaryId: "genericSummary",
+    }),
+  ).document;
+  assert.ok(
+    single.querySelector("#genericSummary").textContent.includes("图标 A"),
+  );
+  assert.equal(
+    single.querySelector('[aria-label="图标 A"]').getAttribute("aria-pressed"),
+    "true",
+  );
+  assert.ok(
+    single.querySelector('[aria-label="图标 B"]').hasAttribute("disabled"),
+  );
+  const multi = parseHTML(
+    module.exports.renderSelectionMarkup(true, {
+      label: "任意多选",
+      items,
+      value: new Set(["alpha"]),
+    }),
+  ).document;
+  assert.ok(multi.querySelector('[value="alpha"]').hasAttribute("checked"));
+  assert.ok(!multi.querySelector('[value="beta"]').hasAttribute("checked"));
   console.log(
     "PASS: React/Mantine shell, unique IDs, mounted panels, ARIA linkage, tool placement, mixed fields and property permissions.",
   );

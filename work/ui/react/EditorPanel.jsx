@@ -3,12 +3,12 @@ import { Tabs } from "@mantine/core";
 import { MapEditorPanel } from "./MapEditorPanel.jsx";
 import { InspectorPanel } from "./InspectorPanel.jsx";
 import { MapProperties } from "./MapProperties.jsx";
-import { DisplayLayers } from "./DisplayLayers.jsx";
+import { LayerVisibility } from "./LayerVisibility.jsx";
 const panels = [
   ["map", "地图编辑", "tabMap", "panelMap", MapEditorPanel],
   ["inspect", "检视", "tabInspect", "panelInspect", InspectorPanel],
   ["properties", "地图属性", "tabProperties", "panelProperties", MapProperties],
-  ["layers", "图层", "tabLayers", "panelLayers", DisplayLayers],
+  ["layers", "图层", "tabLayers", "panelLayers", LayerVisibility],
 ];
 export const EditorPanel = React.memo(function EditorPanel() {
   return (

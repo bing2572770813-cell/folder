@@ -12,3 +12,16 @@ export const renderInspectorMarkup = (props) =>
       <PropertyInspector {...props} />
     </MantineProvider>,
   );
+
+import { SingleSelect_icons } from "./react/SingleSelect_icons.jsx";
+import { MultiSelect_icons } from "./react/MultiSelect_icons.jsx";
+export const renderSelectionMarkup = (multiple, props) =>
+  renderToStaticMarkup(
+    <MantineProvider theme={editorTheme} forceColorScheme="light">
+      {multiple ? (
+        <MultiSelect_icons {...props} />
+      ) : (
+        <SingleSelect_icons {...props} />
+      )}
+    </MantineProvider>,
+  );

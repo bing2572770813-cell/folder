@@ -19,7 +19,7 @@ import {normalizeTagPrefab,assertTagAttachment,entityPropertySchema} from './tag
 import {assertHiddenContentUnchanged} from './editor/visibility-policy.mjs';
 import {projectProperties,serializeMapConfiguration,updateProperty,mergeSerializableProperties,debugChanges} from './core/property-model.mjs';
 import {DebugState} from './editor/debug-state.mjs';
-import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderMechanismText} from './ui/react/catalogs.jsx';
+import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderRegionChecklist,renderMechanismText} from './ui/react/catalogs.jsx';
 import {renderPropertyInspector,clearPropertyInspector} from './ui/property-inspector.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound } from 'lucide';
@@ -513,7 +513,7 @@ function renderRegionControls(){
  const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of regionNames(map))regionChoice.add(new Option(name,name));if(regionNames(map).includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;
  const names=regionNames(map),container=$('regionVisibility'),current=$('exitRegion').value;$('exitRegion').replaceChildren();
  for(const name of names)$('exitRegion').add(new Option(name,name));
- renderNameChecklist(container,names,new Set(names.filter(name=>!hiddenRegions.has(name))),'显示区域 ',(name,checked)=>{if(checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();});
+ renderRegionChecklist(container,names,new Set(names.filter(name=>!hiddenRegions.has(name))),(name,checked)=>{if(checked)hiddenRegions.delete(name);else hiddenRegions.add(name);selectedCells=selectedCells.filter(p=>!cellHidden(p.r,p.c));editRect=cellBounds(selectedCells);buildPaper();});
  if(names.includes(current))$('exitRegion').value=current;
 }
 $('assignRegion').onclick=()=>{try{if(!selectedCells.length)throw new Error('先选择区域方格');if(selectedCells.some(p=>cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域');for(const p of selectedCells)if(map.tiles[p.r]?.[p.c])assertTagAttachment(tagCatalog,'tag-region',map,p.r,p.c);const next=assignRegion(map,selectedCells,$('regionChoice').value||$('regionName').value,!!$('regionChoice').value);for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(cellHidden(r,c)&&JSON.stringify(map.tiles[r][c])!==JSON.stringify(next.tiles[r][c]))throw new Error('区域更名会改变隐藏方块的出口标签，请先显示该区域');record();map=next;buildPaper();persist();}catch(e){toast(e.message,true);}};

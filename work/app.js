@@ -13,6 +13,7 @@ import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {inspectionCells,batchProperties} from './editor/batch-inspection.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
+import {clearMapCells} from './editor/clear-map.mjs';
 import {inspectCell} from './entities/cell-entity.mjs';
 import {EventBus} from './core/event-bus.mjs';
 import {normalizeTagPrefab,assertTagAttachment,entityPropertySchema} from './tags/tag-model.mjs';
@@ -249,6 +250,7 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(b.dataset.
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile))return;color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefabs.find(p=>p.id===selectedPrefabId)?.tile.blocked?'阻挡实体':'可通行实体';if(tool!=='place')setTool('place');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
+$('clearMap').onclick=()=>{try{const next=clearMapCells(map,cellHidden,visibility);record();map=next;selectedCells=[];editRect=null;pendingRegion=null;debugOverrides.clear();clearInspection();controller.resetProgress();buildPaper();persist();toast('地图已清空 · 可撤销');}catch(error){toast(error.message,true);}};
 function editAt(r,c){
   if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
   if(tool==='inspect'){try{inspectAtCell(r,c);}catch(error){toast(error.message,true);}return;}

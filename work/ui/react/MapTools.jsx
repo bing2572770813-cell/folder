@@ -9,6 +9,9 @@ export const MapTools = React.memo(function MapTools() {
         <small>{"TOOLS"}</small>
       </h2>
       <div className="tool-grid">
+        <UiButton id="clearMap" className="tool-btn" data-tip="清空地图" aria-label="清空地图">
+          <i data-lucide="trash-2" />
+        </UiButton>
         <UiButton
           className="tool-btn"
           data-tool="place"

@@ -23,3 +23,5 @@ Node.js 仍只承担资源服务和构建。执行 npm --prefix work ci、npm --
 ## 通用图标选择组件
 
 SingleSelect_icons.jsx 与 MultiSelect_icons.jsx 是不依赖游戏语义的父级组件，通过 items/value/onChange、renderIcon 和参数插槽适配业务。BlockEntityTools 将方块实体和方块标签组合为同款单选下拉栏；LayerVisibility 以显示图层为一级标题，实体和显示区域为同级二级多选下拉栏。业务规则与数据筛选留在适配层，不写入通用父组件。
+
+地图工具的清空地图为可撤销结构操作，保留地图名称、尺寸与地图级配置，清除实体、标签与折线；隐藏内容仍阻止修改。放置操作不能覆盖多格实体的实际占用格，须先删除整个实体，掩码空洞不受此限制。

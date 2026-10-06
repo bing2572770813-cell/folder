@@ -3,6 +3,7 @@ import {paperSurface,isPaper} from './render/paper-surface.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor} from './render/fold-motion.mjs';
+import {createTableScene} from './render/table-scene.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
 import {normalizeMapName,mapFilename} from './core/map-name.mjs';
@@ -32,9 +33,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {LineSegments2} from 'three/examples/jsm/lines/LineSegments2.js';
 import {LineSegmentsGeometry} from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
-import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square } from 'lucide';
+import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2 } from 'lucide';
 
-const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Copy, ClipboardPaste, Redo2 };
+const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Copy, ClipboardPaste, Redo2 };
 for (const node of document.querySelectorAll('[data-lucide]')) {
   const name=node.dataset.lucide.replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
   const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
@@ -63,7 +64,7 @@ let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs[0]?.id??nul
 const getPlayerPrefab=()=>prefabs.find(p=>p.id==='player_ai');
 function brushTile(){const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let map=defaultMap(),tool='place',color='white',foldType='h';
-let hovered=null,showGrid=true;
+let hovered=null,showGrid=true,showTable=true;
 let selectedTagTool=null;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectionMode='single';
@@ -90,6 +91,7 @@ function cellHidden(r,c){const tile=map.tiles[r]?.[c];return !!tile&&(P.mode==='
 function walkable(r,c) { return inside(r,c)&&!cellHidden(r,c) && map.tiles[r][c] !== null && !blocked(map.tiles[r][c]) && map.tiles[r][c].terrain!=='campfire'; }
 
 function coord(r,c) { return columnLabel(c)+(r+1); }
+const voidPlaneTop=(r,c)=>Math.max(tileTop(r,c),sceneryTop);
 function validateMap(data,allowDraft=false){return normalizeMap(data,allowDraft);}
 
 function persist() {for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
@@ -121,6 +123,13 @@ const cameraFollowTarget=new THREE.Vector3();
 const lastFollowPosition=new THREE.Vector3();let lastFollowSteps=0;
 function correctFollowCamera(){const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;playerGroup.getWorldPosition(lastFollowPosition);lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
 const paper=new THREE.Group(); scene.add(paper);
+const tableScenery=createTableScene(); scene.add(tableScenery.group);
+function paperUnderside(){let lowest=null;for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tile=map.tiles?.[r]?.[c];if(!tile||cellHidden(r,c))continue;const bottom=tileTop(r,c)-tileThickness(tile);if(lowest===null||bottom<lowest)lowest=bottom;}return lowest??0;}
+// The tabletop always rests under the lowest visible paper underside.
+let sceneryTop=0;
+function layoutScenery(){sceneryTop=showTable?paperUnderside():0;tableScenery.layout(map.width,map.height,sceneryTop);}
+// Void-plane overlays sit on the tabletop while the table is visible.
+const voidY=offset=>sceneryTop+offset;
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
 const sunlight=new THREE.DirectionalLight('#fff8e5',2.6); sunlight.position.set(-9,18,8); sunlight.castShadow=true;
 sunlight.shadow.mapSize.set(2048,2048); sunlight.shadow.camera.left=-20;sunlight.shadow.camera.right=20;sunlight.shadow.camera.top=20;sunlight.shadow.camera.bottom=-20;sunlight.shadow.camera.near=1;sunlight.shadow.camera.far=55;sunlight.shadow.bias=-.0006;sunlight.shadow.normalBias=.025; sunlight.shadow.radius=4;scene.add(sunlight);
@@ -209,9 +218,9 @@ function buildPaper() {
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));foldLayer.add(marker);
   }
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;entityEdgeLayer.add(outline);}
-  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z-.5,x+.5,.002,z+.5,x+.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z+.5,x-.5,.002,z-.5);}
+  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r),y=voidY(.002);edges.push(x-.5,y,z-.5,x+.5,y,z-.5,x+.5,y,z-.5,x+.5,y,z+.5,x+.5,y,z+.5,x-.5,y,z+.5,x-.5,y,z+.5,x-.5,y,z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
-  rebuildFoldAxes();
+  rebuildFoldAxes();layoutScenery();
   for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
   renderRegionControls();renderEntityVisibility();
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();
@@ -227,7 +236,7 @@ function addAxisLabels(maxHeight){
 }
 function applyVisibility(){
   const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
-  terrainLayer.visible=true;
+  terrainLayer.visible=true;tableScenery.group.visible=showTable;
 }
 for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;if(key==='folds')buildPaper();else applyVisibility();syncState();};
 
@@ -288,6 +297,7 @@ document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(b.dataset.
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile))return;color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefabs.find(p=>p.id===selectedPrefabId)?.tile.blocked?'阻挡实体':'可通行实体';if(tool!=='place')setTool('place');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
+$('tableToggle').onclick=()=>{showTable=!showTable;$('tableToggle').setAttribute('aria-pressed',String(showTable));$('tableToggle').classList.toggle('active',showTable);applyVisibility();syncState();};
 $('clearMap').onclick=()=>{try{const next=clearMapCells(map,cellHidden,visibility);record();map=next;setSelectedCells([]);editRect=null;pendingRegion=null;debugOverrides.clear();clearInspection();controller.resetProgress();buildPaper();persist();toast('地图已清空 · 可撤销');}catch(error){toast(error.message,true);}};
 function editAt(r,c){
   if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
@@ -495,7 +505,7 @@ window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 
 let renderedFrames=0;
-function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
+function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,showTable,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState});}
 function screenPoints(){
   viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.count??o.userData.surfaceCells?.length??0),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,tokenShape:activeTokenHost.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play',defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
@@ -552,8 +562,8 @@ function rebuildFoldAxes(){
  for(const g of foldAxes)for(const [a,b] of foldStrokes(g)){
   const mr=Math.max(0,Math.min(map.height-1,Math.floor((a.r+b.r)/2+.5))),mc=Math.max(0,Math.min(map.width-1,Math.floor((a.c+b.c)/2+.5)));
   if(isPaper(map.tiles[mr]?.[mc]))continue;
-  if(Math.hypot(b.r-a.r,b.c-a.c)<.04){const r=Math.max(0,Math.min(map.height-1,Math.floor(a.r+.5))),c=Math.max(0,Math.min(map.width-1,Math.floor(a.c+.5)));dots.push(wx((a.c+b.c)/2),tileTop(r,c)+.018,wz((a.r+b.r)/2));continue;}
-  for(const p of [a,b]){const r=Math.max(0,Math.min(map.height-1,Math.floor(p.r+.5))),c=Math.max(0,Math.min(map.width-1,Math.floor(p.c+.5)));positions.push(wx(p.c),tileTop(r,c)+.018,wz(p.r));colors.push(.28,.4,.3);}
+  if(Math.hypot(b.r-a.r,b.c-a.c)<.04){const r=Math.max(0,Math.min(map.height-1,Math.floor(a.r+.5))),c=Math.max(0,Math.min(map.width-1,Math.floor(a.c+.5)));dots.push(wx((a.c+b.c)/2),voidPlaneTop(r,c)+.018,wz((a.r+b.r)/2));continue;}
+  for(const p of [a,b]){const r=Math.max(0,Math.min(map.height-1,Math.floor(p.r+.5))),c=Math.max(0,Math.min(map.width-1,Math.floor(p.c+.5)));positions.push(wx(p.c),voidPlaneTop(r,c)+.018,wz(p.r));colors.push(.28,.4,.3);}
  }
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
  foldAxisMesh=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({vertexColors:true,depthTest:false,depthWrite:false,toneMapped:false}));foldAxisMesh.renderOrder=5;foldAxisLayer.add(foldAxisMesh);
@@ -597,7 +607,7 @@ function drawPlacementPreview(hit){
  disposableClear(placementLayer);if(P.mode!=='edit'||tool!=='place'||!hit)return;
  const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)return;
  const cells=footprint(prefab,hit.r,hit.c),invalid=cells.some(p=>{const instance=map.tiles[p.r]?.[p.c]?.instance;return !inside(p.r,p.c)||cellHidden(p.r,p.c)||instance&&(instance.width>1||instance.height>1);});
- for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?tileTop(p.r,p.c)+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
+ for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?tileTop(p.r,p.c)+.04:voidY(.04),wz(p.r));line.renderOrder=12;placementLayer.add(line);}
  $('hoverCoord').textContent=(invalid?'无法放置 · ':'占格预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
 

@@ -31,6 +31,72 @@ function fixture(extra=[]){
  return {map,state,controller,move,add,registry,env,get rebuilds(){return rebuilds;},get world(){return world;},replaceWorld:()=>{const snapshot=world.snapshotRuntime();world=new EntityWorld(transforms,world.serialize());world.restoreRuntime(snapshot);}};
 }
 
+test('walk and teleport carry exclusive causes through leave and enter',()=>{
+ const f=fixture(),events=[];
+ f.registry.register('observer',{events:Object.fromEntries(['enter','leave'].map(type=>[type,context=>{events.push([type,context.trigger]);return {};}]))});
+ for(const [r,c] of [[1,0],[1,1],[2,3]])f.add(`observer-${r}-${c}`,r,c,{observer:{}});
+ f.controller.selectPlayer();events.length=0;f.controller.movePlayer(1,1);
+ // Validation invokes pure handlers too; committed arrival is the final enter.
+ assert.deepEqual(events.slice(-2),[['leave','walk'],['enter','walk']]);
+ assert.equal(f.state.turn.phase,'present');assert.equal(f.state.turn.number,1);
+ f.controller.tick(performance.now()+1000);assert.equal(f.state.turn.phase,'complete');
+ f.controller.setFreeTeleport(true);events.length=0;f.controller.testTeleport(2,3);
+ assert.deepEqual(events.slice(-2),[['leave','teleport'],['enter','teleport']]);
+ assert.equal(f.state.turn.number,2);assert.equal(f.state.terrainState.actions,2);
+ f.controller.tick(performance.now()+1000);f.controller.undo();
+ assert.equal(f.state.turn.number,1);assert.equal(f.state.turn.trigger,'walk');
+ f.controller.restart();assert.equal(f.state.turn.number,0);assert.equal(f.state.turn.phase,'idle');
+});
+
+test('walking into region exit enters destination by teleport within one turn',()=>{
+ const f=fixture();f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+ f.registry.register('arrival',{events:{enter:context=>({actor:{arrival:context.trigger,arrivals:[...(context.actor.arrivals??[]),context.trigger]}})}});
+ f.add('exit-observer',1,1,{arrival:{}});f.add('entry-observer',2,3,{arrival:{}});
+ f.controller.selectPlayer();f.controller.movePlayer(1,1);
+ assert.equal(f.state.terrainState.arrival,'teleport');assert.equal(f.state.turn.trigger,'walk');
+ assert.deepEqual(f.state.terrainState.arrivals,['walk','teleport']);
+ assert.equal(f.state.turn.number,1);assert.equal(f.state.steps,1);assert.equal(f.state.terrainState.actions,1);
+});
+
+test('fold arrival uses teleport cause, counts once and respects trigger-specific restrictions',()=>{
+ const f=fixture();f.registry.register('walkOnly',{canEnter:context=>context.trigger==='teleport'?'只能行走进入':undefined});
+ f.add('walk-only',1,2,{walkOnly:{}});
+ const before=f.controller.snapshot();assert.equal(f.controller.teleport({r:1,c:1,type:'v'}),false);
+ assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.state.playHistory.length,0);
+ f.world.remove('walk-only');
+ f.registry.register('arrival',{events:{enter:context=>({actor:{arrival:context.trigger}})}});f.add('arrival',1,2,{arrival:{}});
+ const phases=[];f.env.onTurnPhase=turn=>{phases.push(turn.phase);turn.number=999;};
+ assert.equal(f.controller.teleport({r:1,c:1,type:'v'}),true);
+ assert.equal(f.state.terrainState.arrival,'teleport');assert.equal(f.state.teleports,1);assert.equal(f.state.steps,1);
+ assert.deepEqual(phases,['validate','snapshot','leave','action','enter','settle','outcome','present']);
+ assert.equal(f.state.turn.number,1);f.controller.tick(performance.now()+1000);assert.equal(phases.at(-1),'complete');
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
+});
+
+test('entry invalidated by departure rolls back runtime, history and player state',()=>{
+ const f=fixture();f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5},state:{left:true}})}});
+ f.registry.register('restriction',{canEnter:context=>context.actor.overheat===5?'禁止进入':undefined});
+ f.add('departure',1,0,{departure:{}});f.add('restriction',1,1,{restriction:{}});
+ f.controller.selectPlayer();const before=f.controller.snapshot();
+ assert.throws(()=>f.controller.movePlayer(1,1),/禁止进入/);
+ assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.state.playHistory.length,0);assert.equal(f.state.moving,false);
+ f.world.remove('restriction');f.move(1,1);assert.equal(f.state.turn.number,1);
+});
+
+test('terminal outcome is resolved before presentation and busy input cannot advance turns',()=>{
+ const f=fixture();f.map.exit={r:1,c:1};f.controller.selectPlayer();f.controller.movePlayer(1,1);
+ assert.equal(f.state.levelWon,true);assert.equal(f.state.moving,true);assert.equal(f.state.turn.outcome,'win');
+ f.controller.movePlayer(1,0);assert.equal(f.state.turn.number,1);
+ f.controller.tick(performance.now()+1000);f.controller.tick(performance.now()+2000);
+ assert.equal(f.state.turn.phase,'complete');assert.equal(f.state.terrainState.actions,1);
+});
+
+test('registry rejects multiple or unknown arrival causes',()=>{
+ const f=fixture(),input={type:'enter',nodes:[],actor:{},runtime:{}};
+ assert.throws(()=>f.registry.dispatch({...input,trigger:['walk','teleport']}),/trigger/i);
+ assert.throws(()=>f.registry.dispatch({...input,trigger:'hover'}),/trigger/i);
+});
+
 test('stacked fire and named keys apply once, undo restores runtime, restart isolates nodes',()=>{
  const f=fixture([['fire',1,1,{fire:{}}],['key-a',1,1,{key:{name:'铜'}}],['key-b',1,2,{key:{name:'银'}}]]);
  f.map.tiles[1][1].terrain='fire';

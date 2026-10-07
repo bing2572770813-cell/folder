@@ -1,12 +1,13 @@
 import {Vector3} from 'three';
 
-export const lightingDefaults = Object.freeze({directional:2.6,ambient:2.1,fill:1.1,shadow:1,azimuth:-48.37,elevation:56.22,exposure:1.05,foldMaxSpeed:6.283185307179586,creaseDepth:.6});
+export const lightingDefaults = Object.freeze({directional:2.6,ambient:2.1,fill:1.1,shadow:1,azimuth:-48.37,elevation:56.22,exposure:1.05,foldMaxSpeed:6.283185307179586,foldMaxAngle:179,creaseDepth:.6});
 export const lightingFields = [
   ['directional','定向光强度',0,10,.1], ['ambient','环境光强度',0,10,.1],
   ['fill','补光强度',0,10,.1], ['shadow','阴影强度',0,1,.05],
   ['azimuth','光照方位角',-180,180,1], ['elevation','光照仰角',1,89,1],
   ['exposure','曝光',.1,4,.05],
   ['foldMaxSpeed','折叠最大角速度 (rad/s)',.1,20,.1],
+  ['foldMaxAngle','折叠最大旋转角 (°)',0,180,1],
   ['creaseDepth','折痕深度',-1,1,.01],
 ];
 export function validateLighting(values){

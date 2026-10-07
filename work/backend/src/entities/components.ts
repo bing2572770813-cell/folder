@@ -77,7 +77,8 @@ export function defaultComponents():ComponentRegistry {
     const min=Number(config.minHeight),max=Number(config.maxHeight),initial=Number(config.initialHeight);
     if(min<.01||max>16||min>max)throw new Error('Invalid lift height range');
     if(initial<min||initial>max)throw new Error('Invalid lift initialHeight');
-    const turns=config.turnsPerLeg??(typeof config.durationMs==='number'&&Number.isFinite(config.durationMs)&&config.durationMs>0?3:undefined);
+    if(Object.hasOwn(config,'durationMs'))throw new Error('durationMs is unsupported; use turnsPerLeg');
+    const turns=config.turnsPerLeg;
     if(typeof turns!=='number'||!Number.isSafeInteger(turns)||turns<1||turns>100)throw new Error('Invalid lift turnsPerLeg');
   }});
   registry.register('fold',{validate:config=>{if(config.directions!==undefined&&(!Array.isArray(config.directions)||config.directions.some(value=>!['h','v','d1','d2'].includes(String(value)))))throw new Error('Invalid fold directions');}});

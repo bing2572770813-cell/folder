@@ -16,7 +16,7 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 高级 JSON 可删除完整的可编辑组件对象，删除递归检查对象内所有字段权限；不能通过删除父对象绕过隐藏或只读子字段。
 
-旧 version:2 中只有 configuration.lift 且仍含 durationMs 的快照允许一次兼容提升；转换后移除 durationMs。新回合配置快照没有独立恢复组件的权限。
+升降配置只接受 turnsPerLeg。durationMs 在组件和配置快照中均被拒绝，不再迁移旧时钟或从快照恢复组件。
 
 纸面连接由 surface.connected 能力控制，兼容视图使用 surfaceConnected，权限双向同步。缺省时可通行的普通纸面连接相邻纸面，阻挡、地形及静态 token 默认保持独立；升降平台始终独立。自定义 prefab 名称不改变表面连接能力。
 

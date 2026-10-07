@@ -17,7 +17,7 @@ console.log('PASS: whole-instance selection expansion, shared fields/types, mixe
 // Exercise the production transaction adapter, including a later-target rejection.
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
 const {updateProperty,mergeSerializableProperties,debugChanges}=await import('./core/property-model.mjs');
-const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
+const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8');
 const body=source.slice(source.indexOf('function applyInspectedProperty('),source.indexOf('\ndocument',source.indexOf('function applyInspectedProperty(')));
 function transactionFixture(readonly){
  const baseline={height:1,width:2,tiles:[[{height:.1},{height:.2,...(readonly?{propertySchema:{height:{tempEditable:false}}}:{})}]]};let records=0;

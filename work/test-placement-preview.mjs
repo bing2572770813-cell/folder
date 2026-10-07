@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import * as THREE from 'three';
-const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
+const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8');
 const draw=source.slice(source.indexOf('function drawPlacementPreview('),source.indexOf('function placementPreviewMap('));
 const inputs=Object.fromEntries(['blockHeight','blockThickness','blockGradualRate','keyName','hoverCoord'].map(id=>[id,{value:'1',textContent:''}]));
 const prefab={id:'paper_ai',name:'纸张',size:{width:1,height:1}},layer=new THREE.Group(),counts={checks:0,projections:0,clears:0};

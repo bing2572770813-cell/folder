@@ -67,3 +67,13 @@ test('render projection can restrict output to requested cells',()=>{
  assert.deepEqual(view.surfaceCells.map(cell=>[cell.r,cell.c]),[[1,1],[1,1]]);
  assert.equal(view.tagCells.length,2);
 });
+
+test('surface projection reuses a base map without rewriting its cells',()=>{
+ const {document}=fixture(),base=document.view(),before=structuredClone(base);
+ document.view=()=>{throw new Error('unexpected full projection');};
+ const result=mapForSurface(document,'b',false,base);
+ assert.equal(result.tiles[1][1].height,.3);
+ assert.deepEqual(base,before);
+ assert.notEqual(result.tiles[1],base.tiles[1]);
+ assert.equal(result.tiles[0],base.tiles[0]);
+});

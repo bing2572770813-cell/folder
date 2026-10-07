@@ -24,6 +24,11 @@ import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-c
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor,tabletopHeight} from './render/fold-motion.mjs';
 import {createTableScene} from './render/table-scene.mjs';
+import {createModelLibrary} from './render/model-library.mjs';
+import {createModelView} from './render/model-view.mjs';
+import {createFbxModelLoader} from './render/fbx-model-loader.mjs';
+import {createVisualAssetSource} from './resources/visual-assets.mjs';
+import {collectModelDescriptors} from './render/model-descriptors.mjs';
 import {creaseGuides,creaseSelection,creaseRegionOutline} from './render/crease-guides.mjs';
 import {entityType,entityChoices,entityHidden} from './entities/visibility-model.mjs';
 import {legalKeyNames,renameKeyCells} from './tags/keys.mjs';
@@ -79,6 +84,7 @@ const TERRAIN_MARKERS={campfire:{name:'篝火',icon:FlameKindling},ice:{name:'�
 const hiddenEntities=new Set();
 const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
+const EMBEDDED_ASSETS = window.__FOLD_FIELD_EXPORT_ASSETS__;
 const clone = data => JSON.parse(JSON.stringify(data));
 const previewCache=new Map();let previewRenderer;
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
@@ -101,7 +107,7 @@ let inspectionFrame=0;
 const debugOverrides=new DebugState(),nodeDebug=new DebugState();
 const editorBus=new EventBus();
 const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer);$('saveState').textContent='保存中';saveTimer=setTimeout(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(savedMap()));$('saveState').textContent='本地已保存';}catch{$('saveState').textContent='仅当前会话';}},120);});
-window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();modelView.dispose();modelLibrary.dispose();}});
 
 const foldableCells=new Set();
 let placementTagCells=[];
@@ -202,6 +208,11 @@ paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,f
 let foldAxes=[],axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
 const mechanismLayer=new THREE.Group(),rayLayer=new THREE.Group();paper.add(mechanismLayer,rayLayer);
+const modelLayer=new THREE.Group();paper.add(modelLayer);
+const visualAssetSource=createVisualAssetSource({offline:Boolean(EMBEDDED_ASSETS),embedded:EMBEDDED_ASSETS??{}});
+const modelLibrary=createModelLibrary({load:createFbxModelLoader(visualAssetSource)});
+let modelErrorKey='';
+const modelView=createModelView({layer:modelLayer,library:modelLibrary,onChange:()=>buildPaper(),onError:(descriptor,error)=>{const key=descriptor.id+':'+error.message;if(key!==modelErrorKey){modelErrorKey=key;console.warn('模型加载失败',descriptor.id,error);}}});
 let brokenViewKey='';
 
 const visibility={coords:true,folds:true,player:true};
@@ -226,7 +237,7 @@ const playerGroup=new THREE.Group(),activeTokenHost=new THREE.Group();let active
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
-const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,mechanismLayer,rayLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
+const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,mechanismLayer,rayLayer,modelLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 function renderPlayer() {renderer.shadowMap.needsUpdate=true;const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);}
 
@@ -257,6 +268,7 @@ function rebuildPaper() {
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
+  modelView.update(collectModelDescriptors(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play',wx,wz,tileTop}));
   paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
@@ -597,14 +609,17 @@ $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringi
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=JSON.parse(await file.text());new TreeDocument(next);setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};
 
 
-function exportGameHtml(){
+async function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
+  const visuals=documentModel.world.serialize().map(node=>node.configuration?.visual).filter(Boolean);
+  let embeddedAssets={};
+  try{embeddedAssets=await visualAssetSource.bundle(visuals);}catch(error){toast('模型资源无法随导出打包：'+error.message,true);return;}
   const documentCopy=document.documentElement.cloneNode(true);
   const exportedViewport=documentCopy.querySelector('#viewport');exportedViewport.replaceChildren();for(const attribute of [...exportedViewport.attributes])if(attribute.name.startsWith('data-'))exportedViewport.removeAttribute(attribute.name);
   documentCopy.querySelector('#resultOverlay').setAttribute('hidden','');
   const current=documentCopy.outerHTML;
-  const boot='<script>window.__FOLD_FIELD_TAGS__='+JSON.stringify(tagCatalog).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_PREFABS__='+JSON.stringify(prefabs).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(savedMap()).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
+  const boot='<script>window.__FOLD_FIELD_TAGS__='+JSON.stringify(tagCatalog).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_PREFABS__='+JSON.stringify(prefabs).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(savedMap()).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_ASSETS__='+JSON.stringify(embeddedAssets).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
   const html='<!doctype html>\n'+current.replace(/<script>/i,boot+'<script>');
   const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
   const a=document.createElement('a');a.href=url;a.download='game.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('独立游戏已导出为 game.html');
@@ -622,8 +637,10 @@ function schedulePlacementPreview(hit){
 function cancelPlacementPreview(){pendingPlacementHit=null;if(placementPreviewFrame){cancelAnimationFrame(placementPreviewFrame);placementPreviewFrame=0;}disposableClear(placementLayer);placementLayer.userData.preview=null;}
 function hitAt(clientX,clientY){
   const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);
-  const surface=raycaster.intersectObjects([tagLayer,terrainLayer,tileLayer].filter(layer=>layer.visible).flatMap(layer=>layer.children.filter(object=>object.visible)),false)[0];
-  if(surface?.object.userData.cell)return surface.object.userData.cell;
+  const surface=raycaster.intersectObjects([modelLayer,tagLayer,terrainLayer,tileLayer].filter(layer=>layer.visible).flatMap(layer=>layer.children.filter(object=>object.visible)),true)[0];
+  let hitObject=surface?.object;
+  while(hitObject&&!hitObject.userData.cell)hitObject=hitObject.parent;
+  if(hitObject?.userData.cell)return hitObject.userData.cell;
   if(surface?.object.userData.triangleCells)return surface.object.userData.triangleCells[surface.faceIndex];
   if(surface?.instanceId!==undefined)return surface.object.userData.cells[surface.instanceId];
   const point=raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());if(!point)return null;

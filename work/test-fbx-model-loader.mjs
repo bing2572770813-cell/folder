@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {Box3} from 'three';
+import {createFbxModelLoader} from './render/fbx-model-loader.mjs';
+import {disposeModel} from './render/model-library.mjs';
+import {normalizeVisual} from './resources/visual-definition.mjs';
+const bytes=await readFile(new URL('../assets/model/boardgame_table_ai.fbx',import.meta.url));
+const load=createFbxModelLoader({read:async()=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),url:()=>{throw new Error('unexpected external texture');}});
+const model=await load(normalizeVisual({model:'model/boardgame_table_ai.fbx'}));
+let meshes=0;model.traverse(object=>{if(object.isMesh){meshes++;assert.ok(object.geometry.attributes.position.count>0);assert.ok(object.castShadow);}});
+assert.ok(meshes>0);assert.equal(new Box3().setFromObject(model).isEmpty(),false);disposeModel(model);
+await assert.rejects(()=>createFbxModelLoader({read:async()=>new TextEncoder().encode('not an FBX').buffer})(normalizeVisual({model:'model/broken_ai.fbx'})));
+console.log('PASS: actual repository FBX parses with mesh/material data; corrupt models fail in isolation.');

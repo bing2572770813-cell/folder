@@ -36,13 +36,14 @@ function nodesForTransforms(world,ids){
  return [...new Set(ids)].flatMap(id=>world.forTransform(id));
 }
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
-  for(const node of nodesForTransforms(world,ids))if(nodeHidden(node))throw new Error('不能修改隐藏实体');
+  const selected=new Set(ids);
+  for(const id of selected)for(const cell of world.transforms.worldCells(id))for(const node of world.at(cell.r,cell.c))if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
 export function validateTreeDocument(candidate){
- const {nodes,byCell}=validateTerrainStacking(candidate.world),registry=defaultComponents();
+ const nodes=candidate.world.serialize();validateTerrainStacking(candidate.world,nodes);const registry=defaultComponents();
  for(const node of nodes){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
- const spawns=[],entries=new Map();
+ const spawns=[],entries=new Map(),byCell=candidate.cellNodes(nodes);
  // Only occupied cells contribute entity tags; avoid allocating a full legacy map.
  for(const [key,nodes] of byCell){
   const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){
@@ -163,7 +164,7 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){
   const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
-  const removed=nodesForTransforms(world,ids);
+  const removed=[...new Map([...ids].flatMap(id=>world.transforms.worldCells(id).flatMap(cell=>world.at(cell.r,cell.c))).filter(node=>ids.has(node.transformId)).map(node=>[node.id,node])).values()];
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
   if(ids.size){

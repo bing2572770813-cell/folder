@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import type {FastifyInstance} from 'fastify';
 import type {BackendConfig} from '../config.js';
-import {assetPath} from '../../../resources/visual-definition.mjs';
+import {assetPath} from '../resources/visual-definition.js';
 import {readStaticFile,isMissingFile} from '../resources/static-files.js';
 
 const inside=(root:string,target:string)=>{const relative=path.relative(root,target);return relative!==''&&!relative.startsWith('..')&&!path.isAbsolute(relative);};

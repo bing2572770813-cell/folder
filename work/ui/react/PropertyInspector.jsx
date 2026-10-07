@@ -18,6 +18,7 @@ const names = {
   gradualRate: "过渡比例",
   physics: "折叠属性",
   followFold: "可跟随折叠",
+  canDropOnFold: "可在折叠时掉落",
   connected: "连接相邻纸面",
   surfaceConnected: "连接相邻纸面",
   blocked: "阻挡",
@@ -26,6 +27,11 @@ const names = {
   kind: "外观类型",
   terrain: "机制类型",
   terrainConfig: "机制参数",
+  lift: "升降机制",
+  minHeight: "最低高度",
+  maxHeight: "最高高度",
+  initialHeight: "初始高度",
+  turnsPerLeg: "单程回合数",
   regionTag: "区域",
   tags: "标签",
   folds: "折线方向",
@@ -210,8 +216,10 @@ function PropertyNode({
     parent,
     path.length === 1 && identityFields.has(path[0]),
   );
-  if (!access.readable) return null;
-  if (value && typeof value === "object" && !Array.isArray(value))
+  if (!access.readable || (options.hideReadOnly && !access.tempEditable)) return null;
+  const objectValue = value && typeof value === "object" && !Array.isArray(value);
+  if (objectValue && !Object.entries(value).some(([key, item]) => hasVisibleField(item, definition.children?.[key] ?? {}, [...path, key], access, options))) return null;
+  if (objectValue)
     return (
       <UiDisclosure data-path={JSON.stringify(path)} open={options.expanded ? true : undefined}>
         <summary>
@@ -246,6 +254,12 @@ function PropertyNode({
       options={options}
     />
   );
+}
+function hasVisibleField(value, definition, path, parent, options) {
+  const access = fieldPermissions(definition, parent, path.length === 1 && identityFields.has(path[0]));
+  if (!access.readable || (options.hideReadOnly && !access.tempEditable)) return false;
+  return !(value && typeof value === "object" && !Array.isArray(value)) ||
+    Object.entries(value).some(([key, item]) => hasVisibleField(item, definition.children?.[key] ?? {}, [...path, key], access, options));
 }
 export function PropertyInspector({
   values,

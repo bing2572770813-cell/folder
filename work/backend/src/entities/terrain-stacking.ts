@@ -7,9 +7,9 @@ export function isTerrainEntity(node:EntityNode):boolean {
 }
 
 /** Physical tile rules are independent of parenting, visibility and collection items. */
-export function validateTerrainStacking(world:EntityWorld):{nodes:EntityNode[];byCell:Map<string,EntityNode[]>} {
+export function validateTerrainStacking(world:EntityWorld,nodes:EntityNode[]=world.serialize()):{nodes:EntityNode[];byCell:Map<string,EntityNode[]>} {
   const byCell=new Map<string,EntityNode[]>();
-  const snapshot=world.serialize();
+  const snapshot=nodes;
   for (const node of snapshot) {
     if(Object.hasOwn(node.components,'lift')&&!Object.hasOwn(node.components,'surface'))throw new Error('升降组件必须属于纸张实体：'+node.id);
     const footprint=world.transforms.get(node.transformId).footprint;

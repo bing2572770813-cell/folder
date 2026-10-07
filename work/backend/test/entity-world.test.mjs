@@ -48,3 +48,40 @@ test('runtime snapshots restore atomically and stay separate from map configurat
   assert.deepEqual(world.snapshotRuntime(),{a:{ice:{frozen:true}}});
   assert.equal(world.serialize()[0].runtime,undefined);
 });
+test('runtime positions move lookup and rendering cells without changing serialized transforms',()=>{
+  const {m,registry,world}=fixture();world.add(registry.instantiate('paper_ai','a','t1'));world.add(registry.instantiate('paper_ai','b','t2'));
+  const staticTransforms=m.serialize();world.setRuntimePosition('a',{r:3,c:4,dir:0});
+  assert.deepEqual(world.at(2,2).map(node=>node.id),['b']);
+  assert.deepEqual(world.at(3,4).map(node=>node.id),['a']);
+  assert.deepEqual(world.cells('a'),[{r:3,c:4}]);
+  assert.deepEqual(m.serialize(),staticTransforms);
+  const snapshot=world.snapshotPositions();
+  assert.throws(()=>world.setRuntimePosition('a',{r:10,c:0,dir:0}),/bounds/);
+  assert.deepEqual(world.snapshotPositions(),snapshot);
+  world.resetRuntime();assert.deepEqual(world.at(2,2).map(node=>node.id),['a','b']);
+  world.restorePositions(snapshot);assert.deepEqual(world.at(3,4).map(node=>node.id),['a']);
+  assert.throws(()=>world.restorePositions({a:{r:-1,c:0,dir:0}}),/bounds/);
+  assert.deepEqual(world.snapshotPositions(),snapshot);
+  assert.throws(()=>world.setRuntimePositions([{id:'a',position:{r:4,c:4,dir:0}},{id:'b',position:{r:10,c:0,dir:0}}]),/bounds/);
+  assert.deepEqual(world.snapshotPositions(),snapshot,'a failed group move leaves all positions intact');
+  world.setRuntimePositions([{id:'a',position:{r:4,c:4,dir:0}},{id:'b',position:{r:3,c:4,dir:0}}]);
+  assert.deepEqual(world.at(3,4).map(node=>node.id),['b']);
+  assert.deepEqual(world.at(4,4).map(node=>node.id),['a']);
+  const clone=world.clone();
+  assert.deepEqual(clone.at(3,4).map(node=>node.id),['b']);
+  clone.resetRuntime();
+  assert.deepEqual(world.at(3,4).map(node=>node.id),['b'],'cloned runtime positions stay independent');
+});
+
+test('forks isolate records, references, indexes and returned snapshots',()=>{
+  const {world,registry}=fixture();world.add(registry.instantiate('paper_ai','a','t1'));
+  const before=world.serialize(),fork=world.clone();
+  const node=fork.get('a');node.components.surface.height=2;fork.remove('a');fork.add(node);
+  fork.transforms.setLocal('t1',{r:4,c:4,dir:0});fork.transforms.retain('t1','fork-only');
+  assert.deepEqual(world.serialize(),before);assert.deepEqual(world.at(2,2).map(n=>n.id),['a']);
+  assert.deepEqual(fork.at(4,4).map(n=>n.id),['a']);assert.ok(!world.transforms.referenceOwners('t1').includes('fork-only'));
+  const snapshot=fork.serialize();snapshot[0].components.surface.height=99;
+  assert.equal(fork.get('a').components.surface.height,2);assert.ok(Object.isFrozen(snapshot[0].static));
+  const transforms=fork.transforms.serialize();transforms[0].footprint.occupied[0]=false;
+  assert.deepEqual(fork.cells('a'),[{r:4,c:4}]);
+});

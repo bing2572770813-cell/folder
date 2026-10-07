@@ -62,6 +62,18 @@ test('player tokens render without their legacy slab, preserving support and vis
  assert.ok(document.world.get('token').components.surface,'read-only render projection preserves legacy map data');
 });
 
+test('runtime item position changes marker projection without moving its saved transform',()=>{
+ const {document,add}=fixture();add('movable-key',{key:{name:'铜'},physics:{canDropOnFold:true}},{entityType:'item'});
+ const before=document.world.transforms.serialize();
+ document.world.setRuntimePosition('movable-key',{r:1,c:2,dir:0});
+ const projection=renderTreeCells(document);
+ assert.deepEqual(projection.terrainCells.filter(cell=>cell.nodeId==='movable-key').map(cell=>[cell.r,cell.c]),[[1,2]]);
+ const local=renderTreeCells(document,{cells:[{r:1,c:2}]});
+ assert.deepEqual(local.terrainCells.filter(cell=>cell.nodeId==='movable-key').map(cell=>[cell.r,cell.c]),[[1,2]]);
+ assert.equal(renderTreeCells(document,{cells:[{r:1,c:1}]}).terrainCells.some(cell=>cell.nodeId==='movable-key'),false);
+ assert.deepEqual(document.world.transforms.serialize(),before);
+});
+
 test('render projection can restrict output to requested cells',()=>{
  const {document}=fixture(),view=renderTreeCells(document,{cells:[{r:1,c:1}]});
  assert.deepEqual(view.surfaceCells.map(cell=>[cell.r,cell.c]),[[1,1],[1,1]]);

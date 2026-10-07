@@ -11,4 +11,6 @@ test('placement ghost uses the final surface height, thickness and connected slo
  const mesh=createSurfacePreview(THREE,slope,{r:0,c:0,tile:slope.tiles[0][0]},material);
  assert.equal(mesh.geometry.type,'BufferGeometry');assert.ok(mesh.geometry.attributes.position.count>36);
  assert.equal(mesh.position.y,0);assert.equal(slope.tiles[0][0].height,.1);
+ const lift={height:.1,thickness:.09,surfaceConnected:true,lift:{initialHeight:.1}},joined={tiles:[[lift,slope.tiles[0][1]]]};
+ assert.equal(createSurfacePreview(THREE,joined,{r:0,c:0,tile:lift},material).geometry.type,'BufferGeometry');
 });

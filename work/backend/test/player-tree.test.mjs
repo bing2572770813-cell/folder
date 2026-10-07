@@ -121,6 +121,56 @@ test('physical fold drop uses one canonical turn and restores key/lift runtime o
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
 });
 
+test('physical fold moves eligible items together, stacks destinations, and restores positions on undo or restart',()=>{
+ const f=physicalFixture();
+ f.add('falling-key',1,0,{key:{name:'移动钥匙'}},{entityType:'item'});
+ f.add('fixed-key',1,0,{key:{name:'固定钥匙'},physics:{canDropOnFold:false}},{entityType:'item'});
+ f.add('falling-token',1,0,{physics:{canDropOnFold:true},collision:{blocked:true}},{entityType:'item'});
+ f.add('falling-creature',1,0,{physics:{}},{entityType:'creature'});
+ f.add('target-item',1,2,{physics:{canDropOnFold:true}},{entityType:'item'});
+ const staticTransforms=f.world.transforms.serialize(),before=f.controller.snapshot();
+ assert.equal(f.controller.beginFoldDrag(1,0,300),true);f.controller.updateFoldDrag(70);
+ assert.equal(f.controller.endFoldDrag(),true);
+ assert.deepEqual(f.world.position('falling-key'),{r:1,c:2,dir:0});
+ assert.deepEqual(f.world.position('falling-token'),{r:1,c:2,dir:0});
+ assert.deepEqual(f.world.position('falling-creature'),{r:1,c:2,dir:0});
+ assert.deepEqual(f.world.position('fixed-key'),{r:1,c:0,dir:0});
+ assert.deepEqual(f.world.at(1,2).filter(node=>['item','creature'].includes(node.static.entityType)||node.components.key).map(node=>node.id),['key','falling-key','falling-token','falling-creature','target-item']);
+ assert.deepEqual(f.world.transforms.serialize(),staticTransforms,'gameplay positions do not rewrite the level');
+ f.controller.tick(performance.now()+1000);f.controller.undo();
+ assert.deepEqual(f.controller.snapshot(),before);
+ assert.deepEqual(f.world.position('falling-key'),{r:1,c:0,dir:0});
+ f.controller.beginFoldDrag(1,0,300);f.controller.updateFoldDrag(70);f.controller.endFoldDrag();f.controller.tick(performance.now()+1000);
+ f.controller.restart();assert.deepEqual(f.world.snapshotPositions(),{});
+});
+
+test('physical fold keeps entities without legal target support and can disable player dropping',()=>{
+ const f=physicalFixture();f.add('unsupported',0,0,{physics:{canDropOnFold:true}},{entityType:'item'});f.add('wrong-base',2,0,{physics:{canDropOnFold:true}},{entityType:'item'});
+ f.env.getEntityPrefab=id=>id==='test'?{BaseEntity:['other_ai']}:undefined;
+ f.world.remove('surface-0-2',true);
+ f.controller.beginFoldDrag(1,0,300);f.controller.updateFoldDrag(70);f.controller.endFoldDrag();
+ assert.deepEqual(f.world.position('unsupported'),{r:0,c:0,dir:0});
+ assert.deepEqual(f.world.position('wrong-base'),{r:2,c:0,dir:0});
+ f.controller.tick(performance.now()+1000);f.controller.undo();
+ f.controller.setPlayerProperties({r:1,c:0,dir:2,maxUp:1,maxDown:1,canDropOnFold:false});
+ assert.equal(f.controller.foldTarget({r:1,c:1,type:'v'}).valid,false);
+ f.controller.selectFold(1,1,'v');assert.equal(f.controller.beginFoldDrag(1,0,300),true);
+ f.controller.updateFoldDrag(70);assert.equal(f.state.foldMotion.ready,false);
+ assert.equal(f.controller.endFoldDrag(),false);
+});
+
+test('fold rebound does not relocate eligible items or create history',()=>{
+ const f=physicalFixture();f.add('rebound-key',1,0,{key:{name:'回弹'}},{entityType:'item'});
+ f.env.foldView.footPosition=()=>[0,0,0];
+ const before=f.controller.snapshot();
+ f.controller.beginFoldDrag(1,0,300);f.controller.updateFoldDrag(280);
+ assert.equal(f.controller.endFoldDrag(),false);
+ assert.deepEqual(f.world.snapshotPositions(),{});
+ f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.controller.snapshot(),before);
+ assert.equal(f.state.playHistory.length,0);
+});
+
 test('failed physical arrival rolls back the canonical turn, key and history',()=>{
  const f=physicalFixture();
  f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5}})}});

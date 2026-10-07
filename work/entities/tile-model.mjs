@@ -13,7 +13,7 @@ function normalizeLift(value){
  if(keys.some(key=>typeof value[key]!=='number'||!Number.isFinite(value[key])))throw new Error('升降配置无效');
  if(value.minHeight<.01||value.maxHeight>16||value.minHeight>value.maxHeight)throw new Error('升降高度范围无效');
  if(value.initialHeight<value.minHeight||value.initialHeight>value.maxHeight)throw new Error('升降初始高度无效');
- if(Object.hasOwn(value,'durationMs'))throw new Error('durationMs 已停用，请使用 turnsPerLeg');
+ if(Object.hasOwn(value,'durationMs'))throw new Error('durationMs 已废弃，请使用 turnsPerLeg');
  const turns=value.turnsPerLeg;
  if(!Number.isSafeInteger(turns)||turns<1||turns>100)throw new Error('单程回合数须为 1–100 的整数');
  return {...Object.fromEntries(keys.map(key=>[key,value[key]])),turnsPerLeg:turns};
@@ -66,14 +66,15 @@ export function normalizeTile(tile) {
   const propertyExtras={...(tile.visual!==undefined?{visual:normalizeVisual(tile.visual)}:{}),...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
   if(tile.followFold!==undefined&&typeof tile.followFold!=='boolean')throw new Error('可跟随折叠须为布尔值');
+  if(tile.canDropOnFold!==undefined&&typeof tile.canDropOnFold!=='boolean')throw new Error('可在折叠时掉落须为布尔值');
   const lift=normalizeLift(tile.lift);
-  return {...propertyExtras,...(tile.followFold!==undefined?{followFold:tile.followFold}:{}),...(tile.surfaceConnected!==undefined?{surfaceConnected:tile.surfaceConnected}:{}),...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(lift?{lift}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),...(tile.components?{components:copyJson(tile.components)}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
+  return {...propertyExtras,...(tile.followFold!==undefined?{followFold:tile.followFold}:{}),...(tile.canDropOnFold!==undefined?{canDropOnFold:tile.canDropOnFold}:{}),...(tile.surfaceConnected!==undefined?{surfaceConnected:tile.surfaceConnected}:{}),...(keyName!==undefined?{keyName:keyName.trim()}:{}),...(lift?{lift}:{}),...(hasColor(tile)?{color:tile.color}:{}),...(tile.edgeColor!==undefined?{edgeColor:tile.edgeColor}:{}),...(tile.kind?{kind:tile.kind}:{}),...(regionTag!==null?{regionTag}:{}),...(Object.keys(tags).length?{tags:{...tags}}:{}),...(tile.instance?{instance:{...tile.instance}}:{}),height,thickness,gradualRate,blocked:blocked(tile),fold:unique[0]??null,folds:unique,prefabId:tile.prefabId??null,...(terrain!==null?{terrain,terrainConfig}:{})};
 }
 export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||(!data.tile&&!data.components))throw new Error('实体需要 version:1、id、name 和 tile 或 components');
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
-  if((data.tile||Object.hasOwn(data.components??{},'surface'))&&(size.width!==1||size.height!==1)&&!Object.hasOwn(data.components??{},'firebird'))throw new Error('纸张实体只能占一个方格');
+  if((data.tile||Object.hasOwn(data.components??{},'surface'))&&(size.width!==1||size.height!==1))throw new Error('纸张实体只能占一个方格');
   const propertySchema=normalizePropertySchema(data.propertySchema??data.tile?.propertySchema??{});
   const extras={};
   if(data.visual!==undefined)extras.visual=normalizeVisual(data.visual);

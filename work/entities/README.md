@@ -18,7 +18,7 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 升降配置只接受 turnsPerLeg。durationMs 在组件和配置快照中均被拒绝，不再迁移旧时钟或从快照恢复组件。
 
-纸面连接由 surface.connected 能力控制，兼容视图使用 surfaceConnected，权限双向同步。缺省时可通行的普通纸面连接相邻纸面，阻挡、地形及静态 token 默认保持独立；升降平台始终独立。自定义 prefab 名称不改变表面连接能力。
+纸面连接由 surface.connected 能力控制，兼容视图使用 surfaceConnected，权限双向同步。缺省时可通行的普通纸面连接相邻纸面，阻挡、地形及静态 token 默认保持独立；升降平台默认独立，可显式开启连接。自定义 prefab 名称不改变表面连接能力。
 
 behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对象。当前注册 replace-cell，保持现有覆盖规则；其 placement 返回 replace 操作。新增策略必须先确认语义并在程序注册，不通过 prefab 路径导入代码。BaseEntity 为实体 prefab ID 列表，void_ai 表示透明虚空；显式空列表不允许任何基底，旧定义省略此字段时兼容现有覆盖规则。placeEntity 在所有占格写入前校验基底与行为结果，失败不修改地图。
 
@@ -26,9 +26,11 @@ behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对�
 
 node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。
 
-升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。旧地图的 `durationMs` 导入为默认 3 回合，保存时移除旧字段。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。方块本体是厚度不变的独立网格，升降图案附着其上，两者一起移动，不与相邻纸面形成渐变坡面。回合变化更新方块、边线和地形标记的位置，不重建地图或清除玩家选择。移动动画端点也读取平台当前高度。
+升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。旧地图的 `durationMs` 导入为默认 3 回合，保存时移除旧字段。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。默认不连接相邻纸面时，方块本体是厚度不变的独立网格，升降图案附着其上；显式开启连接后，升降高度变化会局部更新自身及相邻纸面的网格与边线。回合变化不重建整张地图或清除玩家选择。移动动画端点也读取平台当前高度。
 
 placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType 与 BaseEntity 原子检查，地形清空占格后替换，道具保留支持实体并去除兼容 tile 的 surface。拒绝隐藏占格、多格覆盖和间接越界删除；区域固定格数据及标签/折线保留。旧 replaceTreePrefab/placeTreePrefab 仅供旧数据与受控树工具兼容。
+
+`physics.canDropOnFold` 是道具与生物的可序列化布尔属性，未设置时默认 true；地形不参与实体掉落。`player.cjs` 在物理折叠成功时检查源侧占格、对称目标、显示状态和 BaseEntity 支撑，并统一结算实体掉落。EntityWorld 的 runtime position 索引负责游玩期查询，静态 TransformManager 保持不变；撤销、重启与退出游玩清除或恢复运行时位置。`render/tree-render.mjs` 使用 runtime cells 投影道具和 token。
 
 placement-preview.mjs 为悬停构造局部文档，包含完整子实体足迹、相关祖先/删除后代、引用和唯一标签拥有者，复用 placeCategorizedPrefab 的正式规则，不复制整张地图。调用者须提供包含隐藏节点的 spawn/entry 占格上下文；上下文随文档更新。预览投影只复制受影响行，源地图保持不变。专项一致性测试已接入默认测试入口。
 
@@ -38,10 +40,4 @@ TreeDocument.serialize 直接从起点标签拥有者的实际占格派生唯一
 
 编辑器 commitTree 复用变化比较时的旧文档快照作为历史输入，不重复序列化；历史仍使用独立副本。提交过程中不提前刷新 UI，最终由场景更新刷新一次；无变化不写历史、不重建、不通知保存。
 
-节点隐藏检查和统一放置的删除集合通过 EntityWorld.forTransform 的拥有者索引读取，包含同一 Transform 的全部实体拥有者；区域隐藏检查仍遍历完整实际占格。候选的全局组件、叠层和唯一标签校验保持执行。
-
-TransformManager 的导入仍全量验证。创建、删除、移动与重挂载只重新验证受影响子树并更新其新旧占格；父子关系索引用于定位子树，索引中同格节点顺序保留原插入顺序。全部校验通过后才更新节点与索引，失败保留原状态，clone 的索引与引用独立。现有通知内容保持兼容。运行 `node work/bench-transform-update.mjs` 测量单节点移动的 CPU 成本；该基准不能代表整次编辑或 GPU 延迟。
-
-validateTerrainStacking 返回本次已验证的独立节点快照与占格表；候选的组件及标签校验复用该结果，序列化复用同一节点快照。结果仅在本次操作内使用，不作为长期缓存，也不能回写修改源世界。全量规则校验仍执行，不因复用数据而跳过组件、承载、互斥或唯一标签约束。
-
-检视实体树上下文只读取选中节点、祖先、后代和点击格中的实体，不序列化全世界。EntityWorld.has 查询身份，forTransform 返回拥有者独立副本；TransformManager.orderedIds 仅排序传入 ID，保留原插入顺序。检视面板复用上下文节点填写字段，不再次复制全世界；父节点候选列表仍单独读取完整可选集合。
+放置验证复用一次实体快照完成组件、地形与标签检查；隐藏保护和删除目标通过 Transform 空间索引查找。EntityWorld/TransformManager 的克隆仅复用内部从不原地修改的记录，写入替换记录，外部 getter/序列化仍返回独立副本；引用集合及运行时状态保持独立，完整校验和原子提交规则不变。

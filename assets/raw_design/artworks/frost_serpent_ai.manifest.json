@@ -1,0 +1,26 @@
+{
+  "id": "frost_serpent_ai",
+  "blend": "assets\\raw_design\\artworks\\frost_serpent_ai.blend",
+  "sourceConcept": "assets\\raw_design\\artworks\\frost_serpent_reference.png",
+  "cellSize": 1.0,
+  "footprint": "2x2 cells",
+  "modelBounds": {
+    "min": [
+      -0.82449,
+      -0.6,
+      -0.01725
+    ],
+    "max": [
+      0.94406,
+      0.63125,
+      1.46
+    ]
+  },
+  "skillEffect": "FX_ICE_BREATH / Frost Breath / animated pulse frames 1-24",
+  "collections": [
+    "SNAKE_MODEL | editable",
+    "FX_ICE_BREATH | skill effect",
+    "GRID_REFERENCE | 2x2 cells"
+  ],
+  "visualOnly": true
+}\n

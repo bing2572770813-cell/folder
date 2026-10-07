@@ -50,6 +50,13 @@ export class TreeDocument {
     const checked=validateMap(this.view(),true);
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
   }
+  clone(){
+    const {width,height}=this.world.transforms;
+    const imported=importTreeMap({version:2,width,height,entities:this.world.serialize(),transforms:this.world.transforms.serialize(),cellTags:copy(this.cellTags),legacyMetadata:copy(this.metadata)});
+    const candidate=Object.create(TreeDocument.prototype);
+    candidate.world=imported.world;candidate.metadata=imported.metadata;candidate.cellTags=imported.cellTags;
+    return candidate;
+  }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
   cellNodes(){
     const byCell=new Map();

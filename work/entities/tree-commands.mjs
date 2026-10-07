@@ -10,7 +10,7 @@ import {legalKeyNames} from '../tags/keys.mjs';
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
 export function forkTreeDocument(document){
-  const candidate=new TreeDocument(document.serialize());candidate.world.restoreRuntime(document.world.snapshotRuntime());
+  const candidate=document.clone();candidate.world.restoreRuntime(document.world.snapshotRuntime());
   const owners=new Set(document.world.serialize().map(node=>'entity:'+node.id));
   for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);
   return candidate;

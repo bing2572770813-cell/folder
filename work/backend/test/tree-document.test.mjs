@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {placeEntity} from '../../entities/placement-model.mjs';
 import player from '../../player.cjs';
 import {defaultComponents} from '../dist/entities/components.js';
@@ -10,6 +12,22 @@ const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tre
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
 function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components={fold:{directions:['v']}};tree.entities.push(node);return new TreeDocument(tree);}
+test('production persistence keeps the committed world and saves metadata without reimporting',()=>{
+ const documentModel=stacked(),map=documentModel.view(),world=documentModel.world;
+ const node=world.at(1,1)[0];world.setRuntime(node.id,Object.keys(node.components)[0],{retained:true});
+ const before=documentModel.serialize(),runtime=world.snapshotRuntime();
+ map.name='新地图';map.spawn.dir=3;map.bestSteps=6;
+ let notifications=0;
+ const source=readFileSync(new URL('../../app.js',import.meta.url),'utf8');
+ const persistSource=source.slice(source.indexOf('function persist()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
+ const context={documentModel,map,console,applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
+ runInNewContext(persistSource,context);for(let i=0;i<20;i++)context.persist();
+ assert.equal(notifications,20);assert.equal(documentModel.world,world);
+ const saved=documentModel.serialize();assert.deepEqual(saved.entities,before.entities);assert.deepEqual(saved.transforms,before.transforms);assert.deepEqual(world.snapshotRuntime(),runtime);
+ assert.equal(saved.legacyMetadata.name,'新地图');assert.equal(saved.legacyMetadata.spawn.dir,3);assert.equal(saved.legacyMetadata.bestSteps,6);
+ map.spawn.dir=7;assert.equal(documentModel.metadata.spawn.dir,3,'saved metadata is detached');
+ const reloaded=new TreeDocument(saved).view();assert.equal(reloaded.name,'新地图');assert.equal(reloaded.spawn.dir,3);
+});
 test('primary lookup uses the cell index and returns detached entities',()=>{
  const doc=stacked(),expected=doc.cellNodes().get('1,1').find(node=>node.components.surface&&!node.static.transparent);
  doc.world.serialize=()=>{throw new Error('unexpected full-world scan');};

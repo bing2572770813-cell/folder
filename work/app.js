@@ -121,7 +121,7 @@ function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(
 function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
-function persist() {if(P.mode!=='play')applyMap(map);for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
+function persist() {documentModel.metadata=documentModel.cleanMetadata(map);for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
 function editSnapshot(){return {...createEditSnapshot(documentModel.serialize(),editRect,selectedCells),directSelectedCells:clone(directSelectedCells)};}

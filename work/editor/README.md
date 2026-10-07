@@ -21,3 +21,7 @@ debug-state.mjs 将非序列化字段修改保存在独立覆盖表，不进入�
 `node-edit-permissions.mjs` 将旧 Inspector 的 tags/folds 权限与所有实际贡献节点取交集。属性工具提交前检查 canonical 候选中每个已有节点的 components、tags 和自定义 configuration，包含跨格唯一标签清除、区域改名出口重写及钥匙引用更新；全部验证通过后才记录历史。普通放置、删除、粘贴的结构操作仍走各自校验。
 
 兼容适配器仅修改投影中实际变化的 native component 字段；仅改固定区域时不会补齐稀疏 `surface:{}` 的默认高度或 collision。只读高度仍拒绝实际高度修改。
+
+## 编辑提交与保存
+
+实体和旧地图编辑在命令提交阶段更新 TreeDocument。`app.js` 的 `persist()` 只同步地图元数据并发送保存通知，不重新执行 `applyMap`；名称、起点方向与最佳步数仍进入保存数据。运行时升降高度保留在组件运行时，不从游玩投影写回实体配置。

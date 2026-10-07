@@ -1,0 +1,6 @@
+const directions=Object.freeze({north:{r:-1,c:0},east:{r:0,c:1},south:{r:1,c:0},west:{r:0,c:-1}});
+function center(origin,footprint){return {r:origin.r+Math.floor((footprint.height-1)/2),c:origin.c+Math.floor((footprint.width-1)/2)};}
+function inWatchRange(origin,player,footprint){const point=center(origin,footprint);return Math.abs(point.r-player.r)<=4&&Math.abs(point.c-player.c)<=4;}
+function beam(origin,footprint,direction,width,height){const delta=directions[direction];if(!delta)throw new Error('Invalid firebird direction');const point=center(origin,footprint),cells=[];const side={r:-delta.c,c:delta.r};for(let length=1;length<=21;length++)for(let offset=-1;offset<=1;offset++){const r=point.r+delta.r*length+side.r*offset,c=point.c+delta.c*length+side.c*offset;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;}
+function resolveFirebird(node,action,player,width,height){const origin=node.origin,footprint=node.footprint??{width:3,height:3};if(inWatchRange(origin,player,footprint))return [{type:'addFlame',cells:beam(origin,footprint,node.config.direction,width,height)},{type:'replaceFirebird',entityId:node.id}];return [{type:'addFlame',cells:[action.from]}];}
+module.exports={directions,center,inWatchRange,beam,resolveFirebird};

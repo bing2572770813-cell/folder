@@ -1,6 +1,6 @@
 // Detached render views; all coordinates come from the canonical Transform tree.
 import fragilePresence from '../entities/fragile-presence.cjs';
-const terrainTypes=['campfire','ice','fire','eruption','key'];
+const terrainTypes=['campfire','ice','fire','eruption','key','flame','firebird'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
 const isToken=node=>node.configuration?.kind==='player-token'||node.prefabId==='player_token_ai'||node.prefabId==='player_ai';

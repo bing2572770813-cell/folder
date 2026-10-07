@@ -58,7 +58,7 @@ export function validateTreeDocument(candidate){
 export function configureNode(document,id,components,tags,isHidden=()=>false,nodeHidden=()=>false,schema){
  const original=document.world.get(id);check(document.world,[original.transformId],isHidden,nodeHidden);
  const footprint=document.world.transforms.get(original.transformId).footprint;
- if(Object.hasOwn(components,'surface')&&(footprint.width!==1||footprint.height!==1))throw new Error('纸张实体只能占一个方格');
+ if(Object.hasOwn(components,'surface')&&(footprint.width!==1||footprint.height!==1)&&!Object.hasOwn(components,'firebird'))throw new Error('纸张实体只能占一个方格');
  if(schema){
   const before={components:original.components,tags:original.tags},readable=projectProperties(before,schema,'readable');
   const preserve=(raw,shown,edited)=>{if(!raw||typeof raw!=='object'||Array.isArray(raw))return edited;const next=copy(edited??{});for(const key of Object.keys(raw)){if(!Object.hasOwn(shown??{},key))next[key]=copy(raw[key]);else if(raw[key]&&typeof raw[key]==='object'&&!Array.isArray(raw[key])&&Object.hasOwn(next,key))next[key]=preserve(raw[key],shown[key],next[key]);}return next;};

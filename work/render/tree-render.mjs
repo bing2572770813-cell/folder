@@ -1,3 +1,4 @@
+import fragilePresence from '../entities/fragile-presence.cjs';
 // Detached render views; gameplay-only positions are resolved by EntityWorld.
 const terrainTypes=['campfire','ice','fire','eruption','key'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');

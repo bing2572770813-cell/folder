@@ -35,6 +35,11 @@
     "blocked": true,
     "folds": []
   },
+  "components": {
+    "physics": {
+      "canDropOnFold": true
+    }
+  },
   "static": {
     "entityType": "creature",
     "placeable": false

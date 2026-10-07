@@ -18,6 +18,7 @@ const names = {
   gradualRate: "过渡比例",
   physics: "折叠属性",
   followFold: "可跟随折叠",
+  canDropOnFold: "可在折叠时掉落",
   connected: "连接相邻纸面",
   surfaceConnected: "连接相邻纸面",
   blocked: "阻挡",

@@ -227,7 +227,7 @@ function buildPaper() {
     }else{if(!buckets.has(tile.color))buckets.set(tile.color,[]);buckets.get(tile.color).push(cell);}
     const y=tileHeight(tile),x=wx(c),z=wz(r),edgeStart=edges.length;
     const styleStart=styleEdges.get(entityEdgeColor(tile))?.length??0;
-    if(tile.kind==='player-token'){const token=makeToken(tile.color);token.rotation.y=-Math.PI/2;token.position.set(x,y,z);token.userData.cell=cell;staticTokenLayer.add(token);}
+
 
 
     const edgeColor=entityEdgeColor(tile);
@@ -243,6 +243,7 @@ function buildPaper() {
       const style=entityEdgeColor(tile);if(style)liftLineRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
     }
   }
+  for(const cell of treeCells.tokenCells){const token=makeToken(cell.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(cell.c),Math.max(cell.surfaceTop,cell.tile.height??0),wz(cell.r));token.userData.cell=cell;staticTokenLayer.add(token);}
   for(const marker of treeCells.terrainCells){if(!terrains.has(marker.type))terrains.set(marker.type,[]);terrains.get(marker.type).push(marker);}
   for(const [color,bucket] of surfaces){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(bucket.positions,3));geometry.computeVertexNormals();const mesh=new THREE.Mesh(geometry,materials[color??'white']);mesh.userData.triangleCells=bucket.triangleCells;mesh.userData.surfaceCells=bucket.cells;tileLayer.add(mesh);}
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
@@ -711,8 +712,8 @@ function prefabPreview(prefab){
  const previewTile=prefab.tile??normalizeTile({...prefab.components?.surface,...(Object.hasOwn(prefab.components??{},'surface')?{}:{height:.09})}),height=previewTile.height,span=Math.max(prefab.size.width,prefab.size.height,height+(previewTile.kind==='player-token'?.8:0))*.7+.3;
  const cam=new THREE.OrthographicCamera(-span,span,span*.8,-span*.8,.1,100);cam.position.set(span*1.5,span*1.6+height/2,span*2);cam.lookAt(0,height/2,0);
  for(const p of footprint(prefab,0,0)){
-   const tile=new THREE.Mesh(new THREE.BoxGeometry(.98,tileThickness(previewTile),.98),new THREE.MeshStandardMaterial({color:COLORS[previewTile.color]??COLORS.white}));tile.position.set(p.c-(prefab.size.width-1)/2,height-tileThickness(previewTile)/2,p.r-(prefab.size.height-1)/2);if(prefab.tile||Object.hasOwn(prefab.components??{},'surface'))world.add(tile);
-   if(previewTile.edgeColor){const edge=new THREE.LineSegments(new THREE.EdgesGeometry(tile.geometry),new THREE.LineBasicMaterial({color:previewTile.edgeColor}));edge.position.copy(tile.position);world.add(edge);}
+   const tile=new THREE.Mesh(new THREE.BoxGeometry(.98,tileThickness(previewTile),.98),new THREE.MeshStandardMaterial({color:COLORS[previewTile.color]??COLORS.white}));tile.position.set(p.c-(prefab.size.width-1)/2,height-tileThickness(previewTile)/2,p.r-(prefab.size.height-1)/2);if(previewTile.kind!=='player-token'&&(prefab.tile||Object.hasOwn(prefab.components??{},'surface')))world.add(tile);
+   if(previewTile.edgeColor&&previewTile.kind!=='player-token'){const edge=new THREE.LineSegments(new THREE.EdgesGeometry(tile.geometry),new THREE.LineBasicMaterial({color:previewTile.edgeColor}));edge.position.copy(tile.position);world.add(edge);}
    if(previewTile.kind==='player-token'){const token=makeToken(previewTile.color);token.rotation.y=-Math.PI*.75;token.position.copy(tile.position);token.position.y=height;world.add(token);}
    for(const type of (prefab.tile?.terrain?[prefab.tile.terrain]:['campfire','ice','fire','eruption','key'].filter(type=>Object.hasOwn(prefab.components??{},type)))){const marker=new THREE.Mesh(new THREE.PlaneGeometry(.72,.72),new THREE.MeshBasicMaterial({map:terrainTextures[type],transparent:true,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.copy(tile.position);marker.position.y=height+.012;world.add(marker);}
  }
@@ -761,8 +762,9 @@ function drawPlacementPreview(hit){
    const material=new THREE.MeshStandardMaterial({color:COLORS[p.tile.color??'white'],transparent:true,opacity:.65,depthWrite:false,depthTest:false,roughness:.86,flatShading:true});
    const body=createSurfacePreview(THREE,view,p,material,cellHidden);body.position.x=wx(p.c);body.position.z=wz(p.r);body.position.y+=.012;body.renderOrder=10;placementLayer.add(body);
    if(p.tile.lift)marker(liftTexture,p.r,p.c,tileHeight(p.tile),.58);
-   if(p.tile.kind==='player-token'){const token=makeToken(p.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(p.c),tileHeight(p.tile),wz(p.r));placementLayer.add(token);}
+
   }
+  for(const p of projection.tokenCells.filter(p=>affected.has(p.r+','+p.c))){const token=makeToken(p.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(p.c),Math.max(p.surfaceTop,p.tile.height??0),wz(p.r));placementLayer.add(token);}
   for(const p of projection.terrainCells)if(affected.has(p.r+','+p.c))marker(terrainTextures[p.type],p.r,p.c,p.surfaceTop,p.total>1?.4:.72,p.index,p.total);
   placementLayer.userData.preview={surfaces:surfaceCells.map(p=>({r:p.r,c:p.c,height:tileHeight(p.tile),thickness:tileThickness(p.tile),lift:!!p.tile.lift})),markers:projection.terrainCells.filter(p=>affected.has(p.r+','+p.c)).map(p=>p.type)};
  }

@@ -2,7 +2,8 @@
 const terrainTypes=['campfire','ice','fire','eruption','key'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
-const surfaceVisible=node=>rendered(node)&&!node.static.transparent&&hasSurface(node);
+const isToken=node=>node.configuration?.kind==='player-token'||node.prefabId==='player_token_ai'||node.prefabId==='player_ai';
+const surfaceVisible=node=>rendered(node)&&!node.static.transparent&&hasSurface(node)&&!isToken(node);
 
 function surfaceTile(document,node,r,c,runtime=false){
  const tile={...structuredClone(node.configuration??{}),...structuredClone(node.components.surface??{}),prefabId:node.prefabId,
@@ -18,14 +19,15 @@ function surfaceTile(document,node,r,c,runtime=false){
 }
 
 export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false}={}){
- const surfaceCells=[],terrainCells=[],tagCells=[];
+ const surfaceCells=[],terrainCells=[],tagCells=[],tokenCells=[];
  const nodes=document.world.serialize().sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
    if(cellHidden(r,c))continue;
+   if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
-    const primary=document.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(candidate=>hasSurface(candidate)&&!candidate.static.transparent);
+    const primary=document.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(surfaceVisible);
     surfaceCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime),primary:primary?.id===node.id});
    }
    for(const type of terrainTypes)if(Object.hasOwn(node.components,type))terrainCells.push({nodeId:node.id,r,c,type,tile:{...surfaceTile(document,node,r,c,runtime),terrain:type,terrainConfig:structuredClone(node.components[type]),...(type==='key'?{keyName:node.components.key.name??'钥匙'}:{})}});
@@ -35,7 +37,8 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
  const heights=new Map(),stacks=new Map();for(const cell of surfaceCells){const key=cell.r+','+cell.c;heights.set(key,Math.max(heights.get(key)??0,Number(cell.tile.height??.09)));}
  for(const marker of terrainCells){const key=marker.r+','+marker.c;if(!stacks.has(key))stacks.set(key,[]);stacks.get(key).push(marker);}
  for(const stack of stacks.values())stack.forEach((marker,index)=>{marker.index=index;marker.total=stack.length;marker.surfaceTop=heights.get(marker.r+','+marker.c)??0;});for(const cell of tagCells)cell.surfaceTop=heights.get(cell.r+','+cell.c)??0;
- return {surfaceCells,terrainCells,tagCells};
+ for(const cell of tokenCells)cell.surfaceTop=heights.get(cell.r+','+cell.c)??0;
+ return {surfaceCells,terrainCells,tagCells,tokenCells};
 }
 
 /** Keep neighboring primary geometry so paper seams and hidden-cell rules still work. */

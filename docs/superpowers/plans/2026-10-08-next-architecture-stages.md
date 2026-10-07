@@ -77,7 +77,7 @@
 - [x] 区分资源定义合同与地图格式兼容；现行 prefab schema 合同继续保留。
 - [x] 更新活跃源码、测试夹具、示例地图和 README。
 - [x] 完整检查通过，覆盖导入、导出、保存和 HTML 构建。
-- [ ] 提交：refactor: remove obsolete map compatibility naming。
+- [x] 提交：refactor: remove obsolete map migration paths（49b547e）。
 
 ## 阶段 5：回合生命周期和动作引擎
 

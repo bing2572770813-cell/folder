@@ -18,7 +18,10 @@ function createCheckPlan(cwd, scope = 'all') {
     steps.push(node('backend-build', [tsc, '-p', 'backend/tsconfig.json']));
   }
   if (scope === 'all' || scope === 'backend') steps.push(node('backend-tests', ['--test', ...tests('backend/test', '.test.mjs')]));
-  if (['all', 'frontend', 'prepare'].includes(scope)) steps.push(node('html-build', ['build.cjs']));
+  if (['all', 'frontend', 'prepare'].includes(scope)) {
+    steps.push(node('frontend-typecheck', ['node_modules/typescript/bin/tsc', '--noEmit', '-p', 'tsconfig.frontend.json']));
+    steps.push(node('html-build', ['build.cjs']));
+  }
   if (scope === 'all' || scope === 'frontend') steps.push(node('frontend-tests', ['test-runner.cjs', ...(scope==='all'?['--frontend-only']:[])]));
   if (scope === 'all') {
     steps.push({name: 'working-diff', command: 'git', args: ['diff', '--check']});

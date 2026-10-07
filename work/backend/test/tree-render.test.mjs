@@ -68,5 +68,24 @@ test('runtime item position changes marker projection without moving its saved t
  document.world.setRuntimePosition('movable-key',{r:1,c:2,dir:0});
  const projection=renderTreeCells(document);
  assert.deepEqual(projection.terrainCells.filter(cell=>cell.nodeId==='movable-key').map(cell=>[cell.r,cell.c]),[[1,2]]);
+ const local=renderTreeCells(document,{cells:[{r:1,c:2}]});
+ assert.deepEqual(local.terrainCells.filter(cell=>cell.nodeId==='movable-key').map(cell=>[cell.r,cell.c]),[[1,2]]);
+ assert.equal(renderTreeCells(document,{cells:[{r:1,c:1}]}).terrainCells.some(cell=>cell.nodeId==='movable-key'),false);
  assert.deepEqual(document.world.transforms.serialize(),before);
+});
+
+test('render projection can restrict output to requested cells',()=>{
+ const {document}=fixture(),view=renderTreeCells(document,{cells:[{r:1,c:1}]});
+ assert.deepEqual(view.surfaceCells.map(cell=>[cell.r,cell.c]),[[1,1],[1,1]]);
+ assert.equal(view.tagCells.length,2);
+});
+
+test('surface projection reuses a base map without rewriting its cells',()=>{
+ const {document}=fixture(),base=document.view(),before=structuredClone(base);
+ document.view=()=>{throw new Error('unexpected full projection');};
+ const result=mapForSurface(document,'b',false,base);
+ assert.equal(result.tiles[1][1].height,.3);
+ assert.deepEqual(base,before);
+ assert.notEqual(result.tiles[1],base.tiles[1]);
+ assert.equal(result.tiles[0],base.tiles[0]);
 });

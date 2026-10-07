@@ -4,8 +4,8 @@ import {jsonObject,freezeJson,validateEntityTags,validateStaticFields,type Entit
 /** Entity identity and state registry with a gameplay-only position overlay on static transforms. */
 export class EntityWorld {
   private entities=new Map<string,EntityNode>();
+  private entitiesByTransform=new Map<string,Set<string>>();
   private states=new Map<string,Map<string,JsonObject>>();
-  private owners=new Map<string,Set<string>>();
   private order=new Map<string,number>();
   private nextOrder=0;
   private positions=new Map<string,GridTransform>();
@@ -28,16 +28,26 @@ export class EntityWorld {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;
   }
+  clone():EntityWorld {
+    const result=new EntityWorld(this.transforms.clone());
+    result.entities=new Map(structuredClone([...this.entities]));
+    result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
+    result.states=new Map([...this.states].map(([id,states])=>[id,new Map(structuredClone([...states]))]));
+    result.order=new Map(this.order);result.nextOrder=this.nextOrder;
+    result.positions=new Map(structuredClone([...this.positions]));
+    result.rebuildPositionIndex();
+    return result;
+  }
   add(node:EntityNode):void {
     if(this.entities.has(node.id))throw new Error('Duplicate entity ID');
     const validated=this.validate(node);this.transforms.retain(node.transformId,'entity:'+node.id);this.entities.set(node.id,validated);
-    const owners=this.owners.get(node.transformId)??new Set<string>();owners.add(node.id);this.owners.set(node.transformId,owners);
+    const ids=this.entitiesByTransform.get(node.transformId)??new Set<string>();ids.add(node.id);this.entitiesByTransform.set(node.transformId,ids);
     this.order.set(node.id,this.nextOrder++);
     if(this.positions.size)this.rebuildPositionIndex();
   }
   at(r:number,c:number):EntityNode[] {
     const ids=new Set<string>();
-    for(const transform of this.transforms.at(r,c))for(const id of this.owners.get(transform)??[])if(!this.displaced.has(id))ids.add(id);
+    for(const transform of this.transforms.at(r,c))for(const id of this.entitiesByTransform.get(transform)??[])if(!this.displaced.has(id))ids.add(id);
     for(const id of this.positionIndex.get(r+','+c)??[])ids.add(id);
     return [...ids].sort((a,b)=>this.order.get(a)!-this.order.get(b)!).map(id=>this.get(id));
   }
@@ -71,7 +81,7 @@ export class EntityWorld {
     if(direct)return direct;
     let parent=this.transforms.get(node.transformId).parentId;
     while(parent){
-      for(const owner of this.owners.get(parent)??[]){
+      for(const owner of this.entitiesByTransform.get(parent)??[]){
         const override=this.positions.get(owner);
         if(override){const origin=this.transforms.world(parent);return {r:base.r+override.r-origin.r,c:base.c+override.c-origin.c,dir:(base.dir+override.dir-origin.dir+8)%8};}
       }
@@ -99,7 +109,7 @@ export class EntityWorld {
       try{this.transforms.remove(node.transformId);}catch(error){this.transforms.retain(node.transformId,owner);throw error;}
     }else this.transforms.release(node.transformId,owner);
     this.entities.delete(id);this.states.delete(id);this.positions.delete(id);this.order.delete(id);
-    const owners=this.owners.get(node.transformId);owners?.delete(id);if(!owners?.size)this.owners.delete(node.transformId);
+    const owners=this.entitiesByTransform.get(node.transformId);owners?.delete(id);if(!owners?.size)this.entitiesByTransform.delete(node.transformId);
     if(this.positions.size)this.rebuildPositionIndex();else{this.displaced.clear();this.positionIndex.clear();}
   }
   runtime(id:string,component:string):JsonObject {

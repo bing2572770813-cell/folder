@@ -8,6 +8,8 @@ map:changed 目前连接现有状态改变后的保存请求，负载为 {map}�
 
 本目录不访问 DOM、Three.js、磁盘或玩家状态机。测试为 node work/test-event-bus.mjs。
 
+JSON 校验与复制的唯一实现为 `backend/src/core/json-value.ts`。`json-value.mjs` 委托其编译产物，保留属性深度上限 16 和中文提示；实体模型保留上限 32。两者拒绝稀疏数组及非 JSON 值。直接运行本目录模块前先执行 `npm --prefix work run backend:build`；常规测试与构建命令包含此步骤。
+
 property-model.mjs 提供 propertySchema 校验、嵌套权限、独立属性修改及地图配置投影。描述以字段名为键，使用 readable/serializable/tempEditable、children、items 与可选 label。父级禁止权限时子级不能开放；内部身份只读。prefab 支持 tile.properties 自定义嵌套值及 propertySchema，放置时保留描述快照。
 
 地图 JSON、本地自动保存与独立游戏导出均调用 serializeMapConfiguration；非序列化字段不进入输出，可序列化字段继续保留。源码/身份结构不能由 Inspector 修改。验证：node work/test-property-model.mjs。

@@ -19,5 +19,6 @@ export function applyLighting({sunlight,ambient,fill,renderer},values,width,heig
  sunlight.shadow.intensity=next.shadow;sunlight.castShadow=next.shadow>0;
  const span=Math.max(width,height)*.8+4,camera=sunlight.shadow.camera;
  Object.assign(camera,{left:-span,right:span,top:span,bottom:-span,near:.1,far:radius+span*3});camera.updateProjectionMatrix();
+ renderer.shadowMap.needsUpdate=true;
  renderer.toneMappingExposure=next.exposure;return next;
 }

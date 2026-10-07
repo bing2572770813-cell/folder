@@ -52,24 +52,55 @@ export class TreeDocument {
     const checked=validateMap(this.view(),true);
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
   }
+  clone(){
+    const world=this.world.clone();
+    const candidate=Object.create(TreeDocument.prototype);
+    candidate.world=world;candidate.metadata=copy(this.metadata);candidate.cellTags=copy(this.cellTags);
+    return candidate;
+  }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
+  cellNodes(){
+    const byCell=new Map();
+    for(const node of this.world.serialize())for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
+      const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
+    }
+    for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
+    return byCell;
+  }
   primaryAt(r,c){return this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(visible)??null;}
+  viewCells(cells){
+    const result=new Map();
+    for(const {r,c} of cells){
+      const key=r+','+c;if(result.has(key))continue;
+      const nodes=this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)),primary=nodes.find(visible);
+      if(!primary){result.set(key,null);continue;}
+      const tile=tileOf(primary);tile.tags=mergedTags(nodes);tile.regionTag=this.cellTags[key]?.regionTag??'默认区域';
+      const folds=[...new Set(nodes.flatMap(node=>node.components.fold?.directions??[]))];tile.folds=folds;tile.fold=folds[0]??null;
+      result.set(key,normalizeTile(tile));
+    }
+    return result;
+  }
   view(){
     const {width,height}=this.world.transforms;
+    const byCell=this.cellNodes();
     const tiles=Array.from({length:height},()=>Array(width).fill(null)),foldCells=[];
     for(let r=0;r<height;r++)for(let c=0;c<width;c++){
-      const nodes=this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id));
+      const nodes=byCell.get(r+','+c)??[];
       const primary=nodes.find(visible);
       const folds=[...new Set(nodes.flatMap(node=>node.components.fold?.directions??[]))];
       if(primary){const tile=tileOf(primary);tile.tags=mergedTags(nodes);tile.regionTag=this.cellTags[r+','+c]?.regionTag??'默认区域';tile.folds=folds;tile.fold=folds[0]??null;tiles[r][c]=normalizeTile(tile);}
       else foldCells.push(...folds.map(type=>({r,c,type})));
     }
-    const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if(this.world.at(r,c).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
+    const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if((byCell.get(r+','+c)??[]).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
     return {...metadata,version:1,width,height,tiles,foldCells};
   }
   serialize(options){
-    const spawns=this.world.serialize().filter(node=>node.tags.spawn).flatMap(node=>this.world.transforms.worldCells(node.transformId));
-    return serializeTreeMap(this.world,{...this.metadata,spawn:spawns.length===1?{...this.metadata.spawn,...spawns[0]}:this.metadata.spawn},this.cellTags,options);
+    // Persistence may filter tags; derive the spawn from canonical owners before filtering.
+    const owners=options?.projectProperties?this.world.serialize():null;
+    const snapshot=serializeTreeMap(this.world,this.metadata,this.cellTags,options),spawns=new Map();
+    for(const node of owners??snapshot.entities)if(node.tags.spawn)for(const {r,c} of this.world.transforms.worldCells(node.transformId))spawns.set(r+','+c,{r,c});
+    if(spawns.size===1)snapshot.legacyMetadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
+    return snapshot;
   }
   applyLegacy(input){
     const next={...copy(input),...validateMap(input,true)},before=this.view(),snapshot=this.serialize();

@@ -31,3 +31,11 @@ node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，�
 placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType 与 BaseEntity 原子检查，地形清空占格后替换，道具保留支持实体并去除兼容 tile 的 surface。拒绝隐藏占格、多格覆盖和间接越界删除；区域固定格数据及标签/折线保留。旧 replaceTreePrefab/placeTreePrefab 仅供旧数据与受控树工具兼容。
 
 `physics.canDropOnFold` 是道具与生物的可序列化布尔属性，未设置时默认 true；地形不参与实体掉落。`player.cjs` 在物理折叠成功时检查源侧占格、对称目标、显示状态和 BaseEntity 支撑，并统一结算实体掉落。EntityWorld 的 runtime position 索引负责游玩期查询，静态 TransformManager 保持不变；撤销、重启与退出游玩清除或恢复运行时位置。`render/tree-render.mjs` 使用 runtime cells 投影道具和 token。
+
+placement-preview.mjs 为悬停构造局部文档，包含完整子实体足迹、相关祖先/删除后代、引用和唯一标签拥有者，复用 placeCategorizedPrefab 的正式规则，不复制整张地图。调用者须提供包含隐藏节点的 spawn/entry 占格上下文；上下文随文档更新。预览投影只复制受影响行，源地图保持不变。专项一致性测试已接入默认测试入口。
+
+在 work 中运行 `node bench-placement-preview.mjs` 可比较正式候选构造与局部预览的数据逻辑成本。该比较不代表优化前后或浏览器整体延迟；正式提交、历史与场景重建仍有全量工作，需要另行测量。
+
+TreeDocument.serialize 直接从起点标签拥有者的实际占格派生唯一 spawn，不构造完整显示投影。没有唯一标签格时保留元数据后备值；持久化权限过滤前读取 canonical 标签，避免过滤改变起点派生语义。
+
+编辑器 commitTree 复用变化比较时的旧文档快照作为历史输入，不重复序列化；历史仍使用独立副本。提交过程中不提前刷新 UI，最终由场景更新刷新一次；无变化不写历史、不重建、不通知保存。

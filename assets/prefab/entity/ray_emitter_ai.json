@@ -43,6 +43,25 @@
   "BaseEntity": [
     "paper_ai"
   ],
+  "visual": {
+    "model": "model/emitter_ai.fbx",
+    "scale": [
+      0.005,
+      0.005,
+      0.005
+    ],
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "textures": {}
+  },
   "behavior": {
     "scriptId": "ray-emitter-placement",
     "parameters": {},

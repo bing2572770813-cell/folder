@@ -8,8 +8,8 @@ async function build() {
   const catalog = await require("./prefab-catalog.cjs").readCatalog();
   if (catalog.errors.length) console.warn("Prefab warnings:", catalog.errors);
   const {visualAssetPaths}=await import('./resources/visual-assets.mjs');
-  const playerVisual=catalog.prefabs.find(prefab=>prefab.id==='player_ai')?.visual;
-  const builtinAssets=Object.fromEntries(visualAssetPaths([playerVisual]).map(asset=>[
+  const builtinVisuals=catalog.prefabs.filter(prefab=>['player_ai','ray_emitter_ai'].includes(prefab.id)).map(prefab=>prefab.visual);
+  const builtinAssets=Object.fromEntries(visualAssetPaths(builtinVisuals).map(asset=>[
     asset,'data:'+(asset.endsWith('.png')?'image/png':'application/octet-stream')+';base64,'+
       fs.readFileSync(path.join(root,'../assets',asset)).toString('base64'),
   ]));

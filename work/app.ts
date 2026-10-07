@@ -315,7 +315,7 @@ function rebuildPaper() {
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
-  modelView.update(collectModelDescriptors(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play',wx,wz,tileTop}));
+  refreshModels();
   paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
@@ -427,7 +427,9 @@ function refreshMechanismSurfaces(){
  const key=documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|');
  if(key!==brokenViewKey){brokenViewKey=key;buildPaper();}else refreshMechanismMarkers();
 }
+function refreshModels(){return modelView.update(collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id),nodeHidden,cellHidden,runtime:P.mode==='play',wx,wz,tileTop}));}
 function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
+ refreshModels();
  disposableClear(mechanismLayer);disposableClear(rayLayer);
  brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
  const enemyCells=documentModel.world.serialize().filter(node=>node.static.entityType==='creature'&&(node.components.rayEmitter||node.components.firebird)&&!nodeHidden(node)).flatMap(node=>{
@@ -708,7 +710,7 @@ $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{
 async function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
-  const visuals=[...documentModel.world.serialize().map(node=>node.configuration?.visual),getPlayerPrefab()?.visual].filter(Boolean);
+  const visuals=[...collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id)}).map(descriptor=>descriptor.visual),getPlayerPrefab()?.visual].filter(Boolean);
   let embeddedAssets={};
   try{embeddedAssets=await visualAssetSource.bundle(visuals);}catch(error){toast('模型资源无法随导出打包：'+error.message,true);return;}
   const documentCopy=document.documentElement.cloneNode(true);
@@ -789,7 +791,7 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 let renderedFrames=0,lastZoomLabel=null,diagnosticsEnabled=false;
 function syncState(){viewport.dataset.state=JSON.stringify({map,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,showTable,showCreaseDashes,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState,turn:P.turn});}
 function screenPoints(){
-  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({flameMarkers:mechanismLayer.children.filter(marker=>marker.userData.flame).length,replacedFirebirds:mechanismLayer.children.filter(marker=>marker.userData.replaced).length,foldStart:foldMotionView.stats(),foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.isInstancedMesh?o.count:(o.userData.surfaceCells?.length??0)),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,creaseSegments:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?o.geometry.attributes.position.count/2:0),0),creaseDots:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?0:o.geometry.attributes.position.count/3),0),playerVisual:playerVisual.status(),tokenShape:activeTokenHost.children[0]?.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play',defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({flameMarkers:mechanismLayer.children.filter(marker=>marker.userData.flame).length,replacedFirebirds:mechanismLayer.children.filter(marker=>marker.userData.replaced).length,foldStart:foldMotionView.stats(),foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.isInstancedMesh?o.count:(o.userData.surfaceCells?.length??0)),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,creaseSegments:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?o.geometry.attributes.position.count/2:0),0),creaseDots:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?0:o.geometry.attributes.position.count/3),0),models:modelLayer.children.map(host=>({nodeId:host.userData.cell?.nodeId,model:host.userData.model,rotation:host.rotation.y,position:host.position.toArray()})),playerVisual:playerVisual.status(),tokenShape:activeTokenHost.children[0]?.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play',defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
 }
 	function tick(now){requestAnimationFrame(tick);controls.update();const cameraBusy=cameraInteraction.active;if(!cameraBusy)updateFoldAxes();
@@ -830,7 +832,7 @@ function setupPrefabs(){
     loading=true;
     try{const response=await fetch('/api/prefabs',{cache:'no-store'});if(!response.ok)throw new Error('服务未提供实体目录');const catalog=await response.json();
       const next=catalog.prefabs.map(normalizePrefab),nextTags=(catalog.tags??[]).map(normalizeTagPrefab),key=JSON.stringify([next,nextTags]);
-      if(key!==fingerprint){prefabs=next;tagCatalog=nextTags;fingerprint=key;renderCatalog();renderPlayer();}
+      if(key!==fingerprint){prefabs=next;tagCatalog=nextTags;fingerprint=key;renderCatalog();renderPlayer();refreshModels();}
       $('prefabStatus').textContent=catalog.errors.length?catalog.errors.map(e=>e.file+'：'+e.message).join('；'):'实时读取 assets/prefab · '+prefabs.length+' 种实体';
     }catch(error){$('prefabStatus').textContent='使用内置实体目录 · '+error.message;}finally{loading=false;}
   }

@@ -172,6 +172,26 @@ async function main() {
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);
       results.push({name:'creature-picker-firebird-placement-trigger-flames-and-undo',status:'pass'});
       await page.locator('#editMode').click();
+      const emitterMap=structuredClone(enemyMap);emitterMap.metadata.name='喷射模型验收';
+      for(const [id,r,c,visual] of [['emitter',5,5,undefined],['legacy-emitter',2,5,{model:'model/emitter_ai.fbx',scale:[.005,.005,.005],offset:[4.6652925885,.0319734826,-4.5407583767]}]]){
+        emitterMap.transforms.push({id:'t-'+id,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+        emitterMap.entities.push({id,prefabId:'ray_emitter_ai',transformId:'t-'+id,components:{rayEmitter:{initialDirection:'east'},collision:{blocked:true}},tags:{},static:{entityType:'creature'},configuration:visual?{visual}:{}});
+      }
+      await page.locator('#mapFile').setInputFiles({name:'emitter-model.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(emitterMap))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='喷射模型验收');
+      await page.locator('#playMode').click();
+      await page.waitForFunction(()=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model==='model/emitter_ai.fbx'&&Math.abs(model.rotation+Math.PI/2)<1e-6));});
+      await capture('desktop-emitter-model');
+      const emitterStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(emitterStart.x,emitterStart.y);
+      const emitterNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(emitterNext.x,emitterNext.y);
+      await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
+      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+3*Math.PI/2)<1e-6));
+      await capture('desktop-emitter-model-reversed');
+      await page.locator('#undoBtn').click();
+      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+Math.PI/2)<1e-6));
+      results.push({name:'emitter-fbx-legacy-models-runtime-facing-and-undo',status:'pass'});
+
+      await page.locator('#editMode').click();
       for(const node of enemyMap.entities)node.components.surface.height=.7;
       enemyMap.entities[0].components.fragile={};enemyMap.metadata.name='易碎镜头验收';
       await page.locator('#mapFile').setInputFiles({name:'fragile-camera.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(enemyMap))});

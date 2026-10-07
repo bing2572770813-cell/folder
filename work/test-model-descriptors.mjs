@@ -11,3 +11,19 @@ assert.equal(descriptors[0].cells.length,1);
 assert.equal(descriptors[0].cell.nodeId,'key');
 assert.equal(collectModelDescriptors(document,{nodeHidden:()=>true}).length,0);
 console.log('PASS: visual references project to visible, centered model descriptors.');
+
+const enemy={id:'emitter',prefabId:'ray_emitter_ai',configuration:{},components:{rayEmitter:{initialDirection:'east'}},static:{},transformId:'key-transform'};
+const enemyDocument={world:{...document.world,serialize:()=>[enemy],runtime:()=>({direction:'west'})}};
+const getPrefab=()=>({visual:{model:'model/emitter_ai.fbx',scale:[.005,.005,.005],offset:[0,0,0]}});
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,'model/emitter_ai.fbx','old instances inherit a missing visual from their prefab');
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].dir,2);
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab,runtime:true})[0].dir,6,'model follows runtime direction reversal');
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].dir,2,'runtime changes do not alter edit-mode configuration');
+enemy.configuration.visual=null;assert.equal(collectModelDescriptors(enemyDocument,{getPrefab}).length,0,'explicit null keeps the model disabled');
+enemy.configuration.visual={model:'model/custom_ai.fbx'};assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,'model/custom_ai.fbx','instance override is retained');
+console.log('PASS: legacy enemy visual fallback, runtime orientation and explicit per-instance visual overrides.');
+
+const oldOffset=[4.6652925885,.0319734826,-4.5407583767];
+enemy.configuration.visual={model:'model/emitter_ai.fbx',offset:oldOffset};
+assert.deepEqual(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.offset,[0,0,0]);
+assert.deepEqual(enemy.configuration.visual.offset,oldOffset,'legacy origin correction must not modify saved configuration');

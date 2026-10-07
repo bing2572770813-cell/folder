@@ -24,5 +24,7 @@ for(const name of ['index.html','game.html']){
  assert.ok(match,'built '+name+' must embed the player model');
  const assets=JSON.parse(match[1]),model=await readFile(new URL('../assets/model/player_witch_ai.fbx',import.meta.url));
  assert.deepEqual(Buffer.from(assets['model/player_witch_ai.fbx'].split(',')[1],'base64'),model,'embedded model bytes must match the actual witch FBX');
+ const emitter=await readFile(new URL('../assets/model/emitter_ai.fbx',import.meta.url));
+ assert.deepEqual(Buffer.from(assets['model/emitter_ai.fbx'].split(',')[1],'base64'),emitter,'embedded emitter bytes must match the playable FBX');
 }
 console.log('PASS: editor and game HTML contain the actual playable witch model bytes.');

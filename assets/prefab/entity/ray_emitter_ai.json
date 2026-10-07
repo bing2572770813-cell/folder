@@ -44,7 +44,7 @@
     "paper_ai"
   ],
   "visual": {
-    "model": "model/emitter_ai.fbx",
+    "model": "model/snake_ai.fbx",
     "scale": [
       0.005,
       0.005,

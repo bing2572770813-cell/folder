@@ -287,7 +287,7 @@ const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.Plan
 const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,mechanismLayer,rayLayer,modelLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 const playerVisual=createPlayerVisualView({host:activeTokenHost,library:modelLibrary,createFallback:makeToken,clearFallback:disposableClear,onChange:()=>{renderer.shadowMap.needsUpdate=true;},onError:(descriptor,error)=>console.warn('玩家模型加载失败',descriptor.visual.model,error)});
-function renderPlayer() {renderer.shadowMap.needsUpdate=true;playerVisual.update(getPlayerPrefab());playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;if(!P.animation){playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);}}
+function renderPlayer() {renderer.shadowMap.needsUpdate=true;playerVisual.update(getPlayerPrefab(),P.mode==='play');playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;if(!P.animation){playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);}}
 
 function entityEdgeColor(tile){return tile.edgeColor??(!tile.prefabId&&!blocked(tile)?prefabs.find(p=>p.id==='paper_ai')?.tile?.edgeColor:undefined);}
 function makeToken(color){
@@ -427,7 +427,7 @@ function refreshMechanismSurfaces(){
  const key=documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|');
  if(key!==brokenViewKey){brokenViewKey=key;buildPaper();}else refreshMechanismMarkers();
 }
-function refreshModels(){return modelView.update(collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id),nodeHidden,cellHidden,runtime:P.mode==='play',wx,wz,tileTop}));}
+function refreshModels(){return modelView.update(P.mode==='play'?collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id),nodeHidden,cellHidden,runtime:true,wx,wz,tileTop}):[]);}
 function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
  refreshModels();
  disposableClear(mechanismLayer);disposableClear(rayLayer);
@@ -464,7 +464,7 @@ function addAxisLabels(maxHeight){
 }
 function applyVisibility(){
   renderer.shadowMap.needsUpdate=true;
-  const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
+  const editing=P.mode==='edit';modelLayer.visible=!editing;boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
   terrainLayer.visible=true;tableScenery.group.visible=showTable;creaseGuideLayer.visible=showCreaseDashes&&foldLayer.visible;foldSelectionLayer.visible=foldLayer.visible&&P.mode==='play'&&!!P.chosenFold;
 }
 for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;if(key==='folds')buildPaper();else applyVisibility();syncState();};

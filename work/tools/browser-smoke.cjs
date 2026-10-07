@@ -179,8 +179,11 @@ async function main() {
       }
       await page.locator('#mapFile').setInputFiles({name:'emitter-model.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(emitterMap))});
       await page.waitForFunction(()=>window.foldField.getState().map.name==='喷射模型验收');
+      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.length===0);
+      await capture('desktop-emitter-editor-marker');
+      const currentEmitterModel=await page.evaluate(()=>window.__FOLD_FIELD_PREFABS__.find(prefab=>prefab.id==='ray_emitter_ai').visual.model);
       await page.locator('#playMode').click();
-      await page.waitForFunction(()=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model==='model/emitter_ai.fbx'&&Math.abs(model.rotation+Math.PI/2)<1e-6));});
+      await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected&&Math.abs(model.rotation+Math.PI/2)<1e-6));},currentEmitterModel);
       await capture('desktop-emitter-model');
       const emitterStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(emitterStart.x,emitterStart.y);
       const emitterNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(emitterNext.x,emitterNext.y);
@@ -190,6 +193,12 @@ async function main() {
       await page.locator('#undoBtn').click();
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+Math.PI/2)<1e-6));
       results.push({name:'emitter-fbx-legacy-models-runtime-facing-and-undo',status:'pass'});
+      const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportGame').click()]);
+      const exportedEmitter=path.join(directory,'emitter-offline-game.html');await download.saveAs(exportedEmitter);
+      await page.locator('#editMode').click();
+      await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.models.length===0&&!data.playerVisual.enabled;});
+      results.push({name:'edit-mode-icons-only-after-playing',status:'pass'});
+
 
       await page.locator('#editMode').click();
       for(const node of enemyMap.entities)node.components.surface.height=.7;
@@ -237,6 +246,12 @@ async function main() {
         results.push({name:'fragile-entry-'+source+'-no-camera-shake',status:'pass',screenDrift:drift});
       }
       await closeContext('desktop');
+      await open({width:1280,height:800},pathToFileURL(exportedEmitter).href,{offlineAssets:true});
+      await page.evaluate(()=>window.foldField.enableDiagnostics());
+      await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected));},currentEmitterModel);
+      await capture('offline-current-emitter-model');
+      results.push({name:'exported-game-resolves-current-prefab-model-without-server',status:'pass'});
+      await closeContext('offline-emitter');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());
       await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model==='model/player_witch_ai.fbx'&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;});

@@ -19,9 +19,12 @@ assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,
 assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].dir,2);
 assert.equal(collectModelDescriptors(enemyDocument,{getPrefab,runtime:true})[0].dir,6,'model follows runtime direction reversal');
 assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].dir,2,'runtime changes do not alter edit-mode configuration');
-enemy.configuration.visual=null;assert.equal(collectModelDescriptors(enemyDocument,{getPrefab}).length,0,'explicit null keeps the model disabled');
-enemy.configuration.visual={model:'model/custom_ai.fbx'};assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,'model/custom_ai.fbx','instance override is retained');
-console.log('PASS: legacy enemy visual fallback, runtime orientation and explicit per-instance visual overrides.');
+enemy.configuration.visual=null;assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,'model/emitter_ai.fbx','current prefab visual replaces stale instance null');
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab:()=>({visual:null})}).length,0,'explicit prefab null disables its visual');
+enemy.configuration.visual={model:'model/custom_ai.fbx'};assert.equal(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.model,'model/emitter_ai.fbx','current prefab visual replaces stale instance snapshots');
+assert.equal(collectModelDescriptors(enemyDocument)[0].visual.model,'model/custom_ai.fbx','missing prefab retains saved visual');
+assert.equal(collectModelDescriptors(enemyDocument,{getPrefab:()=>({visual:{model:'model/snake_ai.fbx'}})})[0].visual.model,'model/snake_ai.fbx','changing prefab reference updates existing instances');
+console.log('PASS: current prefab reference changes, runtime orientation and missing-prefab fallback.');
 
 const oldOffset=[4.6652925885,.0319734826,-4.5407583767];
 enemy.configuration.visual={model:'model/emitter_ai.fbx',offset:oldOffset};

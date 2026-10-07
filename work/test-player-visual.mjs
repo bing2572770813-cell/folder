@@ -17,6 +17,8 @@ player.position.set(2,3,4);player.rotation.y=-Math.PI/4;player.updateMatrixWorld
 assert.ok(instance.getWorldPosition(new Vector3()).distanceTo(player.localToWorld(new Vector3(...visual.offset)))<1e-10);
 const pivot=new Group();pivot.add(player);pivot.rotation.z=Math.PI/2;pivot.updateMatrixWorld(true);
 assert.ok(instance.getWorldPosition(new Vector3()).distanceTo(player.localToWorld(new Vector3(...visual.offset)))<1e-10,'model follows the same fold parent as player');
+view.update({visual},false);assert.equal(host.children[1].children.length,0,'edit mode removes the runtime model');assert.equal(view.status().enabled,false);assert.equal(host.children[0].visible,false);
+view.update({visual});await settle();assert.equal(view.status().ready,true,'returning to play restores the model');
 view.update({visual:{...visual,offset:[0,0,0]}});await settle();assert.equal(loads,1,'prefab transform edits reuse FBX bytes and geometry');
 assert.deepEqual(host.children[1].children[0].children[0].position.toArray(),[0,0,0]);
 view.update({tile:{color:'white'}});assert.equal(view.status().fallback,true);assert.equal(host.children[1].children.length,0);

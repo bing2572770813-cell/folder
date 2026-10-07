@@ -12,6 +12,20 @@
 - 单格纸张和地形的原有互斥约束仍适用，不新增叠层规则。
 - 地图保存初始配置；撤销恢复运行状态，重开恢复初始状态。动画时长不能决定机制变化。
 
+### 机制订阅
+
+回合机制使用受控的 `triggerList` 连接生命周期阶段。它只声明机制关注的事件、适用的 `walk/teleport` 触发类型和处理器 ID，不保存脚本或任意表达式。处理器返回效果或更新所属运行时状态；`player.cjs` 的回合结算器负责阶段顺序、统一提交和回滚。
+
+当前阶段连接为：
+
+```text
+beforeTransition  -> foldSwitch
+afterTransition   -> rayEmitter
+afterMechanisms   -> lift
+```
+
+这套表是连接层，不替代机制自身的条件和效果实现。新增机制先选择生命周期阶段，再注册受控处理器；机制之间不能直接互相调用。
+
 ## 升降纸张方块
 
 配置：`lift.minHeight`、`maxHeight`、`initialHeight`、`turnsPerLeg`。

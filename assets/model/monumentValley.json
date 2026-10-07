@@ -1,0 +1,5 @@
+{
+  "source": "User supplied monumentValley.fbx, 2026-10-07",
+  "usage": "Protagonist visual in prefab/entity/player_ai.json",
+  "notes": "Original FBX preserved. Prefab scale and offset center the mesh and align its feet with the player surface. No external textures required."
+}

@@ -30,7 +30,7 @@ async function build() {
   const result = await esbuild.build({
     ...shared,
     plugins: [require("./build-support.cjs").workspaceFiles(root)],
-    entryPoints: [path.join(root, "react-entry.jsx")],
+    entryPoints: [path.join(root, "react-entry.tsx")],
     platform: "browser",
     format: "iife",
     minify: true,

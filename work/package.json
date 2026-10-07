@@ -11,6 +11,7 @@
   },
   "scripts": {
     "check": "node tools/check.cjs",
+    "check:affected": "node tools/affected-check.cjs",
     "check:tools": "node --test tools/test/*.test.cjs",
     "check:report": "node tools/check-report.cjs",
     "preview": "node tools/preview.cjs",

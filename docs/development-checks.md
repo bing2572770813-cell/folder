@@ -20,6 +20,8 @@ Integration with newer main preserves its entity and model-resource regression f
 
 For faster feedback during implementation, use `npm --prefix work run check -- backend`, `-- frontend`, or `-- tools`. Backend scope compiles and runs every backend test. Frontend scope compiles the shared backend, builds HTML and runs the frontend suite. Tools scope runs all auxiliary tool tests. These are explicitly partial checks, not substitutes for the default full check before committing. Unknown scopes fail. No test-result caching is used.
 
+Use `npm --prefix work run check:affected` to inspect the current Git changes and receive a recommended scope. The tool maps backend, frontend, and auxiliary-tool changes to the narrowest matching check; mixed changes widen to `all`. It ignores documentation and generated output changes, prints the files behind each recommendation, and never runs checks by default. Add `-- --run` to execute the recommendation, or `-- --json` for machine-readable output. This is a feedback shortcut only; run the full `npm --prefix work run check` before committing.
+
 Browser performance sampling and screenshots are separate checks; a successful report does not prove a frame-time target or visual correctness. Review generated HTML changes before committing. Logs may contain local paths and application error details; inspect them before sharing.
 
 ## Preview Preparation

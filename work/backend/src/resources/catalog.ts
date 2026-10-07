@@ -30,6 +30,14 @@ async function readDefinition(file: string): Promise<unknown> {
   return JSON.parse(await fs.readFile(file, 'utf8'));
 }
 
+function validatedPrefab(id:string,definitions:Map<string,JsonObject>,normalizePrefab:(value:unknown)=>CatalogDefinition):CatalogDefinition {
+  const resolved=resolvePrefabRecord(id,definitions);
+  const components:Record<string,JsonObject>={};
+  for(const [key,config] of Object.entries(jsonObject(resolved.components??{})))components[key]=jsonObject(config);
+  defaultComponents().validate({id,prefabId:id,transformId:id,components,tags:{},static:validateStaticFields(resolved.static??{})});
+  return normalizePrefab(resolved);
+}
+
 export async function readCatalog(folder: string): Promise<CatalogResult> {
   const {normalizePrefab, normalizeTagPrefab} = await sharedNormalizers();
   const prefabs: CatalogDefinition[] = [];
@@ -54,11 +62,7 @@ export async function readCatalog(folder: string): Promise<CatalogResult> {
   }
   for(const id of definitions.keys()){
     try{
-      const resolved=resolvePrefabRecord(id,definitions);
-      const components:Record<string,JsonObject>={};
-      for(const [key,config] of Object.entries(jsonObject(resolved.components??{})))components[key]=jsonObject(config);
-      defaultComponents().validate({id,prefabId:id,transformId:id,components,tags:{},static:validateStaticFields(resolved.static??{})});
-      prefabs.push(normalizePrefab(resolved));
+      prefabs.push(validatedPrefab(id,definitions,normalizePrefab));
     }catch(error){errors.push({file:definitionFiles.get(id)!,message:errorMessage(error)});}
   }
 
@@ -84,11 +88,7 @@ export async function savePrefab(folder: string, data: unknown): Promise<Catalog
   const definitions=new Map<string,JsonObject>(current.prefabs.map(value=>{const definition=jsonObject(value);return [definition.id as string,definition];}));
   if(definitions.has(raw.id))throw new Error('实体 ID 已存在，请使用新 ID');
   definitions.set(raw.id,raw);
-  const resolved=resolvePrefabRecord(raw.id,definitions);
-  const components:Record<string,JsonObject>={};
-  for(const [key,config] of Object.entries(jsonObject(resolved.components??{})))components[key]=jsonObject(config);
-  defaultComponents().validate({id:raw.id,prefabId:raw.id,transformId:raw.id,components,tags:{},static:validateStaticFields(resolved.static??{})});
-  const prefab = normalizePrefab(resolved);
+  const prefab = validatedPrefab(raw.id,definitions,normalizePrefab);
   if (current.prefabs.some(value => value.id === prefab.id)) throw new Error('实体 ID 已存在，请使用新 ID');
   const target = path.join(folder, 'entity');
   await fs.mkdir(target, {recursive: true});

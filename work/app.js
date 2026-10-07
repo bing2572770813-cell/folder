@@ -756,13 +756,8 @@ function drawPlacementPreview(hit){
  const invalid=!!reason;
  const previewMap=invalid?null:placementCheckCache.candidate.view();
  if(!invalid){
-  const candidate=placementCheckCache.candidate,view=previewMap,before=new Map(documentModel.world.serialize().map(node=>[node.id,node]));
-  const affected=new Set(cells.map(p=>p.r+','+p.c));
-  for(const node of candidate.world.serialize()){
-   const old=before.get(node.id);
-   if(!old||JSON.stringify(old)!==JSON.stringify(node))for(const p of candidate.world.transforms.worldCells(node.transformId))affected.add(p.r+','+p.c);
-  }
-  const projection=renderTreeCells(candidate,{nodeHidden,cellHidden}),surfaceCells=projection.surfaceCells.filter(p=>affected.has(p.r+','+p.c));
+  const candidate=placementCheckCache.candidate,view=previewMap,affected=new Set(cells.map(p=>p.r+','+p.c));
+  const projection=renderTreeCells(candidate,{nodeHidden,cellHidden,cells}),surfaceCells=projection.surfaceCells;
   const marker=(texture,r,c,height,scale,index=0,total=1)=>{
    const mesh=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,opacity:.85,depthWrite:false,depthTest:false,toneMapped:false}));
    mesh.rotation.x=-Math.PI/2;mesh.position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),height+.04+index*.005,wz(r));mesh.scale.setScalar(scale);mesh.renderOrder=12;placementLayer.add(mesh);

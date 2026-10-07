@@ -18,8 +18,10 @@ function surfaceTile(document,node,r,c,runtime=false){
  return tile;
 }
 
-function projection(document){
- const byCell=new Map(),nodes=document.world.serialize();
+function projection(document,cells){
+ const byCell=new Map(),nodes=cells
+  ?[...new Map(cells.flatMap(({r,c})=>document.world.at(r,c)).map(node=>[node.id,node])).values()]
+  :document.world.serialize();
  for(const node of nodes)for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
   const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
  }
@@ -27,13 +29,13 @@ function projection(document){
  return {byCell,nodes};
 }
 
-export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false}={}){
+export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false,cells}={}){
  const surfaceCells=[],terrainCells=[],tagCells=[],tokenCells=[];
- const {byCell,nodes}=projection(document);nodes.sort((a,b)=>a.id.localeCompare(b.id));
+ const allowed=cells&&new Set(cells.map(({r,c})=>r+','+c)),{byCell,nodes}=projection(document,cells);nodes.sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
-   if(cellHidden(r,c))continue;
+   if((allowed&&!allowed.has(r+','+c))||cellHidden(r,c))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
    const primary=(byCell.get(r+','+c)??[]).find(surfaceVisible);

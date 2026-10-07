@@ -37,6 +37,7 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.cells(node.id)){
    if((allowed&&!allowed.has(r+','+c))||cellHidden(r,c))continue;
+   if(runtime&&fragilePresence.isBrokenCell(document.world,byCell.get(r+','+c)??[]))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
    const primary=(byCell.get(r+','+c)??[]).find(surfaceVisible);

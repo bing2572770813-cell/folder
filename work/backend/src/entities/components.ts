@@ -1,4 +1,5 @@
 import {jsonObject,type JsonObject,type EntityNode,type ComponentRuntime} from './entity-model.js';
+import rayEmitter from '../../../entities/ray-emitter-config.cjs';
 
 export type EntityEvent='enter'|'leave'|'interact';
 /** Exclusive cause of an arrival/departure; omitted for initialization or interaction. */
@@ -85,6 +86,9 @@ export function defaultComponents():ComponentRegistry {
   registry.register('tag',{});
   registry.register('collision',{validate:config=>{if(config.blocked!==undefined&&typeof config.blocked!=='boolean')throw new Error('Invalid collision blocked');},canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
+  registry.register('rayEmitter',{validate:rayEmitter.validate,canEnter:()=> '方向喷射方块不可进入'});
+  registry.register('foldSwitch',{validate:config=>{if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
+  registry.register('fragile',{canEnter:(_context,_config,state)=>state.broken?'易碎方块已破碎':undefined,events:{leave:context=>context.trigger==='walk'||context.trigger==='teleport'?{state:{broken:true}}:{}}});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{
     effectOrder:10,

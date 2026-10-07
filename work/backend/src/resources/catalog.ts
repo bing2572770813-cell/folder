@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {errorMessage} from '../core/errors.js';
 import {jsonObject,validateStaticFields,type JsonObject} from '../entities/entity-model.js';
 import {resolvePrefabRecord} from '../entities/prefab-definition.js';
 import {defaultComponents} from '../entities/components.js';
@@ -7,10 +8,6 @@ import {sharedNormalizers, type CatalogDefinition} from './shared-normalizers.js
 
 export type CatalogError = {file: string; message: string};
 export type CatalogResult = {prefabs: CatalogDefinition[]; tags: CatalogDefinition[]; errors: CatalogError[]};
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 async function jsonFiles(folder: string, subdir: string): Promise<Array<{file: string; name: string}>> {
   const source = path.join(folder, subdir);

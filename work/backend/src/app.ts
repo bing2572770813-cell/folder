@@ -3,6 +3,7 @@ import {loadBackendConfig, type BackendConfig} from './config.js';
 import {readCatalog, type CatalogResult} from './resources/catalog.js';
 import {registerPrefabRoutes, type CatalogReader} from './routes/prefabs.js';
 import {registerStaticRoutes} from './routes/static-files.js';
+import {registerAssetRoutes} from './routes/assets.js';
 import type {StaticFileReader} from './resources/static-files.js';
 
 export type AppDependencies = {
@@ -17,6 +18,7 @@ export async function createApp(
   const app = Fastify({logger: false});
   const catalog = dependencies.readCatalog ?? readCatalog;
   await registerPrefabRoutes(app, config, catalog);
+  await registerAssetRoutes(app, config);
   await registerStaticRoutes(app, config, dependencies.readStaticFile);
   return app;
 }

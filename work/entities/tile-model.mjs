@@ -1,6 +1,7 @@
 import {normalizeBehavior,normalizeBaseEntity} from './behaviors.mjs';
 import {normalizePropertySchema} from '../core/property-model.mjs';
 import {copyJson} from '../core/json-value.mjs';
+import {normalizeVisual} from '../resources/visual-definition.mjs';
 export const COLOR_KEYS=['white','red','yellow','blue','green','purple','black'];
 export const FOLD_TYPES=['h','v','d1','d2'];
 export const hasColor=tile=>!!tile&&Object.hasOwn(tile,'color');
@@ -61,7 +62,7 @@ export function normalizeTile(tile) {
   const keyName=terrain==='key'?(tile.keyName??'钥匙'):undefined;
   if(keyName!==undefined&&(typeof keyName!=='string'||!keyName.trim()||keyName.trim().length>80))throw new Error('钥匙名须为 1–80 字');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
-  const propertyExtras={...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
+  const propertyExtras={...(tile.visual!==undefined?{visual:normalizeVisual(tile.visual)}:{}),...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
   if(tile.followFold!==undefined&&typeof tile.followFold!=='boolean')throw new Error('可跟随折叠须为布尔值');
   if(tile.canDropOnFold!==undefined&&typeof tile.canDropOnFold!=='boolean')throw new Error('可在折叠时掉落须为布尔值');
@@ -75,6 +76,7 @@ export function normalizePrefab(data) {
   if((data.tile||Object.hasOwn(data.components??{},'surface'))&&(size.width!==1||size.height!==1))throw new Error('纸张实体只能占一个方格');
   const propertySchema=normalizePropertySchema(data.propertySchema??data.tile?.propertySchema??{});
   const extras={};
+  if(data.visual!==undefined)extras.visual=normalizeVisual(data.visual);
   if(data.children!==undefined){const children=copyJson(data.children);if(!Array.isArray(children)||children.some(child=>!child||typeof child!=='object'||Array.isArray(child)))throw new Error('children 须为子实体列表');extras.children=children;}
   for(const key of ['components','static','tags'])if(data[key]!==undefined){
     const value=copyJson(data[key]);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error(key+' 须为 JSON 对象');

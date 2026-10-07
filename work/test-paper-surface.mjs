@@ -68,3 +68,43 @@ for(const type of ['h','v','d1','d2']){
  for(let i=0;i<raised.points.length;i++)assert.ok(Math.abs(Math.hypot(...raised.points[i].map((v,axis)=>v-raised.bottomPoints[i][axis]))-.1)<1e-10,'raised crease preserves normal thickness');
 }
 console.log('PASS: negative crease depth raises all four crease directions and preserves thickness.');
+
+const surfaceModule=await import('./render/paper-surface.mjs');
+assert.equal(typeof surfaceModule.createPaperSurfaceCache,'function','scene geometry must support bounded reuse');
+const cache=surfaceModule.createPaperSurfaceCache();
+const cachedMap={tiles:[[tile(1),tile(3)],[tile(2),tile(4)]],foldCells:[]};
+const cached=(r=0,c=0,hidden=()=>false,showFolds=true,depth=.6)=>cache.get(cachedMap,r,c,hidden,showFolds,depth);
+cache.begin();const original=cached();cache.end();
+cache.begin();assert.equal(cached(),original,'unchanged geometry is reused across rebuilds');cache.end();
+cachedMap.tiles[0][0].color='red';cachedMap.tiles[0][0].regionTag='region';
+assert.equal(cached(),original,'display-only edits do not invalidate geometry');
+for(const [description,change] of [
+ ['diagonal height',()=>cachedMap.tiles[1][1].height=8],
+ ['neighbor visibility',()=>cachedMap.tiles[0][1].surfaceConnected=false],
+ ['thickness',()=>cachedMap.tiles[0][0].thickness=.1],
+ ['transition rate',()=>cachedMap.tiles[0][0].gradualRate=1],
+ ['entity crease',()=>cachedMap.tiles[0][0].folds=['v']],
+ ['virtual crease',()=>cachedMap.foldCells=[{r:0,c:0,type:'h'}]],
+]){
+ const before=cached();change();const after=cached();
+ assert.notEqual(after,before,description+' must invalidate');
+ assert.deepEqual(after,paperSurface(cachedMap,0,0),description+' matches uncached geometry');
+}
+assert.deepEqual(cached(0,0,()=>false,false),paperSurface(cachedMap,0,0,()=>false,false));
+assert.deepEqual(cached(0,0,()=>false,true,-.5),paperSurface(cachedMap,0,0,()=>false,true,-.5));
+assert.equal(cached(0,0,()=>true),null,'hidden center has no surface');
+assert.deepEqual(cached(0,0,(r,c)=>r===1&&c===1),paperSurface(cachedMap,0,0,(r,c)=>r===1&&c===1));
+cachedMap.tiles[0][0].lift={};assert.equal(cached(),null,'lift does not connect to paper');delete cachedMap.tiles[0][0].lift;
+cachedMap.tiles[0][0].surfaceConnected=false;assert.equal(cached(),null);delete cachedMap.tiles[0][0].surfaceConnected;
+const retained=cached();cache.begin();cache.end();assert.notEqual(cached(),retained,'unvisited entities are released');
+const moved=cache.get(cachedMap,1,0);assert.deepEqual(moved,paperSurface(cachedMap,1,0),'cell coordinates change dependencies');
+const replacement={tiles:[[tile(1)]],foldCells:[]};assert.equal(cache.get(replacement,0,0),null,'map replacement drops old neighbors and folds');
+const bounded=surfaceModule.createPaperSurfaceCache({maxComponents:1});
+const oversized=bounded.get(cachedMap,0,0);assert.notEqual(bounded.get(cachedMap,0,0),oversized,'oversized results are not retained');
+const sharedMap={tiles:Array.from({length:5},()=>Array.from({length:5},()=>({...tile(1),folds:['h']})))};
+assert.equal(cache.get(sharedMap,1,1),cache.get(sharedMap,3,3),'identical local geometry is shared across cells');
+const firstSurface=paperSurface(cachedMap,0,0),oneEntry=surfaceModule.createPaperSurfaceCache({maxComponents:firstSurface.positions.length+firstSurface.points.length*9+firstSurface.boundary.length*3+firstSurface.boundarySegments.length*6});
+const firstEntry=oneEntry.get(cachedMap,0,0);
+oneEntry.get(cachedMap,0,0,()=>false,true,-.5);
+assert.notEqual(oneEntry.get(cachedMap,0,0),firstEntry,'least recently used geometry is evicted when capacity is exceeded');
+console.log('PASS: bounded surface reuse, local dependency invalidation, folds, visibility, movement, map replacement and eviction.');

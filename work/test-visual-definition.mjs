@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {normalizePrefab,normalizeTile} from './entities/tile-model.mjs';
+const raw={version:1,id:'key_model_ai',name:'Model key',tile:{terrain:'key'},visual:{model:'model/key_ai.fbx'}};
+const prefab=normalizePrefab(raw);
+assert.deepEqual(prefab.visual,{model:'model/key_ai.fbx',scale:[1,1,1],offset:[0,0,0],rotation:[0,0,0],textures:{}});
+assert.deepEqual(normalizeTile({...raw.tile,visual:prefab.visual}).visual,prefab.visual);
+assert.equal(raw.visual.scale,undefined,'normalization does not mutate authored data');
+for(const model of ['../secret.fbx','model/../secret.fbx','/model/key.fbx','https://example.com/key.fbx','model/key.glb','model/key%2efbx','model/key\\file.fbx'])assert.throws(()=>normalizePrefab({...raw,visual:{model}}));
+for(const field of ['scale','offset','rotation'])for(const value of [[1,2],[1,2,Infinity],'1'])assert.throws(()=>normalizePrefab({...raw,visual:{...raw.visual,[field]:value}}));
+assert.throws(()=>normalizePrefab({...raw,visual:{...raw.visual,scale:[0,1,1]}}));
+assert.throws(()=>normalizePrefab({...raw,visual:{...raw.visual,textures:{'key.png':'model/key.png'}}}));
+assert.deepEqual(normalizePrefab({...raw,visual:{...raw.visual,textures:{'Key_Diffuse.png':'texture/key_ai.png'}}}).visual.textures,{'Key_Diffuse.png':'texture/key_ai.png'});
+assert.equal(normalizePrefab({...raw,visual:null}).visual,null,'null disables inherited model appearance');
+console.log('PASS: visual definition survives normalization with defaults, detached data and path/transform validation.');

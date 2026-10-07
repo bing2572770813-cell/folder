@@ -33,3 +33,5 @@ placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType
 placement-preview.mjs 为悬停构造局部文档，包含完整子实体足迹、相关祖先/删除后代、引用和唯一标签拥有者，复用 placeCategorizedPrefab 的正式规则，不复制整张地图。调用者须提供包含隐藏节点的 spawn/entry 占格上下文；上下文随文档更新。预览投影只复制受影响行，源地图保持不变。专项一致性测试已接入默认测试入口。
 
 在 work 中运行 `node bench-placement-preview.mjs` 可比较正式候选构造与局部预览的数据逻辑成本。该比较不代表优化前后或浏览器整体延迟；正式提交、历史与场景重建仍有全量工作，需要另行测量。
+
+TreeDocument.serialize 直接从起点标签拥有者的实际占格派生唯一 spawn，不构造完整显示投影。没有唯一标签格时保留元数据后备值；持久化权限过滤前读取 canonical 标签，避免过滤改变起点派生语义。

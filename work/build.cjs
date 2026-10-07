@@ -7,6 +7,12 @@ const root = __dirname,
 async function build() {
   const catalog = await require("./prefab-catalog.cjs").readCatalog();
   if (catalog.errors.length) console.warn("Prefab warnings:", catalog.errors);
+  const {visualAssetPaths}=await import('./resources/visual-assets.mjs');
+  const playerVisual=catalog.prefabs.find(prefab=>prefab.id==='player_ai')?.visual;
+  const builtinAssets=Object.fromEntries(visualAssetPaths([playerVisual]).map(asset=>[
+    asset,'data:'+(asset.endsWith('.png')?'image/png':'application/octet-stream')+';base64,'+
+      fs.readFileSync(path.join(root,'../assets',asset)).toString('base64'),
+  ]));
   const shared = {
     bundle: true,
     write: false,
@@ -48,6 +54,7 @@ async function build() {
     .replace("<style>", "<style>" + css + "</style><style>")
     .replace("<!--REACT_MARKUP-->", markup);
   const code =
+    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';'+
     "window.__FOLD_FIELD_TAGS__??=" +
     JSON.stringify(catalog.tags).replace(/</g, "\\u003c") +
     ";window.__FOLD_FIELD_PREFABS__??=" +

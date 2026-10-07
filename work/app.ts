@@ -256,7 +256,7 @@ let foldAxes=[],axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
 const mechanismLayer=new THREE.Group(),rayLayer=new THREE.Group();paper.add(mechanismLayer,rayLayer);
 const modelLayer=new THREE.Group();paper.add(modelLayer);
-const visualAssetSource=createVisualAssetSource({offline:Boolean(EMBEDDED_ASSETS),embedded:EMBEDDED_ASSETS??{}});
+const visualAssetSource=createVisualAssetSource({offline:Boolean(EMBEDDED_ASSETS),embedded:{...(window.__FOLD_FIELD_BUILTIN_ASSETS__??{}),...(EMBEDDED_ASSETS??{})}});
 const modelLibrary=createModelLibrary({load:createFbxModelLoader(visualAssetSource)});
 let modelErrorKey='';
 const modelView=createModelView({layer:modelLayer,library:modelLibrary,onChange:()=>buildPaper(),onError:(descriptor,error)=>{const key=descriptor.id+':'+error.message;if(key!==modelErrorKey){modelErrorKey=key;console.warn('模型加载失败',descriptor.id,error);}}});

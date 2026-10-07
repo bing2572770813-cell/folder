@@ -9,6 +9,7 @@ import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,place
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
+import {previewPlacement,previewFootprint} from './entities/placement-preview.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
@@ -100,6 +101,7 @@ const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer)
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const foldableCells=new Set();
+let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
 const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
@@ -233,7 +235,12 @@ function buildPaper() {
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();
   foldableCells.clear();
-  for(const node of documentModel.world.serialize())if(nodeFollowsFold(node))for(const cell of documentModel.world.transforms.worldCells(node.transformId))foldableCells.add(cell.r+','+cell.c);
+  placementTagCells=[];
+  for(const node of documentModel.world.serialize()){
+   const cells=documentModel.world.transforms.worldCells(node.transformId);
+   if(node.tags.spawn||node.tags.entry)placementTagCells.push(...cells);
+   if(nodeFollowsFold(node))for(const cell of cells)foldableCells.add(cell.r+','+cell.c);
+  }
   updateLighting();
   disposableClear(placementLayer);placementLayer.userData.preview=null;
   liftLineRanges=[];
@@ -774,9 +781,10 @@ function placementCandidate(r,c,{preview=false}={}){
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
- const candidate=placeCategorizedPrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)});
+ const options={isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)},result=preview?previewPlacement(documentModel,prefab,tile,r,c,{...options,tagCells:placementTagCells}):null;
+ const candidate=preview?result.candidate:placeCategorizedPrefab(documentModel,prefab,tile,r,c,options);
  if(!preview)assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
- assertTreeVisibility(candidate);
+ assertTreeVisibility(candidate,preview?result.source:documentModel);
  return candidate;
 }
 
@@ -784,7 +792,7 @@ let placementCheckCache=null;
 function drawPlacementPreview(hit){
  disposableClear(placementLayer);placementLayer.userData.preview=null;if(P.mode!=='edit'||tool!=='place'||!hit)return;
  const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)return;
- const cells=footprint(prefab,hit.r,hit.c);let reason='';
+ let cells,reason='';try{cells=previewFootprint(prefab,hit.r,hit.c,id=>prefabs.find(p=>p.id===id));}catch(error){$('hoverCoord').textContent='无法放置 · '+error.message;return;}
  const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
  if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
  else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
@@ -812,9 +820,9 @@ function drawPlacementPreview(hit){
 }
 
 function placementPreviewMap(candidate,cells){
- const preview={...map,tiles:map.tiles.map(row=>row.slice())};
+ const preview={...map,tiles:map.tiles.slice()},rows=new Set();
  const changes=candidate.viewCells(cells);
- for(const {r,c} of cells)preview.tiles[r][c]=changes.get(r+','+c)??null;
+ for(const {r,c} of cells){if(!rows.has(r)){preview.tiles[r]=preview.tiles[r].slice();rows.add(r);}preview.tiles[r][c]=changes.get(r+','+c)??null;}
  return preview;
 }
 
@@ -828,7 +836,7 @@ function refreshEntityVisibility(){setSelectedCells(directSelectedCells);buildPa
 $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility();};
 $('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
-function assertTreeVisibility(next){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(documentModel,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(documentModel,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
+function assertTreeVisibility(next,before=documentModel){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(before,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(before,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
 function commitTree(next){assertTreeVisibility(next);if(JSON.stringify(next.serialize())===JSON.stringify(documentModel.serialize())){refreshTreePanel();return;}record();documentModel=next;map=next.view();if(selectedNodeId&&!next.world.serialize().some(node=>node.id===selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();updateUI();}
 function refreshTreePanel(){
  const panel=$('treeNodes');if(!panel)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];

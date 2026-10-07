@@ -57,7 +57,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     }
     node.components.fold.directions=[...new Set([...(node.components.fold.directions as string[]),fold.type])];
   }
-  const {tiles:ignoredTiles,foldCells:ignoredFolds,...metadata}=map;
+  const {version:ignoredVersion,width:ignoredWidth,height:ignoredHeight,tiles:ignoredTiles,foldCells:ignoredFolds,...metadata}=map;
   const tree:TreeMap={version:2,width:map.width,height:map.height,entities,transforms,cellTags,legacyMetadata:jsonObject(metadata)};
   loadTree(tree);return tree;
 }

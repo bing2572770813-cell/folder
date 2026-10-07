@@ -14,3 +14,5 @@ table-scene.mjs 将 Blender 建模的桌游桌以内联几何载入场景（独�
 空闲 pointermove 通过 `core/frame-task.mjs` 合并为每帧一次；拖拽编辑和玩家折纸手势保持即时处理。相机交互开始时取消待执行的悬停与预览，结束后重新计算最后位置。调度器不持有地图、实体或 Three.js 对象。
 
 渲染循环默认不写 `viewport.dataset.frames/render/points`。浏览器性能检查需要这些数据时先调用 `window.foldField.enableDiagnostics(true)`，关闭时调用 `enableDiagnostics(false)`；相机手势期间仍暂停这些周期性诊断。`getState()` 和 `screenPoint(r,c)` 始终可按需读取。
+
+放置预览在同一文档、落点、笔刷、prefab 和显示条件下保留 Three.js 网格，不因同格鼠标微动重新创建材质/几何；切换工具、相机手势、离开画布和场景重建时清除。拖拽放置期间不生成会立即被正式场景刷新清除的额外悬停预览。

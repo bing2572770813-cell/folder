@@ -32,3 +32,13 @@ const unchanged={...context,documentModel:original,editHistory:[],next:original}
 runInNewContext(functions+';commitTree(next);',unchanged);
 assert.equal(unchanged.editHistory.length,0);assert.equal(counts.build,0);assert.equal(counts.persist,0);
 console.log('PASS: production tree commits reuse history snapshots, refresh once and leave no-op history untouched.');
+
+const placed={...context,documentModel:original,next,editHistory:[],gestureBefore:{map:{version:2}},selectedNodeId:null};
+counts.before=0;counts.after=0;counts.build=0;counts.persist=0;
+runInNewContext(functions+';commitTree(next,{placement:true});',placed);
+assert.equal(counts.before,0);assert.equal(counts.after,0);assert.equal(placed.editHistory.length,0);assert.equal(counts.build,1);
+const clicked={...context,documentModel:original,next,editHistory:[],gestureBefore:null,selectedNodeId:null};
+counts.before=0;counts.after=0;
+runInNewContext(functions+';commitTree(next,{placement:true});',clicked);
+assert.equal(counts.before,1);assert.equal(counts.after,0);assert.equal(clicked.editHistory.length,1);
+console.log('PASS: placement preserves click undo while drag cells reuse the gesture snapshot without repeated serialization.');

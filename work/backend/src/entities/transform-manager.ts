@@ -26,14 +26,20 @@ export class TransformManager {
   get(id:string):TransformNode {const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return copy(node);}
   clone():TransformManager {
     const result=new TransformManager(this.width,this.height);
-    // Nodes and index arrays are replaced on writes and never exposed directly.
-    result.nodes=new Map(this.nodes);
-    result.index=new Map(this.index);
+    result.nodes=new Map(structuredClone([...this.nodes]));
+    result.index=new Map(structuredClone([...this.index]));
+    result.children=new Map([...this.children].map(([id,children])=>[id,[...children]]));
+    result.order=new Map(this.order);result.nextOrder=this.nextOrder;
     result.references=new Map([...this.references].map(([id,owners])=>[id,new Set(owners)]));
     return result;
   }
-  serialize():TransformNode[]{return copy([...this.nodes.values()]);}
-  childrenOf(id:string):string[]{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
+  serialize():TransformNode[]{return [...this.nodes.values()].map(copy);}
+  childrenOf(id:string):string[]{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);return [...(this.children.get(id)??[])];}
+  orderedIds(ids:Iterable<string>):string[]{
+    const result=[...new Set(ids)];
+    for(const id of result)if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);
+    return result.sort((a,b)=>this.order.get(a)!-this.order.get(b)!);
+  }
   world(id:string):GridTransform{return this.resolve(this.nodes,id,new Set());}
   at(r:number,c:number):string[]{return [...(this.index.get(r+','+c)??[])];}
   worldCells(id:string):Array<{r:number;c:number}>{const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return this.cells(node,this.resolve(this.nodes,id,new Set()));}

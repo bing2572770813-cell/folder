@@ -1,17 +1,10 @@
 import {tileHeight,tileThickness,tileGradualRate,foldsAt} from '../entities/tile-model.mjs';import {entityType} from '../entities/visibility-model.mjs';
 export const isPaper=tile=>!!tile&&(tile.surfaceConnected??(!tile.lift&&entityType(tile)==='paper_ai'));
-export function hasConnectedLiftNearby(map,r,c,hidden=()=>false){
- if(!isPaper(map.tiles[r]?.[c])||hidden(r,c))return false;
- for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
-  const y=r+dr,x=c+dc,tile=map.tiles[y]?.[x];
-  if(tile?.lift&&isPaper(tile)&&!hidden(y,x))return true;
- }
- return false;
-}
+export function hasConnectedLiftNearby(map,r,c,hidden=()=>false){if(!isPaper(map.tiles[r]?.[c])||hidden(r,c))return false;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const y=r+dr,x=c+dc,tile=map.tiles[y]?.[x];if(tile?.lift&&isPaper(tile)&&!hidden(y,x))return true;}return false;}
 // 保留 0–1 的下压规则；负值沿法线突起，幅度为其绝对值乘以厚度。
 export const DEFAULT_CREASE_DEPTH=.6;
 export const creaseRatio=value=>Math.min(1,Math.max(-1,Number.isFinite(value)?value:DEFAULT_CREASE_DEPTH));
-function surfaceInputs(map,r,c,hidden,showFolds,creaseDepth){
+function surfaceInputs(map,r,c,hidden,showFolds,creaseDepth,forceSurface=false){
  const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;
  const neighbors=[];
  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){
@@ -19,7 +12,7 @@ function surfaceInputs(map,r,c,hidden,showFolds,creaseDepth){
   neighbors.push(isPaper(neighbor)&&!hidden(r+dr,c+dc)?tileHeight(neighbor):null);
  }
  const height=tileHeight(tile),rate=tileGradualRate(tile),folds=showFolds?foldsAt(map,r,c):[];
- if((!neighbors.some(value=>value!==null&&value!==height)||rate===0)&&!folds.length)return null;
+ if(!forceSurface&&(!neighbors.some(value=>value!==null&&value!==height)||rate===0)&&!folds.length)return null;
  return {height,thickness:tileThickness(tile),rate,folds,depth:creaseRatio(creaseDepth),neighbors};
 }
 
@@ -29,8 +22,8 @@ export function createPaperSurfaceCache({maxComponents=1_000_000}={}){
  const remove=key=>{components-=entries.get(key).components;entries.delete(key);};
  return {
   begin(){used.clear();},
-  get(map,r,c,hidden=()=>false,showFolds=true,creaseDepth=DEFAULT_CREASE_DEPTH){
-   const input=surfaceInputs(map,r,c,hidden,showFolds,creaseDepth);if(!input)return null;
+  get(map,r,c,hidden=()=>false,showFolds=true,creaseDepth=DEFAULT_CREASE_DEPTH,forceSurface=false){
+   const input=surfaceInputs(map,r,c,hidden,showFolds,creaseDepth,forceSurface);if(!input)return null;
    const key=JSON.stringify(input),entry=entries.get(key);
    if(entry){entries.delete(key);entries.set(key,entry);used.add(key);return entry.surface;}
    const surface=surfaceFromInputs(input);if(!surface)return null;
@@ -46,9 +39,11 @@ export function createPaperSurfaceCache({maxComponents=1_000_000}={}){
 }
 // Shared top boundaries join flat centers; thickness offsets the underside along surface normals.
 export function paperSurface(map,r,c,hidden=()=>false,showFolds=true,creaseDepth=DEFAULT_CREASE_DEPTH,forceSurface=false){
- const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;const height=tileHeight(tile),thickness=tileThickness(tile),folds=showFolds?foldsAt(map,r,c):[];
- const paper=(y,x)=>isPaper(map.tiles[y]?.[x])&&!hidden(y,x),average=cells=>{const values=cells.filter(([y,x])=>paper(y,x)).map(([y,x])=>tileHeight(map.tiles[y][x]));return values.reduce((a,b)=>a+b,0)/values.length;};
- let changed=false;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(paper(r+dr,c+dc)&&tileHeight(map.tiles[r+dr][c+dc])!==height)changed=true;if(!forceSurface&&(!changed||tileGradualRate(tile)===0)&&!folds.length)return null;
+ const input=surfaceInputs(map,r,c,hidden,showFolds,creaseDepth,forceSurface);return input?surfaceFromInputs(input):null;
+}
+function surfaceFromInputs({height,thickness,rate,folds,depth:creaseDepth,neighbors}){
+ const r=0,c=0;
+ const at=(y,x)=>neighbors[(y+1)*3+x+1],average=cells=>{const values=cells.map(([y,x])=>at(y,x)).filter(value=>value!==null);return values.reduce((a,b)=>a+b,0)/values.length;};
  const corners=[average([[r,c],[r-1,c],[r,c-1],[r-1,c-1]]),average([[r,c],[r-1,c],[r,c+1],[r-1,c+1]]),average([[r,c],[r+1,c],[r,c+1],[r+1,c+1]]),average([[r,c],[r+1,c],[r,c-1],[r+1,c-1]])];
  const mids=[average([[r,c],[r-1,c]]),average([[r,c],[r,c+1]]),average([[r,c],[r+1,c]]),average([[r,c],[r,c-1]])],inner=.5/(1+rate),steps=[-.5,-inner,0,inner,.5];
  const interpolate=(a,m,b,t)=>t<=0?a+(m-a)*(t+.5)*2:m+(b-m)*t*2;

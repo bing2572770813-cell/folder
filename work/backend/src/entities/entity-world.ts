@@ -1,4 +1,5 @@
 import {TransformManager,type GridTransform} from './transform-manager.js';
+import {normalizeVisual} from '../resources/visual-definition.js';
 import {jsonObject,freezeJson,validateEntityTags,validateStaticFields,type EntityNode,type JsonObject,type ComponentRuntime} from './entity-model.js';
 
 /** Entity identity and state registry with a gameplay-only position overlay on static transforms. */
@@ -22,14 +23,15 @@ export class EntityWorld {
     const components:Record<string,JsonObject>={};
     for(const [id,config] of Object.entries(jsonObject(node.components)))components[id]=jsonObject(config);
     for(const field of ['followFold','canDropOnFold'])if(components.physics?.[field]!==undefined&&typeof components.physics[field]!=='boolean')throw new Error('Invalid physics '+field);
-    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:validateEntityTags(node.tags),static:freezeJson(validateStaticFields(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
+    const configuration=node.configuration?jsonObject(node.configuration):undefined;
+    if(configuration?.visual!==undefined){const visual=normalizeVisual(configuration.visual);configuration.visual=visual===null?null:jsonObject(visual);}
+    return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:validateEntityTags(node.tags),static:freezeJson(validateStaticFields(node.static)),...(configuration?{configuration}:{})};
   }
   has(id:string):boolean{return this.entities.has(id);}
   get(id:string):EntityNode {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;
   }
-  has(id:string):boolean{return this.entities.has(id);}
   forTransform(id:string):EntityNode[]{
     this.transforms.get(id);
     return [...(this.entitiesByTransform.get(id)??[])].map(owner=>this.get(owner));

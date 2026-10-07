@@ -4,6 +4,7 @@ import {jsonObject,freezeJson,validateEntityTags,validateStaticFields,type Entit
 /** Entity identity and state registry. Spatial lookup belongs exclusively to TransformManager. */
 export class EntityWorld {
   private entities=new Map<string,EntityNode>();
+  private entitiesByTransform=new Map<string,Set<string>>();
   private states=new Map<string,Map<string,JsonObject>>();
   constructor(readonly transforms:TransformManager,entities:EntityNode[]=[]) {
     const validated=entities.map(node=>this.validate(node));
@@ -25,10 +26,12 @@ export class EntityWorld {
   add(node:EntityNode):void {
     if(this.entities.has(node.id))throw new Error('Duplicate entity ID');
     const validated=this.validate(node);this.transforms.retain(node.transformId,'entity:'+node.id);this.entities.set(node.id,validated);
+    const ids=this.entitiesByTransform.get(node.transformId)??new Set<string>();ids.add(node.id);this.entitiesByTransform.set(node.transformId,ids);
   }
   at(r:number,c:number):EntityNode[] {
-    const transforms=new Set(this.transforms.at(r,c));
-    return [...this.entities.values()].filter(node=>transforms.has(node.transformId)).map(node=>this.get(node.id));
+    const result:EntityNode[]=[];
+    for(const transformId of this.transforms.at(r,c))for(const id of this.entitiesByTransform.get(transformId)??[])result.push(this.get(id));
+    return result;
   }
   remove(id:string,removeTransform=false):void {
     const node=this.get(id);const owner='entity:'+id;
@@ -36,7 +39,7 @@ export class EntityWorld {
       this.transforms.release(node.transformId,owner);
       try{this.transforms.remove(node.transformId);}catch(error){this.transforms.retain(node.transformId,owner);throw error;}
     }else this.transforms.release(node.transformId,owner);
-    this.entities.delete(id);this.states.delete(id);
+    this.entities.delete(id);this.entitiesByTransform.get(node.transformId)?.delete(id);if(this.entitiesByTransform.get(node.transformId)?.size===0)this.entitiesByTransform.delete(node.transformId);this.states.delete(id);
   }
   runtime(id:string,component:string):JsonObject {
     this.get(id);return structuredClone(this.states.get(id)?.get(component)??{});

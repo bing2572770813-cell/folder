@@ -12,7 +12,7 @@ Successful stages print only their name and elapsed time. Failures print the las
 
 Every run writes full stdout/stderr logs and `report.json` under the ignored `work/.dev-checks/<run-id>/` directory. `work/.dev-checks/latest.json` points to the most recent report. Reports include commands' exit codes, Node version, durations and skipped stages. Concurrent runs retain separate logs, but should not be used in the same worktree because they share generated build files.
 
-Existing `test`, `backend:test` and `build` commands are unchanged. The new entry runs both test suites; a green `npm test` alone does not assert that backend tests passed. Use `npm --prefix work run check:tools` to test the check runner itself.
+Existing `test`, `backend:test` and `build` command names remain available. Frontend tests now discover matching files rather than use a manual list. The unified entry runs both test suites; a green `npm test` alone does not assert that backend tests passed. Use `npm --prefix work run check:tools` to test the auxiliary tools.
 
 For faster feedback during implementation, use `npm --prefix work run check -- backend`, `-- frontend`, or `-- tools`. Backend scope compiles and runs every backend test. Frontend scope compiles the shared backend, builds HTML and runs the frontend suite. Tools scope runs all auxiliary tool tests. These are explicitly partial checks, not substitutes for the default full check before committing. Unknown scopes fail. No test-result caching is used.
 
@@ -30,7 +30,7 @@ Do not run these commands concurrently in one checkout because HTML and compiled
 
 Run `npm --prefix work run experiment:cost -- 3` to compare the existing frontend runner, isolated serial execution, two/four isolated test workers, and normal/incremental backend compilation. It builds first, records a separate warm-up for every variant, rotates sample order and reports median/min/max. Failed variants abort rather than being counted as savings. Full logs and `comparison.json` remain under `.dev-checks/experiment-*`.
 
-The parallel variant discovers root `test-*.mjs`, `test-*.cjs` and `verify-*.cjs` files, excluding the runner itself. A tool test compares that set against the existing runner. Test processes have isolated globals; the currently inspected filesystem-writing tests use unique temporary directories. New tests must preserve isolation before being run in parallel. Every test still runs; results are not cached.
+Default serial tests and parallel experiments share one discovery function for root `test-*.mjs`, `test-*.cjs` and `verify-*.cjs` files, excluding the runner itself. Adding a test file automatically includes it in both paths; there is no manually maintained test list. A regression test confirms a newly added failing test fails default verification. Test processes have isolated globals; the currently inspected filesystem-writing tests use unique temporary directories. New tests must preserve isolation before being run in parallel. Every test still runs; results are not cached.
 
 Use `npm --prefix work run frontend:fast -- 4` for optional faster frontend feedback after building. This is partial verification; default full checks remain unchanged. Try two workers if four increase contention on another machine.
 

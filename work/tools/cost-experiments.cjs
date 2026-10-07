@@ -3,12 +3,7 @@ const path = require('node:path');
 const {createHash, randomUUID} = require('node:crypto');
 const {runChecks} = require('./check-runner.cjs');
 const {createCheckPlan} = require('./check-plan.cjs');
-
-function frontendFiles(cwd) {
-  const files = fs.readdirSync(cwd).filter(file => /^(test-.*\.(mjs|cjs)|verify-.*\.cjs)$/.test(file) && file !== 'test-runner.cjs').sort();
-  if (!files.length) throw new Error('Frontend test suite is empty');
-  return files;
-}
+const {frontendFiles} = require('./frontend-test-files.cjs');
 function summarize(samples) {
   if (!samples.length) throw new Error('Cannot summarize empty samples');
   if (samples.some(sample => sample.status !== 'pass')) throw new Error('Cannot summarize failed samples as savings');

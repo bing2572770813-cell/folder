@@ -2,18 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const {frontendFiles, summarize, outputDigest} = require('../cost-experiments.cjs');
 const cwd = path.resolve(__dirname, '../..');
 
-test('parallel experiments execute exactly the existing frontend suite', () => {
-  const invoked = [];
-  vm.runInNewContext(fs.readFileSync(path.join(cwd, 'test-runner.cjs'), 'utf8'), {
-    __dirname: cwd,
-    require: name => name === 'node:child_process' ? {spawnSync: (_, args) => {invoked.push(path.basename(args[0])); return {status: 0};}} : require(name),
-    process: {execPath: process.execPath, exit: () => {throw new Error('Unexpected exit');}},
-  });
-  assert.deepEqual(frontendFiles(cwd), invoked.sort());
+test('parallel experiments share the default frontend discovery contract', () => {
+  assert.equal(frontendFiles, require('../frontend-test-files.cjs').frontendFiles);
+  assert.ok(frontendFiles(cwd).includes('test-player.mjs'));
+  assert.ok(frontendFiles(cwd).includes('verify-static.cjs'));
 });
 test('summaries use medians and reject failed samples', () => {
   const sample = durationMs => ({status: 'pass', durationMs});

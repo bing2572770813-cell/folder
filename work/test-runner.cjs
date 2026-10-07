@@ -1,5 +1,7 @@
 const {spawnSync}=require('node:child_process');
 const path=require('node:path');
+const frameTest=spawnSync(process.execPath,[path.join(__dirname,'test-frame-task.mjs')],{stdio:'inherit'});
+if(frameTest.status!==0)process.exit(frameTest.status||1);
 const contextTest=spawnSync(process.execPath,[path.join(__dirname,'test-entity-tree-context.mjs')],{stdio:'inherit'});
 if(contextTest.status!==0)process.exit(contextTest.status||1);
 const foldMotionResult=spawnSync(process.execPath,[path.join(__dirname,'test-fold-motion.mjs')],{stdio:'inherit'});

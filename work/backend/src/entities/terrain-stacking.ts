@@ -8,7 +8,7 @@ export function isTerrainEntity(node:EntityNode):boolean {
 
 /** Physical tile rules are independent of parenting, visibility and collection items. */
 export function validateTerrainStacking(world:EntityWorld):void {
-  const checked = new Set<string>();
+  const byCell=new Map<string,EntityNode[]>();
   for (const node of world.serialize()) {
     if(Object.hasOwn(node.components,'lift')&&!Object.hasOwn(node.components,'surface'))throw new Error('升降组件必须属于纸张实体：'+node.id);
     const footprint=world.transforms.get(node.transformId).footprint;
@@ -16,10 +16,11 @@ export function validateTerrainStacking(world:EntityWorld):void {
     if (terrainComponents.filter(id => Object.hasOwn(node.components, id)).length > 1)
       throw new Error('同一实体不能同时包含多种地形：' + node.id);
     for (const {r, c} of world.transforms.worldCells(node.transformId)) {
-      const key = r + ',' + c;
-      if (checked.has(key)) continue;
-      checked.add(key);
-      const nodes = world.at(r, c);
+      const key = r + ',' + c, nodes=byCell.get(key)??[];
+      nodes.push(node);byCell.set(key,nodes);
+    }
+  }
+  for (const [key,nodes] of byCell) {
       if(nodes.some(item=>item.static.entityType==='terrain')){
         const terrainCount=nodes.filter(item=>item.static.entityType==='terrain'||(item.static.entityType===undefined&&(Object.hasOwn(item.components,'surface')||isTerrainEntity(item)))).length;
         if(terrainCount>1)throw new Error('所有地形（包括纸张）互斥：'+key);
@@ -30,6 +31,5 @@ export function validateTerrainStacking(world:EntityWorld):void {
       if (terrains && !papers) throw new Error('地形必须由纸张方格承载：' + key);
       if (terrains > 1)
         throw new Error('纸张方格上最多只能叠加一个 terrain 实体：' + key);
-    }
   }
 }

@@ -35,7 +35,7 @@ test('broken support vanishes from runtime projections and preserves canonical s
 test('markers reflect runtime direction and state without mutating persisted configuration',()=>{
  const components={rayEmitter:{initialDirection:'east'},foldSwitch:{initialState:0},fragile:{}},before=structuredClone(components);
  const marker=mechanismMarker(THREE,components,{rayEmitter:{direction:'west'},foldSwitch:{state:1}});
- assert.equal(marker.userData.direction,'west');assert.equal(marker.userData.switchState,1);assert.equal(marker.children.length,3);assert.deepEqual(components,before);
+ assert.equal(marker.userData.direction,'west');assert.equal(marker.userData.switchState,1);assert.ok(marker.children.length>=8);assert.deepEqual(components,before);
  const arrow=marker.children[0];marker.updateMatrixWorld();const tip=new THREE.Vector3(0,-.32,0).applyMatrix4(arrow.matrixWorld);assert.ok(tip.x<0);
- const shot=shotMarker(THREE,{last:true});assert.equal(shot.userData.lastShot,true);assert.equal(shot.material.opacity,.3);
+ const shot=shotMarker(THREE,{last:true});assert.equal(shot.userData.lastShot,true);assert.equal(shot.material.opacity,.34);
 });

@@ -12,7 +12,7 @@ import {TreeDocument} from './entities/tree-document.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
-import {paperSurface,isPaper} from './render/paper-surface.mjs';
+import {paperSurface,isPaper,hasConnectedLiftNearby} from './render/paper-surface.mjs';
 import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
@@ -217,7 +217,7 @@ function makeToken(color){
  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.DodecahedronGeometry(.36,0),new THREE.MeshStandardMaterial({color:COLORS[color]??COLORS.white,roughness:.8}));body.position.y=.42;g.add(body);
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
-let liftLineRanges=[];
+let liftLineRanges=[],dynamicSurfaceEntries=[];
 function buildPaper() {
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();
@@ -225,13 +225,26 @@ function buildPaper() {
   for(const node of documentModel.world.serialize())if(nodeFollowsFold(node))for(const cell of documentModel.world.cells(node.id))foldableCells.add(cell.r+','+cell.c);
   updateLighting();
   disposableClear(placementLayer);placementLayer.userData.preview=null;
-  liftLineRanges=[];
+  liftLineRanges=[];dynamicSurfaceEntries=[];
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=new Map(),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
   const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),surfaceMaps=new Map();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
-    const cell={r,c,nodeId,tile},surface=paperSurface(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId)),surfaceMaps.get(nodeId))),r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth);if(surface){if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}else if(tile.lift){
+    const cell={r,c,nodeId,tile},surfaceMap=projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId,P.mode==='play',map)),surfaceMaps.get(nodeId)));
+    const dynamic=hasConnectedLiftNearby(surfaceMap,r,c,cellHidden);
+    const surface=paperSurface(surfaceMap,r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth,dynamic);
+    let dynamicEntry=null;
+    if(surface){
+      if(dynamic){
+        const geometry=new THREE.BufferGeometry(),positions=[];
+        for(let i=0;i<surface.positions.length;i+=3)positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));
+        geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
+        const mesh=new THREE.Mesh(geometry,materials[tile.color??'white']);mesh.userData.triangleCells=Array.from({length:positions.length/9},()=>cell);mesh.userData.surfaceCells=[cell];tileLayer.add(mesh);
+        dynamicEntry={r,c,nodeId,primary:projection.primary,cell,mesh};dynamicSurfaceEntries.push(dynamicEntry);
+        if(tile.lift){const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(c),tileHeight(tile)+.035,wz(r));marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.cell=cell;marker.userData.dynamicLiftMarker=true;tileLayer.add(marker);dynamicEntry.marker=marker;}
+      }else{if(!surfaces.has(tile.color))surfaces.set(tile.color,{positions:[],triangleCells:[],cells:[]});const bucket=surfaces.get(tile.color);bucket.cells.push(cell);for(let i=0;i<surface.positions.length;i+=3)bucket.positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));for(let i=0;i<surface.positions.length/9;i++)bucket.triangleCells.push(cell);}
+    }else if(tile.lift){
       const body=createLiftBlock(THREE,tile,materials[tile.color??'white']);body.position.x=wx(c);body.position.z=wz(r);body.userData.cell=cell;body.userData.surfaceCells=[cell];
       const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));
       marker.rotation.x=-Math.PI/2;marker.position.y=tileThickness(tile)/2+.035;marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.liftMarker=true;body.add(marker);tileLayer.add(body);
@@ -249,7 +262,8 @@ function buildPaper() {
 
     if(edgeColor){if(!styleCells.has(edgeColor))styleCells.set(edgeColor,[]);const count=((styleEdges.get(edgeColor)?.length??0)-styleStart)/6;for(let i=0;i<count;i++)styleCells.get(edgeColor).push(cell);}
     if(surface){for(const segment of surface.boundarySegments)for(const p of segment)edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
-    if(documentModel.world.get(nodeId).components.lift){
+    if(dynamicEntry){dynamicEntry.gridStart=edgeStart;dynamicEntry.gridEnd=edges.length;dynamicEntry.style=entityEdgeColor(tile);dynamicEntry.styleStart=styleStart;dynamicEntry.styleEnd=dynamicEntry.style?styleEdges.get(dynamicEntry.style).length:styleStart;}
+    if(documentModel.world.get(nodeId).components.lift&&!dynamicEntry){
       liftLineRanges.push({r,c,height:y,start:edgeStart,end:edges.length,style:null});
       const style=entityEdgeColor(tile);if(style)liftLineRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
     }
@@ -278,6 +292,7 @@ function buildPaper() {
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z+.5,x+.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
   for(const range of liftLineRanges){range.attribute=range.style===null?grid.geometry.attributes.position:entityEdgeLayer.children.find(line=>line.userData.edgeColor===range.style)?.geometry.attributes.position;}
+  for(const entry of dynamicSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?entityEdgeLayer.children.find(line=>line.userData.edgeColor===entry.style)?.geometry.attributes.position:null;}
   rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
   for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
   renderRegionControls();renderEntityVisibility();refreshTreePanel();
@@ -296,6 +311,19 @@ function refreshLiftSurfaces(){
   for(let i=range.start+1;i<range.end;i+=3)range.attribute.array[i]+=delta;
   range.height+=delta;range.attribute.needsUpdate=true;
  }
+ const surfaceMaps=new Map();
+ for(const entry of dynamicSurfaceEntries){
+  const surfaceMap=entry.primary?map:(surfaceMaps.get(entry.nodeId)??(surfaceMaps.set(entry.nodeId,mapForSurface(documentModel,entry.nodeId,true,map)),surfaceMaps.get(entry.nodeId)));
+  const surface=paperSurface(surfaceMap,entry.r,entry.c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth,true);
+  if(!surface)continue;
+  const points=entry.mesh.geometry.attributes.position;
+  for(let i=0;i<surface.positions.length;i+=3){points.array[i]=surface.positions[i]+wx(entry.c);points.array[i+1]=surface.positions[i+1];points.array[i+2]=surface.positions[i+2]+wz(entry.r);}
+  points.needsUpdate=true;entry.mesh.geometry.computeVertexNormals();entry.mesh.geometry.computeBoundingSphere();
+  const writeEdges=(attribute,start,segments,raise=0)=>{if(!attribute)return;let i=start;for(const segment of segments)for(const point of segment){attribute.array[i++]=wx(entry.c)+point[0];attribute.array[i++]=point[1]+raise;attribute.array[i++]=wz(entry.r)+point[2];}attribute.needsUpdate=true;};
+  writeEdges(entry.gridAttribute,entry.gridStart,surface.boundarySegments,.002);
+  if(entry.styleAttribute)writeEdges(entry.styleAttribute,entry.styleStart,entityEdgeSegments(entry.cell.tile,surface));
+  if(entry.marker)entry.marker.position.y=surface.height+.035;
+ }
  for(const layer of [gridLayer,entityEdgeLayer])for(const mesh of layer.children){mesh.geometry?.computeBoundingSphere();}
  const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
  for(const mesh of terrainLayer.children){
@@ -304,6 +332,7 @@ function refreshLiftSurfaces(){
  for(const mesh of tagLayer.children){const {r,c}=mesh.userData.cell;mesh.position.y=tileTop(r,c)+.045;}
  for(const mesh of foldLayer.children)if(mesh.userData.exitCell){const {r,c}=mesh.userData.exitCell;mesh.position.y=tileTop(r,c)+.012;}
  axisViewKey=null;rebuildFoldAxes();buildCreaseGuides();buildFoldSelection();
+ if(dynamicSurfaceEntries.length){foldMotionView.invalidatePrepared();scheduleFoldPreparation();}
  if(hovered&&hoverOutline.visible)hoverOutline.position.y=tileTop(hovered.r,hovered.c)+.035;
 }
 function addAxisLabels(maxHeight){

@@ -15,7 +15,7 @@ function surfaceTile(document,node,r,c,runtime=false){
  if(node.components.physics?.followFold!==undefined)tile.followFold=node.components.physics.followFold;
  if(node.components.physics?.canDropOnFold!==undefined)tile.canDropOnFold=node.components.physics.canDropOnFold;
  tile.folds=structuredClone(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
- tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
+ tile.surfaceConnected=node.components.surface?.connected??(!tile.lift&&!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
  return tile;
 }
 
@@ -43,8 +43,8 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
 }
 
 /** Keep neighboring primary geometry so paper seams and hidden-cell rules still work. */
-export function mapForSurface(document,nodeId,runtime=false){
- const map=document.view(),node=document.world.get(nodeId);
+export function mapForSurface(document,nodeId,runtime=false,baseMap=null){
+ const map=baseMap?structuredClone(baseMap):document.view(),node=document.world.get(nodeId);
  if(!hasSurface(node))return map;
  for(const {r,c} of document.world.cells(node.id))map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
  return map;

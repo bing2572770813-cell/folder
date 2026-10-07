@@ -93,7 +93,7 @@ export function defaultComponents():ComponentRegistry {
   registry.register('foldSwitch',{validate:config=>{validateTriggers(config);if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
   registry.register('firebird',{validate:config=>{validateTriggers(config);if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
   registry.register('flame',{validate:config=>{if(config.source!==undefined&&typeof config.source!=='boolean')throw new Error('火焰来源标记无效');},canEnter:()=> '火焰覆盖的方格不可进入'});
-  registry.register('fragile',{validate:config=>{const count=Number(config.count??1);if(!Number.isSafeInteger(count)||count<1||count>100)throw new Error('Invalid fragile count');},canEnter:(_context,_config,state)=>state.broken||state.breaking?'易碎方块已破碎':undefined,events:{action:(_context,config,state):ComponentEffect=>{const remaining=Number(state.remaining??config.count??1)-1;return remaining<=0?{state:{remaining:0,breaking:true}}:{state:{remaining}};}}});
+  registry.register('fragile',{validate:config=>{const count=Number(config.count??1);if(!Number.isSafeInteger(count)||count<1||count>100)throw new Error('Invalid fragile count');},canEnter:(_context,_config,state)=>state.broken||state.breaking?'易碎方块已破碎':undefined,events:{action:(_context,config,state):ComponentEffect=>{if(state.broken)return {};const remaining=Number(state.remaining??config.count??1)-1;return remaining<=0?{state:{remaining:0,breaking:true}}:{state:{remaining}};}}});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{
     effectOrder:10,

@@ -140,3 +140,10 @@ test('fragile paper consumes global actions; failed moves, previews, undo and re
  f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').breaking,true);f.controller.tick(performance.now()+1000);assert.equal(f.world.runtime('fragile','fragile').broken,true);
  f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
 });
+
+test('broken fragile paper ignores later global actions',()=>{
+ const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
+ f.move(2,2);assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);
+ const state=f.world.runtime('fragile','fragile');assert.equal(state.broken,true);assert.equal(state.breaking,undefined);
+});

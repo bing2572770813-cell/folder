@@ -17,6 +17,7 @@ import {paperSurface,isPaper,hasConnectedLiftNearby} from './render/paper-surfac
 import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
+import {refreshFlatPaperPlacement} from './render/flat-placement.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
@@ -454,7 +455,7 @@ function editAt(r,c){
   
 
   
-  if(tool==='place'){try{commitTree(placementCandidate(r,c),{placement:true});}catch(e){toast(e.message,true);}return;}
+  if(tool==='place'){try{commitTree(placementCandidate(r,c),{placement:true,cell:{r,c}});}catch(e){toast(e.message,true);}return;}
   if(tool==='fold'){try{if(!visibility.folds)throw new Error('隐藏折线禁止编辑');if(foldType)assertTagAttachment(tagCatalog,'tag-fold',map,r,c);const next=clone(map);if(!applyFoldLine(next,r,c,foldType))return;validateMap(next,true);applyPropertyMap(next);buildPaper();persist();}catch(error){toast(error.message,true);}return;}
   if(tool==='erase'){try{const cells=removeEntity(map,r,c,cellHidden);if(!visibility.player&&cells.some(p=>Object.keys(map.tiles[p.r][p.c]?.tags??{}).length))throw new Error('删除实体会改变隐藏标签');if(cells.some(p=>map.tiles[p.r][p.c]?.tags?.spawn))throw new Error('先移动玩家起点标签');const next=clone(map);for(const p of cells){const tile=next.tiles[p.r][p.c];next.foldCells.push(...foldsOf(tile).map(type=>({...p,type})));next.tiles[p.r][p.c]=null;}applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}return;}
   buildPaper();persist();updateUI();
@@ -886,7 +887,9 @@ $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility
 $('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
 function assertTreeVisibility(next,before=documentModel){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(before,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(before,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
-function commitTree(next,{placement=false}={}){assertTreeVisibility(next);const before=placement&&gestureBefore?null:documentModel.serialize();if(!placement&&JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});documentModel=next;map=next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();}
+function commitTree(next,{placement=false,cell}={}){assertTreeVisibility(next);const before=placement&&gestureBefore?null:documentModel.serialize();if(!placement&&JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});const previousDocument=documentModel,previousMap=map;documentModel=next;map=next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();
+ if(placement&&cell&&refreshFlatPaperPlacement(THREE,{before:previousDocument.world,after:next.world,beforeMap:previousMap,afterMap:map,...cell,layer:tileLayer,materialFor:color=>materials[color],wx,wz,hidden:cellHidden})){cancelPlacementPreview();clearSelection();foldMotionView.invalidatePrepared();renderer.shadowMap.needsUpdate=true;refreshTreePanel();applyVisibility();updateUI();scheduleFoldPreparation();}
+ else buildPaper();persist();}
 function refreshTreePanel(){
  const panel=$('treeNodes');if(!panel||!panel.closest('details')?.open)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
  renderTreeNodes(panel,entityTreeContext(documentModel.world,selectedNodeId,point).map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});

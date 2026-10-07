@@ -17,7 +17,7 @@ function fixture(type='h'){
  for(let r=0;r<7;r++)for(let c=0;c<7;c++){mesh.setMatrixAt(r*7+c,new THREE.Matrix4().makeTranslation(c-3,.0775,r-3));mesh.userData.cells.push({r,c});}layer.add(mesh);
  const view=createFoldMotionView({paper,layers:[layer],playerGroup:player,wx:c=>c-3,wz:r=>r-3});
  const P=runtime.createPlayerState(map.spawn),inside=(r,c)=>r>=0&&c>=0&&r<7&&c<7,noop=()=>{};
- const renderPlayer=()=>{player.position.set(P.player.c-3,.108,P.player.r-3);player.rotation.set(0,-P.player.dir*Math.PI/4,0);};
+ const renderPlayer=()=>{player.position.set(P.player.c-3,.108,P.player.r-3);player.rotation.y=-P.player.dir*Math.PI/4;};
  let controller;
  const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>player,getSelectionRing:()=>ring,getEffectLayer:()=>paper,getFoldHinge:g=>hingeFor(map,g,c=>c-3,r=>r-3),foldView:view,invalidateAxes:noop,isHidden:()=>false,blocked,inside,walkable:(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c]),canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c-3,wz:r=>r-3,tileTop:(r,c)=>map.tiles[r]?.[c]?.height??0};
  const selectionChanges=[];env.onSelectionChanged=()=>selectionChanges.push(P.chosenFold?{...P.chosenFold}:null);
@@ -94,3 +94,12 @@ const fixedView=createFoldMotionView({paper:referenceRoot,layers:[referenceLayer
 fixedView.begin([{r:0,c:0}],{origin:[0,0,0],direction:[0,0,1],side:1});fixedView.setAngle(Math.PI/2);referenceRoot.updateMatrixWorld(true);
 assert.equal(referenceLine.visible,true);assert.equal(referenceLayer.children.length,1);assert.deepEqual(referenceLine.geometry.attributes.position.array,referenceBefore);assert.deepEqual(referenceLine.matrixWorld.elements,referenceMatrix.elements);fixedView.reset();
 console.log('PASS: fixed reference layers retain their geometry and world transforms throughout folding.');
+
+for(const type of ['h','v','d1','d2'])for(let dir=0;dir<8;dir++){
+ const f=fixture(type);f.P.player.dir=dir;f.env.renderPlayer();const before=f.player.quaternion.clone();
+ f.controller.beginFoldDrag(f.P.player.r,f.P.player.c,300);f.controller.updateFoldDrag(180);settle(f);
+ f.controller.endFoldDrag(true);f.controller.tick(performance.now()+1000);
+ assert.equal(f.P.player.dir,dir,'rebound preserves logical facing');
+ assert.ok(Math.abs(f.player.quaternion.dot(before))>1-1e-9,`${type} rebound preserves rendered facing ${dir}`);
+}
+console.log('PASS: rebound restores rendered and logical facing for all eight headings and four fold axes.');

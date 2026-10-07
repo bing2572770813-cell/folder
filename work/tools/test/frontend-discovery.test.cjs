@@ -35,8 +35,8 @@ test('default runner retains main entity regression tests and propagates their f
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'entity-regressions-'));
   try {
     fs.mkdirSync(path.join(directory, 'backend/test'), {recursive: true});
-    for(const name of ['visual-prefab','visual-assets','local-placement-preview','categorized-placement','transform','tree-commands','tree-document']) {
-      fs.writeFileSync(path.join(directory, 'backend/test/' + name + '.test.mjs'), name === 'categorized-placement' ? "throw new Error('entity regression retained');\n" : '');
+    for(const name of ['visual-prefab','visual-assets','transform','trigger-list']) {
+      fs.writeFileSync(path.join(directory, 'backend/test/' + name + '.test.mjs'), name === 'trigger-list' ? "throw new Error('entity regression retained');\n" : '');
     }
     const code = `process.exitCode = require(${JSON.stringify(path.resolve(__dirname, '../../test-runner.cjs'))}).runEntityRegressions(${JSON.stringify(directory)})`;
     // The fixture launches its own test runner, independent of this test worker.

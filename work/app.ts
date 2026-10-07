@@ -1,6 +1,5 @@
 // @ts-nocheck
-// Transitional composition boundary: app.ts is checked for syntax and bundled,
-// while its legacy .mjs/.cjs collaborators are typed behind dedicated bridges.
+// Composition boundary: app.ts wires the typed entry point to focused domain modules.
 // Narrowing this file is a later migration step; do not add new domain rules here.
 
 import {nodeFollowsFold,nodeCanDropOnFold} from './entities/fold-properties.mjs';
@@ -133,7 +132,7 @@ function coord(r,c) { return columnLabel(c)+(r+1); }
 const voidPlaneTop=(r,c)=>Math.max(tileTop(r,c),sceneryTop);
 function validateMap(data,allowDraft=false){return normalizeMap(data,allowDraft);}
 
-function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(documentModel.view(),next,visibility);if(P?.mode==='edit'){const before=documentModel.view();for(let r=0;r<before.height;r++)for(let c=0;c<before.width;c++)if(JSON.stringify(before.tiles[r][c])!==JSON.stringify(next.tiles[r]?.[c]??null)||JSON.stringify(foldsAt(before,r,c))!==JSON.stringify(r<next.height&&c<next.width?foldsAt(next,r,c):[])){if(cellHidden(r,c)||documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能间接修改隐藏实体或区域');}}const candidate=forkTreeDocument(documentModel);candidate.applyLegacy(next);return candidate;}
+function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(documentModel.view(),next,visibility);if(P?.mode==='edit'){const before=documentModel.view();for(let r=0;r<before.height;r++)for(let c=0;c<before.width;c++)if(JSON.stringify(before.tiles[r][c])!==JSON.stringify(next.tiles[r]?.[c]??null)||JSON.stringify(foldsAt(before,r,c))!==JSON.stringify(r<next.height&&c<next.width?foldsAt(next,r,c):[])){if(cellHidden(r,c)||documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能间接修改隐藏实体或区域');}}const candidate=forkTreeDocument(documentModel);candidate.applyProjection(next);return candidate;}
 function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
@@ -515,7 +514,7 @@ function inspectedPropertySchema(r,c,tile){
   return projectedCellSchema(node,documentModel.world.at(r,c),tile,nodeSchema,entityPropertySchema(tile,tagCatalog));
 }
 function applyPropertyMap(next){
- const checked=forkTreeDocument(documentModel);checked.applyLegacy(next);
+ const checked=forkTreeDocument(documentModel);checked.applyProjection(next);
  assertNodePropertyChanges(documentModel,checked,nodeSchema);
  applyMap(next,true);
 }
@@ -569,7 +568,7 @@ function applyInspectedProperty(path,value,scope='entity'){
     if(path[0]==='regionTag'){assertTagAttachment(tagCatalog,'tag-region',candidate,r,c);next=assignRegion(candidate,[{r,c}],merged.regionTag,regionNames(candidate,documentModel.cellTags).includes(merged.regionTag),documentModel.cellTags);}
     if(path[0]==='tags'){
       const tag=path[1];if(['spawn','entry','exitTo'].includes(tag)&&merged.tags[tag]){assertTagAttachment(tagCatalog,tag==='spawn'?'tag-spawn':tag==='entry'?'tag-entry':'tag-exit',candidate,r,c);tagCell(next,r,c,tag,merged.tags[tag]);}
-      const checkedTree=forkTreeDocument(documentModel);checkedTree.applyLegacy(next);const errors=validateRegions(next,checkedTree.world).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
+      const checkedTree=forkTreeDocument(documentModel);checkedTree.applyProjection(next);const errors=validateRegions(next,checkedTree.world).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
     }
     if(path[0]==='folds'||path[0]==='fold')assertTagAttachment(tagCatalog,'tag-fold',candidate,r,c);
     assertHiddenContentUnchanged(candidate,next,visibility);
@@ -958,7 +957,3 @@ function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,nod
 function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
 function applyTreeConfiguration(node,shown,after,schema){if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,node.id,after.components,after.tags,cellHidden,nodeHidden,schema);commitTree(next);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);refreshTreePanel();$('nodeEditStatus').textContent='已应用';}
 $('applyNodeConfig').onclick=()=>{try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable');applyTreeConfiguration(node,shown,{...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)},schema);}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}};
-// @ts-nocheck
-// Transitional composition boundary: app.ts is checked for syntax and bundled,
-// while its legacy .mjs/.cjs collaborators are typed behind dedicated bridges.
-// Narrowing this file is a later migration step; do not add new domain rules here.

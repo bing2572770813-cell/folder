@@ -18,7 +18,7 @@
 | prefab 兼容入口 | `work/prefab-catalog.cjs`、`work/resources/prefab-catalog.cjs` | 保留，桥接到 TS 目录实现 |
 | 地图编辑适配 | `work/entities/tree-document.mjs`、`tree-commands.mjs` | 仍为 JS；使用共享 TS 模型 |
 | 玩家与回合引擎 | `work/player.cjs` | 仍为 CommonJS；已接入回合管理器 |
-| 前端应用与界面 | `work/app.js`、`work/ui/react/*.jsx` | JS + React/Mantine |
+| 前端应用与界面 | `work/app.ts`、`work/ui/react/*.jsx` | TypeScript + React/Mantine |
 | 渲染 | `work/render/*.mjs` | Three.js；通过适配接口读取实体与运行时 |
 
 旧文档 `docs/typescript-fastify-migration.md` 是初期方案。其 `work/server.ts` 目标路径、`tsx` 开发方式，以及“尚待建立 TransformManager”的阶段说明不能作为当前实现现状。当前后端用 `tsc` 编译，前端用 esbuild 打包，未配置 `tsx` 启动脚本。
@@ -39,10 +39,10 @@ work/
     test/                        # 后端和共享模型测试
   entities/
     tree-runtime.mjs             # 浏览器导出共享 TS 模型
-    tree-document.mjs            # 规范实体树 → 旧 tiles 视图
-    tree-commands.mjs            # 编辑事务与兼容属性更新
+    tree-document.mjs            # 规范实体树与网格编辑投影
+    tree-commands.mjs            # 编辑事务与属性更新
   player.cjs                     # 玩家状态机、交互、回合生命周期
-  app.js                         # UI/渲染/编辑器适配与事件绑定
+  app.ts                         # UI/渲染/编辑器适配与事件绑定
   ui/react/                      # React/Mantine 界面
   render/                        # Three.js 表现
   build.cjs / build-support.cjs   # 构建与 TS 源码解析桥接
@@ -112,14 +112,14 @@ type CatalogResult = {
 | 改动 | 入口 | 后续迁移时需保持 |
 | --- | --- | --- |
 | 共享 TS 模型桥接 | `entities/tree-runtime.mjs` | 模型只保留一份；浏览器包不包含 Node IO |
-| 实体树作为地图来源 | `tree-document.mjs`、`app.js` | v1 导入转换、v2 保存、tiles 投影与运行时隔离 |
+| 实体树作为地图来源 | `tree-document.mjs`、`app.ts` | v2 树存储、网格投影与运行时隔离 |
 | 原子编辑与复制粘贴 | `tree-commands.mjs`、`tree-clipboard.mjs` | 失败不部分写入；保留身份和叠加；粘贴创建独立身份 |
 | 点击上下文实体树 | `ui/entity-tree-context.mjs`、`TreeInspector.jsx` | 显示被点击实体的相关层级与同格关系，避免全图实体列表 |
 | 配置、权限与调试适配 | 属性检视器、`node-edit-permissions.mjs` | 配置变化与临时运行时变化分开，隐藏/只读限制继续生效 |
-| terrain 与纸张表现关联 | `render/tree-render.mjs`、`app.js` | 地形替换或移除后重建对应表现，不遗留旧标记 |
+| terrain 与纸张表现关联 | `render/tree-render.mjs`、`app.ts` | 地形替换或移除后重建对应表现，不遗留旧标记 |
 | 升降方块整体运动 | `render/lift-block.mjs`、`refreshLiftSurfaces` | 方块本体与附属贴图同步移动，渲染不推进回合 |
 | 行走/传送统一入口 | `player.cjs` | `movePlayer`、`teleport`、`testTeleport` 委托 TurnManager |
-| 动画与终局 UI 分离 | `app.js` 的 `updateUI` | 结算时确定胜负；`!P.moving` 时展示结果面板 |
+| 动画与终局 UI 分离 | `app.ts` 的 `updateUI` | 结算时确定胜负；`!P.moving` 时展示结果面板 |
 | 回合诊断 | `foldField.getState()`、视口 `dataset.state` | 返回回合信息的副本，供验证使用 |
 | 旧 DOM 兼容 | `ui/react` | 保留事件绑定所需 ID；Tab 切换保持面板挂载 |
 | 独立 HTML 导出 | `build.cjs` 与前端导出适配 | 页面保留运行所需模型、目录与地图，不强制依赖在线服务 |
@@ -195,9 +195,9 @@ npm --prefix work start
 - 产品约束：`docs/entity-transform-tree-product-design.md`。
 - 初期迁移背景：`docs/typescript-fastify-migration.md`。
 - HTTP 配置与服务：`work/backend/src/config.ts`、`app.ts`、`server.ts`。
-- 地图格式迁移：`work/backend/src/entities/tree-serialization.ts`、`legacy-map.ts`、`paper-tiles.ts`。
+- 地图格式：`work/backend/src/entities/tree-serialization.ts` 与 `work/entities/tree-document.mjs`，只接受 v2 树结构。
 - 前后端共享入口：`work/entities/tree-runtime.mjs`。
-- 前端适配与界面时序：`work/app.js`。
+- 前端适配与界面时序：`work/app.ts`。
 - 回合及所有玩家交互：`work/player.cjs`。
 
 交接时以实际文件、最新提交和测试输出为准。本文只新增迁移说明，不执行后端迁移、不修改前端实现、不提交或推送主线程正在进行的代码。

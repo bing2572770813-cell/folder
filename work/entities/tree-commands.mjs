@@ -44,7 +44,7 @@ export function validateTreeDocument(candidate){
  const nodes=candidate.world.serialize();validateTerrainStacking(candidate.world,nodes);const registry=defaultComponents();
  for(const node of nodes){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
  const spawns=[],entries=new Map(),byCell=candidate.cellNodes(nodes);
- // Only occupied cells contribute entity tags; avoid allocating a full legacy map.
+ // Only occupied cells contribute entity tags; avoid allocating a full grid projection.
  for(const [key,nodes] of byCell){
   const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){
    if(name!=='requiredKeys'&&Object.hasOwn(tags,name)&&JSON.stringify(tags[name])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+name);tags[name]=value;
@@ -100,7 +100,7 @@ export function replaceTreePrefab(document,prefab,tile,r,c,options={}){
   if(!Object.keys(node.components).length&&!Object.keys(node.tags).length)candidate.world.remove(node.id,true);
   else{candidate.world.remove(node.id);candidate.world.add(node);}
  }
- candidate.applyLegacy(result.map);
+ candidate.applyProjection(result.map);
  return validateTreeDocument(candidate);
 }
 export function placeTreePrefab(document,prefab,tile,r,c,options={}){

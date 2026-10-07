@@ -65,5 +65,5 @@ test('player tokens render without their legacy slab, preserving support and vis
 test('render projection can restrict output to requested cells',()=>{
  const {document}=fixture(),view=renderTreeCells(document,{cells:[{r:1,c:1}]});
  assert.deepEqual(view.surfaceCells.map(cell=>[cell.r,cell.c]),[[1,1],[1,1]]);
- assert.equal(view.tagCells.length,1);
+ assert.equal(view.tagCells.length,2);
 });

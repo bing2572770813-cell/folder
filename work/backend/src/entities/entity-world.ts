@@ -36,8 +36,10 @@ export class EntityWorld {
     const ids=this.entitiesByTransform.get(node.transformId)??new Set<string>();ids.add(node.id);this.entitiesByTransform.set(node.transformId,ids);
   }
   at(r:number,c:number):EntityNode[] {
-    const result:EntityNode[]=[];
-    for(const transformId of this.transforms.at(r,c))for(const id of this.entitiesByTransform.get(transformId)??[])result.push(this.get(id));
+    const ids:string[]=[];
+    for(const transformId of this.transforms.at(r,c))for(const id of this.entitiesByTransform.get(transformId)??[])ids.push(id);
+    const result=structuredClone(ids.map(id=>this.entities.get(id)!));
+    for(const node of result)freezeJson(node.static);
     return result;
   }
   remove(id:string,removeTransform=false):void {

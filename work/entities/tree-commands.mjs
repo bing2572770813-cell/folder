@@ -40,7 +40,7 @@ function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   for(const node of world.serialize())if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
-export function validateTreeDocument(candidate){validateTerrainStacking(candidate.world);const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of candidate.world.at(r,c))for(const [key,value] of Object.entries(node.tags)){if(key!=='requiredKeys'&&Object.hasOwn(tags,key)&&JSON.stringify(tags[key])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+key);tags[key]=value;}if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');for(const key of spawns)if(entries.has(candidate.cellTags[key]?.regionTag??'默认区域'))throw new Error('同一区域不能同时包含玩家起点与区域入口');return candidate;}
+export function validateTreeDocument(candidate){validateTerrainStacking(candidate.world);const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map(),byCell=candidate.cellNodes();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of byCell.get(r+','+c)??[])for(const [key,value] of Object.entries(node.tags)){if(key!=='requiredKeys'&&Object.hasOwn(tags,key)&&JSON.stringify(tags[key])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+key);tags[key]=value;}if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');for(const key of spawns)if(entries.has(candidate.cellTags[key]?.regionTag??'默认区域'))throw new Error('同一区域不能同时包含玩家起点与区域入口');return candidate;}
 export function configureNode(document,id,components,tags,isHidden=()=>false,nodeHidden=()=>false,schema){
  const original=document.world.get(id);check(document.world,[original.transformId],isHidden,nodeHidden);
  const footprint=document.world.transforms.get(original.transformId).footprint;
@@ -123,7 +123,7 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     }
     return node.id;
   }
-  instantiate(prefab,tile,{r,c,dir:0});return validateTreeDocument(candidate);
+  instantiate(prefab,tile,{r,c,dir:0});return options.validate===false?candidate:validateTreeDocument(candidate);
 }
 
 /** Unified placement: terrain replaces its cell; items retain their required support. */
@@ -159,6 +159,6 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
   const deleteTransform=id=>{for(const child of candidate.world.transforms.childrenOf(id))if(ids.has(child))deleteTransform(child);candidate.world.transforms.remove(id);};
   for(const id of ids)if(!ids.has(world.transforms.get(id).parentId))deleteTransform(id);
  }
- candidate=placeTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain'});
+ candidate=placeTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
  return candidate;
 }

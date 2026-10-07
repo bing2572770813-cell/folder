@@ -39,3 +39,11 @@ test('markers reflect runtime direction and state without mutating persisted con
  const arrow=marker.children[0];marker.updateMatrixWorld();const tip=new THREE.Vector3(0,-.32,0).applyMatrix4(arrow.matrixWorld);assert.ok(tip.x<0);
  const shot=shotMarker(THREE,{last:true});assert.equal(shot.userData.lastShot,true);assert.equal(shot.material.opacity,.34);
 });
+test('legacy level fixture imports the new mechanism components',()=>{
+ const level=JSON.parse(readFileSync(new URL('./fixtures/reverse-corridor-level.json',import.meta.url),'utf8'));
+ const doc=new TreeDocument(level);
+ assert.ok(doc.world.serialize().some(node=>node.components.fragile));
+ assert.ok(doc.world.serialize().some(node=>node.components.rayEmitter));
+ assert.ok(doc.world.serialize().some(node=>node.components.lift));
+ assert.ok(doc.world.serialize().some(node=>node.components.foldSwitch));
+});

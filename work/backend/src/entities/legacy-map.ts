@@ -7,6 +7,7 @@ export interface TreeMap {version:2;width:number;height:number;entities:EntityNo
 interface LegacyTile {
   prefabId?:string;instance?:{id:string};height?:number;thickness?:number;gradualRate?:number;color?:string;edgeColor?:string;surfaceConnected?:boolean;
   followFold?:boolean;blocked?:boolean;terrain?:string;terrainConfig?:JsonObject;keyName?:string;regionTag?:string;tags?:JsonObject;folds?:string[];fold?:string|null;lift?:JsonObject;
+  components?:Record<string,JsonObject>;
 }
 interface LegacyMap {width:number;height:number;tiles:(LegacyTile|null)[][];foldCells?:{r:number;c:number;type:string}[];[key:string]:unknown}
 
@@ -30,6 +31,7 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     else if(tile.terrain==='key')components.key={...tile.terrainConfig,name:tile.keyName??'钥匙'};
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};
+    for(const [id,config] of Object.entries(tile.components??{}))components[id]=jsonObject(config);
     cellTags[r+','+c]={regionTag:tile.regionTag??'默认区域'};
     const {regionTag:ignoredRegion,instance:ignoredInstance,...configuration}=tile;
     const prefabId=tile.prefabId==='large_paper_ai'?'paper_ai':tile.prefabId??'paper_ai';

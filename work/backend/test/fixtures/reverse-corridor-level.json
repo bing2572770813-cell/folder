@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "name": "反向走廊",
+  "width": 5,
+  "height": 5,
+  "spawn": {"r": 2, "c": 0, "dir": 2},
+  "exit": {"r": 4, "c": 4},
+  "maxSteps": 30,
+  "foldCells": [
+    {"r": 0, "c": 2, "type": "v"},
+    {"r": 1, "c": 2, "type": "v"},
+    {"r": 2, "c": 2, "type": "v"},
+    {"r": 3, "c": 2, "type": "v"},
+    {"r": 4, "c": 2, "type": "v"}
+  ],
+  "tiles": [
+    [
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"green","prefabId":"fold_switch_ai","components":{"foldSwitch":{"initialState":0}},"tags":{}},
+      {"color":"white"},
+      {"color":"white"}
+    ],
+    [
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"}
+    ],
+    [
+      {"color":"white","prefabId":"fragile_paper_ai","components":{"fragile":{}},"tags":{"spawn":true}},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white","prefabId":"lift_paper_ai","lift":{"minHeight":0.09,"maxHeight":0.75,"initialHeight":0.09,"turnsPerLeg":3}},
+      {"color":"white"}
+    ],
+    [
+      {"color":"red","prefabId":"ray_emitter_ai","components":{"rayEmitter":{"initialDirection":"east"},"collision":{"blocked":true}}},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"}
+    ],
+    [
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white"},
+      {"color":"white","tags":{"exit":true}}
+    ]
+  ]
+}

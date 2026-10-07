@@ -1,0 +1,21 @@
+{
+  "id": "player_witch_ai",
+  "sourceConcept": "assets/raw_design/artworks/witch_girl_reference.png",
+  "referenceRole": "attached concept and modeling reference supplied by the user",
+  "thumbnail": "assets/raw_design/artworks/witch_girl_lowpoly_thumbnail.png",
+  "blend": "assets/raw_design/artworks/witch_girl_player.blend",
+  "glb": "assets/model/player_witch_ai.glb",
+  "coordinates": "Blender Z-up / glTF Y-up",
+  "fixedView": "Three.js editor fixedView orthographic",
+  "boardCellFootprint": 0.92,
+  "heightUnits": 2.15,
+  "design": [
+    "bent curled witch hat with a single-cell readable brim",
+    "faceted near-black plum cloak with light front fold",
+    "silver angular bob hair and simple cream face",
+    "three-plane folded-paper collar",
+    "separate boots visible below the open cloak",
+    "low-poly flat-shaded surfaces, no smooth subdivision"
+  ],
+  "gameplay": "Visual asset only; player.cjs and player prefab remain authoritative."
+}

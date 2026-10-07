@@ -17,6 +17,13 @@ export class TransformManager {
     this.index=this.validate(this.nodes);
   }
   get(id:string):TransformNode {const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return copy(node);}
+  clone():TransformManager {
+    const result=new TransformManager(this.width,this.height);
+    result.nodes=new Map([...this.nodes].map(([id,node])=>[id,copy(node)]));
+    result.index=new Map([...this.index].map(([key,ids])=>[key,[...ids]]));
+    result.references=new Map([...this.references].map(([id,owners])=>[id,new Set(owners)]));
+    return result;
+  }
   serialize():TransformNode[]{return [...this.nodes.values()].map(copy);}
   childrenOf(id:string):string[]{this.get(id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
   world(id:string):GridTransform{return this.resolve(this.nodes,id,new Set());}

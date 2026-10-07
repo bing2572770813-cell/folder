@@ -9,6 +9,8 @@ import {legalKeyNames} from '../tags/keys.mjs';
 
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
+const terrainComponentIds=['campfire','ice','fire','eruption','rayEmitter','foldSwitch','firebird','flame'];
+const isTerrainNode=node=>node.static.entityType==='terrain'||Object.hasOwn(node.components,'surface')||terrainComponentIds.some(id=>Object.hasOwn(node.components,id));
 export function forkTreeDocument(document){
   return document.clone();
 }
@@ -165,8 +167,10 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  }
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){
-  const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
-  const removed=[...new Map([...ids].flatMap(id=>world.transforms.worldCells(id).flatMap(cell=>world.at(cell.r,cell.c))).filter(node=>ids.has(node.transformId)).map(node=>[node.id,node])).values()];
+  // Terrain replacement removes the paper and old terrain only. Items and
+  // creatures are independent overlays and must survive the replacement.
+  const removed=[...new Map([...targets.values()].filter(isTerrainNode).map(node=>[node.id,node])).values()];
+  const ids=new Set(removed.map(node=>node.transformId));
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
   if(ids.size){
@@ -177,8 +181,12 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
   if(cells.length===1){const old=document.viewCells(cells).get(r+','+c);configuration.tags=copy(old?.tags??{});configuration.folds=[...new Set([...targets.values()].flatMap(node=>node.components.fold?.directions??[]))];}
   if((configuration.tags?.spawn||configuration.tags?.entry)&&(configuration.blocked||configuration.terrain==='campfire'))throw new Error('不能用不可通行实体覆盖玩家起点或区域入口');
   for(const node of removed)candidate.world.remove(node.id);
-  const deleteTransform=id=>{for(const child of candidate.world.transforms.childrenOf(id))if(ids.has(child))deleteTransform(child);candidate.world.transforms.remove(id);};
-  for(const id of ids)if(!ids.has(world.transforms.get(id).parentId))deleteTransform(id);
+  const deleteTransform=id=>{
+   if(candidate.world.forTransform(id).length)return;
+   for(const child of candidate.world.transforms.childrenOf(id))deleteTransform(child);
+   if(!candidate.world.transforms.childrenOf(id).length&&!candidate.world.transforms.referenceOwners(id).length)candidate.world.transforms.remove(id);
+  };
+  for(const id of ids)deleteTransform(id);
  }
  candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
  return validateTreeDocument(candidate);

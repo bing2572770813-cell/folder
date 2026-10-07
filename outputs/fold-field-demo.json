@@ -558,7 +558,9 @@
           "blocked": false
         }
       },
-      "tags": {},
+      "tags": {
+        "spawn": true
+      },
       "static": {},
       "configuration": {
         "color": "green",

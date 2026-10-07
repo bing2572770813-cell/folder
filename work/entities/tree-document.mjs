@@ -67,7 +67,10 @@ export class TreeDocument {
     const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if(this.world.at(r,c).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
     return {...metadata,version:1,width,height,tiles,foldCells};
   }
-  serialize(options){return serializeTreeMap(this.world,{...this.metadata,spawn:this.view().spawn},this.cellTags,options);}
+  serialize(options){
+    const spawns=this.world.serialize().filter(node=>node.tags.spawn).flatMap(node=>this.world.transforms.worldCells(node.transformId));
+    return serializeTreeMap(this.world,{...this.metadata,spawn:spawns.length===1?{...this.metadata.spawn,...spawns[0]}:this.metadata.spawn},this.cellTags,options);
+  }
   applyLegacy(input){
     const next={...copy(input),...validateMap(input,true)},before=this.view(),snapshot=this.serialize();
     snapshot.width=next.width;snapshot.height=next.height;

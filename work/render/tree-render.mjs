@@ -24,7 +24,7 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
  const nodes=document.world.serialize().sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
-  for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
+  for(const {r,c} of document.world.cells(node.id)){
    if(cellHidden(r,c))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
@@ -46,6 +46,6 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
 export function mapForSurface(document,nodeId,runtime=false){
  const map=document.view(),node=document.world.get(nodeId);
  if(!hasSurface(node))return map;
- for(const {r,c} of document.world.transforms.worldCells(node.transformId))map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+ for(const {r,c} of document.world.cells(node.id))map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
  return map;
 }

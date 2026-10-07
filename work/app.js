@@ -13,6 +13,7 @@ import {previewPlacement,previewFootprint} from './entities/placement-preview.mj
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
+import {mechanismMarker,shotMarker} from './render/directional-mechanisms.mjs';
 import {paperSurface,isPaper,hasConnectedLiftNearby} from './render/paper-surface.mjs';
 import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
@@ -116,7 +117,7 @@ const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,ch
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
 function defaultMap() {
-  return validateMap(clone(demoMap),true);
+  return clone(demoMap);
 }
 function inside(r,c) { return Number.isInteger(r) && Number.isInteger(c) && r>=0 && c>=0 && r<map.height && c<map.width; }
 function cellHidden(r,c){const name=documentModel.cellTags[r+','+c]?.regionTag??'默认区域';return P.mode==='edit'?hiddenRegions.has(name):!P.revealedRegions.has(name);}
@@ -642,7 +643,7 @@ let renaming=false;
 $('mapName').oninput=()=>{if(!renaming){editHistory.push(editSnapshot());trimHistory(editHistory);redoHistory=[];renaming=true;}map.name=normalizeMapName($('mapName').value);persist();updateUI();};
 $('mapName').onblur=()=>{renaming=false;$('mapName').value=map.name;};
 $('mapName').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('mapName').blur();}};
-$('newMap').onclick=()=>{setMode('edit');const tiles=Array.from({length:map.height},()=>Array.from({length:map.width},blankTile));replaceMap({version:1,width:map.width,height:map.height,tiles,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null});toast('已新建空白地图');};
+$('newMap').onclick=()=>{setMode('edit');const snapshot=documentModel.serialize();snapshot.entities=[];snapshot.transforms=[];snapshot.cellTags={};snapshot.legacyMetadata={...snapshot.legacyMetadata,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null};replaceMap(snapshot);toast('已新建空白地图');};
 $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>128||height>128){toast('宽度和高度须为 3–128 的整数',true);return;}if(width===map.width&&height===map.height)return;for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if((r>=height||c>=width)&&cellHidden(r,c)){toast('缩小地图会删除隐藏区域，请先显示该区域',true);return;}const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||blocked(tiles[spawn.r][spawn.c]))tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;try{applyMap({...map,version:1,width,height,tiles,foldCells:(map.foldCells??[]).filter(p=>p.r<height&&p.c<width),spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps},true);controller.resetPosition();buildPaper();fitCamera();persist();updateUI();toast('地图尺寸已更新');}catch(error){toast(error.message,true);}};
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(savedMap(),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=mapFilename(map.name);a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=JSON.parse(await file.text());new TreeDocument(next);setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};

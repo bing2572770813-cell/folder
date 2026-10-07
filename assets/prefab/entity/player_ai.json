@@ -39,5 +39,12 @@
     "entityType": "creature",
     "placeable": false
   },
-  "BaseEntity": []
+  "BaseEntity": [],
+  "visual": {
+    "model": "model/monumentValley.fbx",
+    "scale": [0.005, 0.005, 0.005],
+    "offset": [4.6652925885, 0.0319734826, -4.5407583767],
+    "rotation": [0, 0, 0],
+    "textures": {}
+  }
 }

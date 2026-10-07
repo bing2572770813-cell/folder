@@ -18,16 +18,25 @@ function surfaceTile(document,node,r,c,runtime=false){
  return tile;
 }
 
+function projection(document){
+ const byCell=new Map(),nodes=document.world.serialize();
+ for(const node of nodes)for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
+  const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
+ }
+ for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
+ return {byCell,nodes};
+}
+
 export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false}={}){
  const surfaceCells=[],terrainCells=[],tagCells=[],tokenCells=[];
- const nodes=document.world.serialize().sort((a,b)=>a.id.localeCompare(b.id));
+ const {byCell,nodes}=projection(document);nodes.sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
    if(cellHidden(r,c))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
-    const primary=document.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(surfaceVisible);
+   const primary=(byCell.get(r+','+c)??[]).find(surfaceVisible);
     surfaceCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime),primary:primary?.id===node.id});
    }
    for(const type of terrainTypes)if(Object.hasOwn(node.components,type))terrainCells.push({nodeId:node.id,r,c,type,tile:{...surfaceTile(document,node,r,c,runtime),terrain:type,terrainConfig:structuredClone(node.components[type]),...(type==='key'?{keyName:node.components.key.name??'钥匙'}:{})}});

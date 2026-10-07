@@ -15,5 +15,9 @@ export function createFrameTask(run,{requestFrame,cancelFrame}){
    handle=null;const value=latest;latest=undefined;run(value);
   });
  }
- return {request,cancel};
+ function flush(){
+  if(handle===null)return;
+  const value=latest;cancel();run(value);
+ }
+ return {request,cancel,flush};
 }

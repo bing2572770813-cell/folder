@@ -20,6 +20,10 @@ export function validateTerrainStacking(world:EntityWorld):void {
       if (checked.has(key)) continue;
       checked.add(key);
       const nodes = world.at(r, c);
+      if(nodes.some(item=>item.static.entityType==='terrain')){
+        const terrainCount=nodes.filter(item=>item.static.entityType==='terrain'||(item.static.entityType===undefined&&(Object.hasOwn(item.components,'surface')||isTerrainEntity(item)))).length;
+        if(terrainCount>1)throw new Error('所有地形（包括纸张）互斥：'+key);
+      }
       const papers = nodes.filter(item => Object.hasOwn(item.components, 'surface')).length;
       const terrains = nodes.filter(isTerrainEntity).length;
       if (papers > 1) throw new Error('同一方格不能叠加多个纸张实体：' + key);

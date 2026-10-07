@@ -38,5 +38,6 @@
   "static": {
     "entityType": "creature",
     "placeable": false
-  }
+  },
+  "BaseEntity": []
 }

@@ -16,5 +16,8 @@
   ],
   "static": {
     "entityType": "terrain"
-  }
+  },
+  "BaseEntity": [
+    "paper_ai"
+  ]
 }

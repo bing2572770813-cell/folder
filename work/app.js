@@ -5,7 +5,7 @@ import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mj
 import {nodePermissions} from './entities/node-permissions.mjs';
 import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
-import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,configureNode,forkTreeDocument,renameTreeKeys} from './entities/tree-commands.mjs';
+import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,placeCategorizedPrefab,configureNode,forkTreeDocument,renameTreeKeys} from './entities/tree-commands.mjs';
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
@@ -505,7 +505,7 @@ function updateUI(){
   renderTestModifiers($('testModifierControls'),{freeTeleport:P.freeTeleport,foldHints:P.foldHints},(kind,checked)=>{if(kind==='teleport')controller.setFreeTeleport(checked);else controller.setFoldHints(checked);});
   if(document.activeElement!==$('mapName'))$('mapName').value=map.name;
   $('sceneMapName').textContent=map.name;document.title=map.name+' · FOLD FIELD';
-  applyVisibility();const playing=P.mode==='play';$('playHints').textContent=P.freeTeleport?'测试传送已开启：点击任意可通行实体即可传送；目标区域会自动显示。':P.foldHints?'点击玩家显示行走与所有合法折纸传送落点；点击高亮方块即可移动。':'点击玩家显示行走范围；点击折纸线仍会高亮传送落点，也可按 F 传送。';$('freeTeleportToggle').checked=P.freeTeleport;$('foldHintsToggle').checked=P.foldHints;$('freeTeleportToggle').setAttribute('aria-checked',String(P.freeTeleport));$('foldHintsToggle').setAttribute('aria-checked',String(P.foldHints));$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩编辑':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
+  applyVisibility();const playing=P.mode==='play';$('playHints').textContent=P.freeTeleport?'测试传送已开启：点击任意可通行实体即可传送；目标区域会自动显示。':P.foldHints?'点击玩家显示行走与所有合法掉落目标；点击高亮方块即可移动。':'点击玩家显示行走范围；点击折纸线仍会高亮掉落目标，也可按 F 掉落。';$('freeTeleportToggle').checked=P.freeTeleport;$('foldHintsToggle').checked=P.foldHints;$('freeTeleportToggle').setAttribute('aria-checked',String(P.freeTeleport));$('foldHintsToggle').setAttribute('aria-checked',String(P.foldHints));$('editPanel').hidden=playing;$('playPanel').hidden=!playing;$('editMode').classList.toggle('active',!playing);$('playMode').classList.toggle('active',playing);$('canvasMode').textContent=playing?'游玩编辑':'编辑';$('statusMode').textContent=playing?'PLAY MODE':'EDIT MODE';$('startLabel').textContent=playing?'返回编辑':'开始游玩';
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
   const names={inspect:'点击实体或虚空检视 · 不修改地图',select:selectionMode==='single'?'单选 · 点击选择方格':'多选 · 点击累加 / 拖拽替换 / Shift 拖拽累加',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',entry:'设置区域入口','region-exit':'设置区域出口','clear-tags':'清除方块标签'};if(!P.chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(P.player.r,P.player.c):names[tool];
@@ -516,7 +516,7 @@ function updateUI(){
   renderNameChecklist($('playerKeyChoices'),legalKeyNames(map,documentModel.world),new Set(P.terrainState.collectedKeys),'持有钥匙 ',(name,checked)=>{const keys=new Set(JSON.parse($('playerCollectedKeys').value));if(checked)keys.add(name);else keys.delete(name);$('playerCollectedKeys').value=JSON.stringify([...keys]);},'无可收集钥匙');
   $('playerRow').max=map.height;$('playerColumn').max=map.width;$('applyPlayerProperties').disabled=!playing||P.moving||!!P.foldMotion;if(P.foldMotion)$('teleportBtn').disabled=true;
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
-  $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块传送。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
+  $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块掉落。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&!P.moving&&(P.levelWon||P.stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}folds+=(map.foldCells??[]).length;$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';
   $('undoBtn').disabled=!currentHistory().length||P.moving;$('restartBtn').disabled=!playing||P.moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=P.moving);$('teleportBtn').disabled=P.moving||!P.chosenFold||!foldTarget(P.chosenFold).valid;
@@ -613,7 +613,7 @@ function setupPrefabs(){
     const summary=$('prefabSummary'),name=document.createElement('span');name.textContent=prefab?.name||'无可用实体';summary.replaceChildren();
     if(prefab){const img=document.createElement('img');img.src=prefabPreview(prefab);img.alt='';summary.append(img);}
     summary.append(name);
-    $('stackPlacement').disabled=!!prefab&&!prefab.tile;if(prefab&&!prefab.tile)$('stackPlacement').checked=true;for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab?.tile;$('blockHeightLabel').textContent=prefab?.tile?.lift?'初始高度':'方块高度';$('blockGradualRate').disabled=!prefab?.tile||!!prefab.tile.lift;$('blockHeight').min=prefab?.tile?.lift?.minHeight??.01;$('blockHeight').max=prefab?.tile?.lift?.maxHeight??16;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';renderEntityGrid($('prefabGrid'),prefabs.map(p=>({...p,preview:prefabPreview(p)})),selectedPrefabId,id=>{selectedPrefabId=id;$('prefabType').value=id;applyPrefabBrush();setTool('place');});
+    for(const id of ['blockHeight','blockThickness','blockGradualRate'])$(id).disabled=!prefab?.tile;$('blockHeightLabel').textContent=prefab?.tile?.lift?'初始高度':'方块高度';$('blockGradualRate').disabled=!prefab?.tile||!!prefab.tile.lift;$('blockHeight').min=prefab?.tile?.lift?.minHeight??.01;$('blockHeight').max=prefab?.tile?.lift?.maxHeight??16;$('footprintInfo').textContent=prefab?prefab.size.width+' × '+prefab.size.height+' · 占用 '+prefab.occupied.filter(Boolean).length+' 格':'';renderEntityGrid($('prefabGrid'),prefabs.map(p=>({...p,preview:prefabPreview(p)})),selectedPrefabId,id=>{selectedPrefabId=id;$('prefabType').value=id;applyPrefabBrush();setTool('place');});
     if(prefab?.tile){color=colored?prefab.tile.color:null;brushHeight=prefab.tile.lift?.initialHeight??prefab.tile.height;$('blockHeight').value=brushHeight;$('blockThickness').value=tileThickness(prefab.tile);$('blockGradualRate').value=tileGradualRate(prefab.tile);}
     document.querySelectorAll('[data-color]').forEach(b=>{const active=colored&&b.dataset.color===color;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
     $('colorName').textContent=colored?COLOR_NAMES[color]:'';$('colorType').textContent=prefab?.tile?.blocked?'阻挡实体':'可通行实体';
@@ -729,9 +729,7 @@ function placementCandidate(r,c){
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
- const candidate=$('stackPlacement').checked||!prefab.tile
-  ?placeTreePrefab(documentModel,prefab,tile,r,c,{stack:true,isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)})
-  :replaceTreePrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden});
+ const candidate=placeCategorizedPrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)});
  assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
  assertTreeVisibility(candidate);
  return candidate;
@@ -742,7 +740,7 @@ function drawPlacementPreview(hit){
  disposableClear(placementLayer);placementLayer.userData.preview=null;if(P.mode!=='edit'||tool!=='place'||!hit)return;
  const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)return;
  const cells=footprint(prefab,hit.r,hit.c);let reason='';
- const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('stackPlacement').checked,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
+ const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
  if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
  else{let candidate;try{candidate=placementCandidate(hit.r,hit.c);}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
  const invalid=!!reason;
@@ -770,7 +768,7 @@ function drawPlacementPreview(hit){
   placementLayer.userData.preview={surfaces:surfaceCells.map(p=>({r:p.r,c:p.c,height:tileHeight(p.tile),thickness:tileThickness(p.tile),lift:!!p.tile.lift})),markers:projection.terrainCells.filter(p=>affected.has(p.r+','+p.c)).map(p=>p.type)};
  }
  for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;const top=invalid?tileTop(p.r,p.c):tileHeight(previewMap.tiles[p.r]?.[p.c]);line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?top+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
- $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':($('stackPlacement').checked?'叠加':'替换')+'预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
+ $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':'放置预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
 }
 
 $('applyKeyName').onclick=()=>{try{if(P.mode!=='edit')throw new Error('仅编辑模式可修改钥匙');commitTree(renameTreeKeys(documentModel,selectedCells,$('keyName').value,{isHidden:cellHidden,nodeHidden,schemaFor:nodeSchema}));}catch(error){toast(error.message,true);}};

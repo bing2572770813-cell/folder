@@ -40,7 +40,7 @@ export const EditorLayout = React.memo(function EditorLayout() {
               <span id="gameDescription">{"—"}</span>
               <small id="gameHint">
                 {
-                  "点击玩家查看移动范围；点击折纸线高亮目标，再次点击目标方块传送。"
+                  "点击玩家查看移动范围；点击折纸线高亮目标，再次点击目标方块掉落。"
                 }
               </small>
             </div>

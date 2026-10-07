@@ -266,7 +266,7 @@ function foldTarget(axis){const map=env.getMap();return foldTargetFor(axis,P.pla
 function selectFold(r,c,preferredType=null){const map=env.getMap();const directions=foldsAt(map,r,c),previous=P.chosenFold;const index=previous?.r===r&&previous?.c===c?(directions.indexOf(previous.type)+1)%directions.length:0;clearSelection();P.chosenFold={r,c,type:preferredType??directions[index]};const t=foldTarget(P.chosenFold);overlay(r,c,'#e7ce67',.35);tileOutline(r,c,'#ac9456');
   const a=P.chosenFold;env.invalidateAxes();
   if(inside(t.r,t.c)){overlay(t.r,t.c,t.valid?'#91d6c9':'#de9b91',.4);tileOutline(t.r,t.c,t.valid?'#4b967d':'#b4594e');}
-  $('foldTitle').textContent=coord(r,c)+' · '+FOLD_NAMES[a.type];$('foldDetail').textContent=t.valid?coord(P.player.r,P.player.c)+' → '+coord(t.r,t.c):t.reason;$('teleportBtn').disabled=!t.valid;$('toolStatus').textContent=t.valid?'再次点击 '+coord(t.r,t.c)+' 传送':t.reason;
+  $('foldTitle').textContent=coord(r,c)+' · '+FOLD_NAMES[a.type];$('foldDetail').textContent=t.valid?coord(P.player.r,P.player.c)+' → '+coord(t.r,t.c):t.reason;$('teleportBtn').disabled=!t.valid;$('toolStatus').textContent=t.valid?'再次点击 '+coord(t.r,t.c)+' 掉落':t.reason;
   env.onSelectionChanged?.();
 }
 // The preview uses the same radius and player-side partition as physical folds.
@@ -317,7 +317,7 @@ function validateAction(action){
   action.to={r,c,dir:(Math.round(Math.atan2(c-P.player.c,P.player.r-r)/(Math.PI/4))+8)%8};
  }else if(source==='fold'&&trigger===Trigger.Teleport){
   const axis=action.axis??P.chosenFold;if(!axis){toast('请先选择折纸线',true);return false;}
-  const t=foldTarget(axis);if(!t.valid){toast(t.reason+'，无法传送',true);return false;}
+  const t=foldTarget(axis);if(!t.valid){toast(t.reason+'，无法掉落',true);return false;}
   const forward=reflectPoint(P.player.r-Math.cos(P.player.dir*Math.PI/4),P.player.c+Math.sin(P.player.dir*Math.PI/4),axis);
   action.to={r:t.r,c:t.c,dir:(Math.round(Math.atan2(forward.c-t.c,t.r-forward.r)/(Math.PI/4))+8)%8};
  }else if(source==='test'&&trigger===Trigger.Teleport){

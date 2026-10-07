@@ -18,4 +18,4 @@ assert.throws(()=>placeEntity(map,{...prefab,BaseEntity:[]},prefab.tile,1,1),/�
 assert.doesNotThrow(()=>placeEntity(map,{...prefab,BaseEntity:undefined},prefab.tile,0,0));
 console.log('PASS: objectified behavior serialization, controlled IDs, explicit bases, empty rejection and atomic legacy-compatible replacement.');
 const {readFileSync}=await import('node:fs');const playerDefinition=JSON.parse(readFileSync(new URL('../assets/prefab/entity/player_ai.json',import.meta.url),'utf8'));
-const playerPrefab=normalizePrefab(playerDefinition);assert.equal(playerPrefab.behavior.scriptId,'player-controller');assert.equal(placeEntity(map,playerPrefab,playerPrefab.tile,1,1).map.tiles[1][1].kind,'player-token');
+const playerPrefab=normalizePrefab(playerDefinition);assert.equal(playerPrefab.behavior.scriptId,'player-controller');assert.equal(playerPrefab.static.entityType,'creature');assert.equal(playerPrefab.static.placeable,false);assert.throws(()=>placeEntity(map,playerPrefab,playerPrefab.tile,1,1),/不允许/);

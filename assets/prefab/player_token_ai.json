@@ -18,5 +18,18 @@
   },
   "static": {
     "entityType": "item"
-  }
+  },
+  "BaseEntity": [
+    "player_token_ai",
+    "campfire_ai",
+    "entity_1791205468489_ai",
+    "eruption_ai",
+    "fire_ai",
+    "ice_ai",
+    "key_ai",
+    "lift_paper_ai",
+    "obstacle_ai",
+    "paper_ai",
+    "plain_ai"
+  ]
 }

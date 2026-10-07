@@ -19,5 +19,8 @@
   ],
   "static": {
     "entityType": "terrain"
-  }
+  },
+  "BaseEntity": [
+    "void_ai"
+  ]
 }

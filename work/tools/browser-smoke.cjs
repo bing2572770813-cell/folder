@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const {pathToFileURL}=require('node:url');
 const assert = require('node:assert/strict');
 const {performance} = require('node:perf_hooks');
 const {randomUUID} = require('node:crypto');
@@ -47,7 +48,7 @@ async function main() {
     await page.screenshot({path: path.join(directory, name + '.png'), fullPage: true});
     results.push({name, status: 'pass', canvasColors});
   }
-  async function open(viewport, route) {
+  async function open(viewport, route, {offlineAssets=false}={}) {
     context = await browser.newContext({viewport});
     await context.tracing.start({screenshots: true, snapshots: true});
     page = await context.newPage();
@@ -58,6 +59,7 @@ async function main() {
     page.on('response', response => {if (response.status() >= 400) errors.push(response.url() + ': HTTP ' + response.status());});
     // Browsers request a favicon independently; it is not part of the app's readiness contract.
     await page.route('**/favicon.ico', route => route.fulfill({status: 204, body: ''}));
+    if(offlineAssets)await page.route('**/assets/**',route=>route.fulfill({status:404,body:'external assets unavailable'}));
     await page.goto(new URL(route, preview.url).href, {waitUntil: 'networkidle'});
   }
   async function closeContext(name) {
@@ -170,6 +172,12 @@ async function main() {
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);
       results.push({name:'creature-picker-firebird-placement-trigger-flames-and-undo',status:'pass'});
       await closeContext('desktop');
+      await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
+      await page.evaluate(()=>window.foldField.enableDiagnostics());
+      await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model==='model/player_witch_ai.fbx'&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;});
+      await capture('standalone-builtin-player');
+      results.push({name:'player-fbx-renders-from-file-without-asset-server',status:'pass'});
+      await closeContext('standalone-player');
     }
     if (scenario === 'all' || scenario === 'mobile') {
       await open({width: 390, height: 844}, '/');

@@ -14,14 +14,15 @@ export function createVisualAssetSource({embedded={},offline=false,fetch:fetchAs
  function read(path){
   assetPath(path,path.startsWith('model/')?'model':'texture');
   if(!bytes.has(path))bytes.set(path,Promise.resolve().then(async()=>{
-   if(offline){const data=embedded[path];if(typeof data!=='string'||!/^data:[^,]*;base64,/.test(data))throw new Error('离线文件缺少资源：'+path);return decode(data);}
+   const data=embedded[path];if(typeof data==='string'&&/^data:[^,]*;base64,/.test(data))return decode(data);
+   if(offline)throw new Error('离线文件缺少资源：'+path);
    const response=await fetchAsset('/assets/'+path);if(!response.ok)throw new Error('资源读取失败：'+path+' (HTTP '+response.status+')');return response.arrayBuffer();
   }));
   return bytes.get(path);
  }
  return {
   read,
-  url(path){assetPath(path,'texture');if(offline){if(!embedded[path])throw new Error('离线文件缺少贴图：'+path);return embedded[path];}return '/assets/'+path;},
+  url(path){assetPath(path,'texture');if(embedded[path])return embedded[path];if(offline)throw new Error('离线文件缺少贴图：'+path);return '/assets/'+path;},
   async bundle(visuals){const result={};await Promise.all(visualAssetPaths(visuals).map(async path=>{result[path]=encode(path,await read(path));}));return result;},
  };
 }

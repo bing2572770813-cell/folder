@@ -42,7 +42,7 @@ test('surface map preserves neighbors and follows transform changes without cach
 });
 
 test('lift rendering shares initial and runtime height with markers without changing configuration',()=>{
- const {document,add}=fixture();add('lift',{surface:{height:.09,thickness:.09},lift:{minHeight:.09,maxHeight:1.4,initialHeight:1.4,durationMs:1000}});
+ const {document,add}=fixture();add('lift',{surface:{height:.09,thickness:.09},lift:{minHeight:.09,maxHeight:1.4,initialHeight:1.4,turnsPerLeg:3}});
  const before=document.world.serialize();let projection=renderTreeCells(document);
  assert.equal(projection.surfaceCells.find(cell=>cell.nodeId==='lift').tile.height,1.4);
  document.world.setRuntime('lift','lift',{height:.6,direction:-1});

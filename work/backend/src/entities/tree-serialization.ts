@@ -6,24 +6,6 @@ import {migratePaperTiles} from './paper-tiles.js';
 
 export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Record<string,JsonObject>}
 
-/** Old clocks have no meaningful turn equivalent; use the new default leg length. */
-function migrateLiftConfig(config:JsonObject):JsonObject {
-  const result=jsonObject(config);
-  if(result.turnsPerLeg===undefined&&typeof result.durationMs==='number'&&result.durationMs>0)result.turnsPerLeg=3;
-  delete result.durationMs;
-  return result;
-}
-function migrateLiftSchema(schema:JsonObject):void {
-  if(schema.durationMs!==undefined){
-    schema.turnsPerLeg??={...jsonObject(schema.durationMs),label:'单程回合数'};
-    delete schema.durationMs;
-  }
-  for(const key of ['components','lift','children']){
-    const child=schema[key];
-    if(child&&typeof child==='object'&&!Array.isArray(child))migrateLiftSchema(child);
-  }
-}
-
 /** JSON boundary shared by future browser import/export adapters and backend tooling. */
 export function importTreeMap(input:unknown):ImportedTree {
   const data=jsonObject(input);
@@ -39,16 +21,11 @@ export function importTreeMap(input:unknown):ImportedTree {
   }else throw new Error('Unsupported map version');
   tree=migratePaperTiles(tree);
   for(const node of tree.entities){
-    const legacyLift=node.configuration?.lift;
-    if(!node.components.lift&&legacyLift&&typeof legacyLift==='object'&&!Array.isArray(legacyLift)&&Object.hasOwn(legacyLift,'durationMs'))node.components.lift=jsonObject(legacyLift);
-    if(node.components.lift)node.components.lift=migrateLiftConfig(node.components.lift);
+    const snapshot=node.configuration?.lift;
+    if(snapshot&&typeof snapshot==='object'&&!Array.isArray(snapshot)&&Object.hasOwn(snapshot,'durationMs'))throw new Error('durationMs is unsupported; use turnsPerLeg');
     if(node.configuration){
       if(node.components.lift)node.configuration.lift=jsonObject(node.components.lift);
       else delete node.configuration.lift;
-    }
-    if(node.components.lift&&node.configuration?.propertySchema){
-      const schema=jsonObject(node.configuration.propertySchema);
-      migrateLiftSchema(schema);node.configuration.propertySchema=schema;
     }
   }
   const world=loadTree(tree);

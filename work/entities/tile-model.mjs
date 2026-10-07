@@ -13,7 +13,8 @@ function normalizeLift(value){
  if(keys.some(key=>typeof value[key]!=='number'||!Number.isFinite(value[key])))throw new Error('升降配置无效');
  if(value.minHeight<.01||value.maxHeight>16||value.minHeight>value.maxHeight)throw new Error('升降高度范围无效');
  if(value.initialHeight<value.minHeight||value.initialHeight>value.maxHeight)throw new Error('升降初始高度无效');
- const turns=value.turnsPerLeg??(typeof value.durationMs==='number'&&Number.isFinite(value.durationMs)&&value.durationMs>0?3:undefined);
+ if(Object.hasOwn(value,'durationMs'))throw new Error('durationMs 已停用，请使用 turnsPerLeg');
+ const turns=value.turnsPerLeg;
  if(!Number.isSafeInteger(turns)||turns<1||turns>100)throw new Error('单程回合数须为 1–100 的整数');
  return {...Object.fromEntries(keys.map(key=>[key,value[key]])),turnsPerLeg:turns};
 }

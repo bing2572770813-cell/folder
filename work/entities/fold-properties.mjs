@@ -1,3 +1,5 @@
+import {entityCategory} from './entity-category.mjs';
+
 // Folding capability is independent of walking collision and fold-line tags.
 export function followsFold(tile){
  if(!tile)return false;
@@ -12,4 +14,9 @@ export function nodeFollowsFold(node){
   blocked:node.components.collision?.blocked??false,lift:node.components.lift,
   terrain:['campfire','ice','fire','eruption','key'].find(key=>Object.hasOwn(node.components,key))};
  return followsFold(tile);
+}
+
+export function nodeCanDropOnFold(node){
+ if(!node||!['item','creature'].includes(entityCategory(node)))return false;
+ return node.components?.physics?.canDropOnFold??node.configuration?.canDropOnFold??true;
 }

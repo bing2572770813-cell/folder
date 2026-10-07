@@ -16,6 +16,11 @@
     "kind": "player-token",
     "folds": []
   },
+  "components": {
+    "physics": {
+      "canDropOnFold": true
+    }
+  },
   "static": {
     "entityType": "item"
   },

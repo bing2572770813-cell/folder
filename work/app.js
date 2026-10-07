@@ -1,4 +1,4 @@
-import {nodeFollowsFold} from './entities/fold-properties.mjs';
+import {nodeFollowsFold,nodeCanDropOnFold} from './entities/fold-properties.mjs';
 import {renderTreeNodes,renderTreeParents} from './ui/react/TreeInspector.jsx';
 import {renderTestModifiers} from './ui/react/PlayPanel.jsx';
 import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mjs';
@@ -13,7 +13,7 @@ import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
 import {paperSurface,isPaper} from './render/paper-surface.mjs';
-import {isPlaceableEntity} from './entities/entity-category.mjs';
+import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
@@ -804,7 +804,7 @@ function treeAction(action){try{if(P.mode!=='edit'||!selectedNodeId)throw new Er
 $('moveNode').onclick=()=>treeAction(()=>moveNode(documentModel,selectedNodeId,{r:Number($('nodeLocalR').value),c:Number($('nodeLocalC').value),dir:Number($('nodeLocalDir').value)},cellHidden,nodeHidden));
 $('reparentNode').onclick=()=>treeAction(()=>reparentNode(documentModel,selectedNodeId,$('nodeParent').value||null,$('preserveWorld').checked,cellHidden,nodeHidden));
 $('deleteNode').onclick=()=>treeAction(()=>deleteNode(documentModel,selectedNodeId,cellHidden,nodeHidden));
-function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema);return projectProperties({...value,components:{...value.components,physics:{followFold:nodeFollowsFold(node),...value.components?.physics}}},schema,'readable');}
+function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema),physics={followFold:nodeFollowsFold(node),...(['item','creature'].includes(entityCategory(node))?{canDropOnFold:nodeCanDropOnFold(node)}:{}),...value.components?.physics};return projectProperties({...value,components:{...value.components,physics}},schema,'readable');}
 function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
 function applyTreeConfiguration(node,shown,after,schema){if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,node.id,after.components,after.tags,cellHidden,nodeHidden,schema);commitTree(next);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);refreshTreePanel();$('nodeEditStatus').textContent='已应用';}
 $('applyNodeConfig').onclick=()=>{try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable');applyTreeConfiguration(node,shown,{...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)},schema);}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}};

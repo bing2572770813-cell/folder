@@ -1,6 +1,6 @@
 {
  "version":2,"name":"机制验收地图","width":5,"height":5,
- "legacyMetadata":{"name":"机制验收地图","spawn":{"r":2,"c":1,"dir":2},"exit":{"r":4,"c":4},"maxSteps":0},
+ "metadata":{"name":"机制验收地图","spawn":{"r":2,"c":1,"dir":2},"exit":{"r":4,"c":4},"maxSteps":0},
  "cellTags":{},
  "transforms":[
   {"id":"p","parentId":null,"local":{"r":2,"c":1,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},

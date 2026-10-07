@@ -12,7 +12,7 @@ export function importTreeMap(input:unknown):ImportedTree {
   if(data.version!==2)throw new Error('Unsupported map version; expected version 2');
   if(!Array.isArray(data.entities)||!Array.isArray(data.transforms))throw new Error('Tree map requires entity and transform arrays');
   const tree=data as unknown as TreeMap;
-  tree.legacyMetadata=jsonObject(tree.legacyMetadata??{});
+  tree.metadata=jsonObject(tree.metadata??{});
   for(const node of tree.entities){
     const snapshot=node.configuration?.lift;
     if(snapshot&&typeof snapshot==='object'&&!Array.isArray(snapshot)&&Object.hasOwn(snapshot,'durationMs'))throw new Error('durationMs is unsupported; use turnsPerLeg');
@@ -30,7 +30,7 @@ export function importTreeMap(input:unknown):ImportedTree {
     if(tags.regionTag!==undefined&&(typeof tags.regionTag!=='string'||!tags.regionTag.trim()||tags.regionTag.length>80))throw new Error('Invalid cell regionTag');
     cellTags[key]=tags;
   }
-  return {world,metadata:jsonObject(tree.legacyMetadata),cellTags};
+  return {world,metadata:jsonObject(tree.metadata),cellTags};
 }
 
 export interface TreeSerializationOptions {
@@ -101,6 +101,6 @@ export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTa
   }
   return {
     version:2,width:world.transforms.width,height:world.transforms.height,
-    entities,transforms:world.transforms.serialize(),cellTags:serializedCellTags,legacyMetadata:jsonObject(metadata),
+    entities,transforms:world.transforms.serialize(),cellTags:serializedCellTags,metadata:jsonObject(metadata),
   };
 }

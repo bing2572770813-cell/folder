@@ -45,6 +45,7 @@ export function validateStaticFields(value:unknown):JsonObject {
   const statics=jsonObject(value);
   for(const flag of ['render','transparent','walkable','placeable'])if(statics[flag]!==undefined&&typeof statics[flag]!=='boolean')throw new Error('Invalid static '+flag);
   if(statics.events!==undefined&&(!Array.isArray(statics.events)||statics.events.some(event=>typeof event!=='string'||!['enter','leave','interact'].includes(event))))throw new Error('Invalid static events');
+  if(statics.entityType!==undefined&&!['terrain','item','creature'].includes(String(statics.entityType)))throw new Error('Invalid static entityType');
   return statics;
 }
 export function freezeJson<T extends JsonValue>(value:T):T {

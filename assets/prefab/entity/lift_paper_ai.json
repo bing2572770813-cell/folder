@@ -26,15 +26,48 @@
     }
   },
   "propertySchema": {
-    "minHeight": {"label": "最低高度", "tempEditable": true},
-    "maxHeight": {"label": "最高高度", "tempEditable": true},
-    "initialHeight": {"label": "初始高度", "tempEditable": true},
-    "turnsPerLeg": {"label": "单程回合数", "tempEditable": true},
-    "components": {"children": {"lift": {"children": {
-      "minHeight": {"label": "最低高度", "tempEditable": true},
-      "maxHeight": {"label": "最高高度", "tempEditable": true},
-      "initialHeight": {"label": "初始高度", "tempEditable": true},
-      "turnsPerLeg": {"label": "单程回合数", "tempEditable": true}
-    }}}}
+    "minHeight": {
+      "label": "最低高度",
+      "tempEditable": true
+    },
+    "maxHeight": {
+      "label": "最高高度",
+      "tempEditable": true
+    },
+    "initialHeight": {
+      "label": "初始高度",
+      "tempEditable": true
+    },
+    "turnsPerLeg": {
+      "label": "单程回合数",
+      "tempEditable": true
+    },
+    "components": {
+      "children": {
+        "lift": {
+          "children": {
+            "minHeight": {
+              "label": "最低高度",
+              "tempEditable": true
+            },
+            "maxHeight": {
+              "label": "最高高度",
+              "tempEditable": true
+            },
+            "initialHeight": {
+              "label": "初始高度",
+              "tempEditable": true
+            },
+            "turnsPerLeg": {
+              "label": "单程回合数",
+              "tempEditable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "static": {
+    "entityType": "terrain"
   }
 }

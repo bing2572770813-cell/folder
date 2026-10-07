@@ -85,7 +85,7 @@ export const PlayPanel = React.memo(function PlayPanel() {
                   </div>
                   <div>
                     <strong id="teleports">{"00"}</strong>
-                    <span>{"传送次数"}</span>
+                    <span>{"掉落次数"}</span>
                   </div>
                 </div>
                 <UiDisclosure className="studio-section player-properties" open>
@@ -219,14 +219,14 @@ export const PlayPanel = React.memo(function PlayPanel() {
                     disabled={true}
                   >
                     <i data-lucide="waypoints" />
-                    {"折纸传送"}
+                    {"掉落"}
                     <kbd>{"F"}</kbd>
                   </UiButton>
                 </div>
                 <UiButton id="interactBtn" type="button">与当前格实体交互</UiButton>
                 <div className="play-hints" id="playHints">
                   {
-                    "点击折痕后，在玩家同侧有效方格上向上拖拽折纸；目标变蓝时松开掉落，未对齐则回弹。点击传送与 F 快捷键仍可使用。"
+                    "点击折痕后，在玩家同侧有效方格上向上拖拽折纸；目标变蓝时松开掉落，未对齐则回弹。点击掉落与 F 快捷键仍可使用。"
                   }
                 </div>
               </>

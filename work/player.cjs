@@ -346,7 +346,7 @@ const turnManager=createTurnManager({
   clearSelection();if(context.action.source==='test')buildPaper();
   animatePlayer(context.from,P.player,context.action.trigger===Trigger.Teleport||context.transitioned?'teleport':'move',context.id);
   if(context.action.dropFrom&&!context.transitioned){P.animation.type='drop';P.animation.from.fromArray(context.action.dropFrom);P.animation.duration=350;env.getPlayerGroup().position.copy(P.animation.from);}
-  updateUI();if(context.action.source==='fold'&&!P.terrainState.message)toast('折纸传送 · '+coord(context.from.r,context.from.c)+' → '+coord(context.action.to.r,context.action.to.c));
+  updateUI();if(context.action.source==='fold'&&!P.terrainState.message)toast('掉落 · '+coord(context.from.r,context.from.c)+' → '+coord(context.action.to.r,context.action.to.c));
  },
  onPhase:turn=>env.onTurnPhase?.(turn),
 });

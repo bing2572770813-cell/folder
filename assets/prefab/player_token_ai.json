@@ -15,5 +15,8 @@
     "blocked": true,
     "kind": "player-token",
     "folds": []
+  },
+  "static": {
+    "entityType": "item"
   }
 }

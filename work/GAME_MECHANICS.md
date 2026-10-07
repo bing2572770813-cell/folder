@@ -378,3 +378,5 @@ player 的 `foldDrop.vertical`（默认 1）与 `foldDrop.horizontal`（默认 0
 折叠失败回弹或取消时，玩家保持折叠前的朝向，完整恢复直立旋转姿态，不保留临时折叠的倾斜或欧拉角翻转。成功掉落仍按原折线镜像规则更新朝向。
 
 Player Token 道具只渲染带眼睛的十二面体，不渲染旧配置中的底部方块平面；地图、缩略图及放置预览一致，底层地形独立渲染。
+
+实体分为地形（terrain）、道具（item）和生物（creature），prefab 静态字段 static.entityType 标注分类。方块实体选择器及实体显示 checklist 按类型分组；Player 属于生物、仅自动生成，不能通过地图工具放置。Player Token 和钥匙属于道具。通过折叠移到对称格的行为统一称为“掉落”，沿用现有操作入口与计步规则。

@@ -17,5 +17,8 @@
   },
   "occupied": [
     true
-  ]
+  ],
+  "static": {
+    "entityType": "item"
+  }
 }

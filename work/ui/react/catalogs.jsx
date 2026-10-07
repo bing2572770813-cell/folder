@@ -1,4 +1,6 @@
 import React from "react";
+import {GroupedIconOptions} from "./GroupedIconOptions.jsx";
+import {entityCategories,entityCategory,isPlaceableEntity} from "../../entities/entity-category.mjs";
 import { SingleSelectIconOptions } from "./SingleSelect_icons.jsx";
 import { MultiSelectIconOptions } from "./MultiSelect_icons.jsx";
 import { UiCheckbox } from "./controls.jsx";
@@ -23,8 +25,8 @@ export function renderIsland(container, node) {
 }
 export function EntityGrid({ items, selected, onSelect }) {
   return (
-    <SingleSelectIconOptions
-      items={items}
+    <GroupedIconOptions groups={entityCategories.map(group=>({...group,items:items.filter(item=>entityCategory(item)===group.id)}))} renderOptions={groupItems=>(<SingleSelectIconOptions
+      items={groupItems.map(item=>({...item,disabled:!isPlaceableEntity(item)}))}
       value={selected}
       onChange={onSelect}
       renderIcon={(item) => <img src={item.preview} alt={item.name} />}
@@ -32,7 +34,7 @@ export function EntityGrid({ items, selected, onSelect }) {
         "data-prefab": item.id,
         "data-name": item.name,
       })}
-    />
+    />)} />
   );
 }
 export function renderEntityGrid(container, items, selected, onSelect) {
@@ -43,8 +45,8 @@ export function renderEntityGrid(container, items, selected, onSelect) {
 }
 export function EntityChecklist({ items, hidden, onChange }) {
   return (
-    <MultiSelectIconOptions
-      items={items}
+    <GroupedIconOptions groups={entityCategories.map(group=>({...group,items:items.filter(item=>entityCategory(item)===group.id)}))} renderOptions={groupItems=>(<MultiSelectIconOptions
+      items={groupItems}
       value={
         new Set(
           items.filter((item) => !hidden.has(item.id)).map((item) => item.id),
@@ -53,7 +55,7 @@ export function EntityChecklist({ items, hidden, onChange }) {
       onChange={onChange}
       ariaPrefix="显示实体 "
       renderIcon={(item) => <img src={item.preview} alt={item.name} />}
-    />
+    />)} />
   );
 }
 export function renderEntityChecklist(container, items, hidden, onChange) {

@@ -13,5 +13,8 @@
   },
   "occupied": [
     true
-  ]
+  ],
+  "static": {
+    "entityType": "terrain"
+  }
 }

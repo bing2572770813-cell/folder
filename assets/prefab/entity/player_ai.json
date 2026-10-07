@@ -2,15 +2,31 @@
   "version": 1,
   "id": "player_ai",
   "name": "Player",
-  "size": { "width": 1, "height": 1 },
-  "occupied": [true],
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ],
   "behavior": {
     "scriptId": "player-controller",
     "parameters": {
-      "moveHeight": { "maxUp": 1, "maxDown": 1 },
-      "foldDrop": { "vertical": 1, "horizontal": 0.35 }
+      "moveHeight": {
+        "maxUp": 1,
+        "maxDown": 1
+      },
+      "foldDrop": {
+        "vertical": 1,
+        "horizontal": 0.35
+      }
     },
-    "state": { "overheat": 0, "frozen": false, "actions": 0, "collectedKeys": [] }
+    "state": {
+      "overheat": 0,
+      "frozen": false,
+      "actions": 0,
+      "collectedKeys": []
+    }
   },
   "tile": {
     "kind": "player-token",
@@ -18,5 +34,9 @@
     "height": 0.09,
     "blocked": true,
     "folds": []
+  },
+  "static": {
+    "entityType": "creature",
+    "placeable": false
   }
 }

@@ -80,6 +80,7 @@ export function normalizePrefab(data) {
     if(key==='components')for(const config of Object.values(value))if(!config||typeof config!=='object'||Array.isArray(config))throw new Error('组件配置须为 JSON 对象');
     extras[key]=value;
   }
+  if(extras.static?.entityType!==undefined&&!['terrain','item','creature'].includes(extras.static.entityType))throw new Error('实体类型无效');
   if(extras.tags?.regionTag!==undefined)throw new Error('区域标签只能属于地图格');
   return {...extras,version:1,id:data.id,name:data.name.trim().slice(0,80),size:{...size},occupied:[...occupied],...(BaseEntity!==undefined?{BaseEntity}:{}),behavior:normalizeBehavior(data.behavior),...(Object.keys(propertySchema).length?{propertySchema}:{}),...(data.tile?{tile:normalizeTile({...data.tile,...(Object.keys(propertySchema).length?{propertySchema}:{}),prefabId:data.id})}:{})};
 }

@@ -25,14 +25,14 @@ export class TransformManager {
     return result;
   }
   serialize():TransformNode[]{return [...this.nodes.values()].map(copy);}
-  childrenOf(id:string):string[]{this.get(id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
+  childrenOf(id:string):string[]{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
   world(id:string):GridTransform{return this.resolve(this.nodes,id,new Set());}
   at(r:number,c:number):string[]{return [...(this.index.get(r+','+c)??[])];}
   worldCells(id:string):Array<{r:number;c:number}>{const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return this.cells(node,this.resolve(this.nodes,id,new Set()));}
   onChange(listener:(event:TransformChange)=>void):()=>void{this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};}
-  retain(id:string,owner:string):void{this.get(id);if(!owner)throw new Error('Empty reference owner');const refs=this.references.get(id)??new Set();refs.add(owner);this.references.set(id,refs);}
+  retain(id:string,owner:string):void{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);if(!owner)throw new Error('Empty reference owner');const refs=this.references.get(id)??new Set();refs.add(owner);this.references.set(id,refs);}
   release(id:string,owner:string):void{this.references.get(id)?.delete(owner);}
-  referenceOwners(id:string):string[]{this.get(id);return [...(this.references.get(id)??[])];}
+  referenceOwners(id:string):string[]{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);return [...(this.references.get(id)??[])];}
   assertRemovable(id:string,ignoredOwners:string[]=[]):void{
     this.get(id);if(this.childrenOf(id).length)throw new Error('Transform has children');
     const ignored=new Set(ignoredOwners);

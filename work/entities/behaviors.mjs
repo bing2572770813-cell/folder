@@ -17,5 +17,16 @@ export class ReplaceCellBehavior {
 }
 // Script identity is resolved through code, never through JSON-provided import paths.
 // Placed player prefabs are passive tokens; only player.cjs creates the controlled runtime instance.
-const factories=new Map([['replace-cell',descriptor=>new ReplaceCellBehavior(descriptor)],['player-controller',descriptor=>new ReplaceCellBehavior(descriptor)]]);
+class EnemyPlacementBehavior extends ReplaceCellBehavior {
+  validatePlacement({prefab,cells,world}){
+    const size=this.descriptor.scriptId==='firebird-placement'?3:1;
+    if(prefab.size.width!==size||prefab.size.height!==size||cells.length!==size*size)throw new Error('敌人机关必须占据完整 '+size+'×'+size+' 范围');
+    for(const cell of cells){
+      const owners=world.at(cell.r,cell.c);
+      if(!owners.some(node=>node.components.surface&&node.static.entityType!=='creature'&&!node.components.collision?.blocked&&node.static.walkable!==false))throw new Error('敌人机关的每个占用格都需要可行走纸面');
+      if(owners.some(node=>node.static.entityType==='creature'||node.components.firebird||node.components.rayEmitter||node.tags.spawn||node.tags.entry))throw new Error('敌人机关不能覆盖生物、玩家起点或区域入口');
+    }
+  }
+}
+const factories=new Map([['replace-cell',descriptor=>new ReplaceCellBehavior(descriptor)],['player-controller',descriptor=>new ReplaceCellBehavior(descriptor)],['firebird-placement',descriptor=>new EnemyPlacementBehavior(descriptor)],['ray-emitter-placement',descriptor=>new EnemyPlacementBehavior(descriptor)]]);
 export function createEntityBehavior(value){const descriptor=normalizeBehavior(value),factory=factories.get(descriptor.scriptId);if(!factory)throw new Error('未注册的实体行为：'+descriptor.scriptId);return factory(descriptor);}

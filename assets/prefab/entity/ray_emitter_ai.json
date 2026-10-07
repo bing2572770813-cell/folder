@@ -2,16 +2,6 @@
   "version": 1,
   "id": "ray_emitter_ai",
   "name": "方向喷射方块",
-  "tile": {
-    "followFold": true,
-    "color": "red",
-    "edgeColor": "#adada9",
-    "height": 0.09,
-    "thickness": 0.09,
-    "gradualRate": 0.6666666666666666,
-    "blocked": true,
-    "folds": []
-  },
   "size": {
     "width": 1,
     "height": 1
@@ -22,6 +12,13 @@
   "components": {
     "rayEmitter": {
       "initialDirection": "north"
+    },
+    "physics": {
+      "followFold": true,
+      "canDropOnFold": true
+    },
+    "collision": {
+      "blocked": true
     }
   },
   "propertySchema": {
@@ -39,10 +36,16 @@
     }
   },
   "static": {
-    "entityType": "terrain",
-    "walkable": false
+    "entityType": "creature",
+    "walkable": false,
+    "placeable": true
   },
   "BaseEntity": [
     "paper_ai"
-  ]
+  ],
+  "behavior": {
+    "scriptId": "ray-emitter-placement",
+    "parameters": {},
+    "state": {}
+  }
 }

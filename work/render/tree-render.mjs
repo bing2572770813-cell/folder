@@ -1,6 +1,6 @@
 import fragilePresence from '../entities/fragile-presence.cjs';
 // Detached render views; gameplay-only positions are resolved by EntityWorld.
-const terrainTypes=['campfire','ice','fire','eruption','key','flame','firebird'];
+const terrainTypes=['campfire','ice','fire','eruption','key','flame'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
 const isToken=node=>node.configuration?.kind==='player-token'||node.prefabId==='player_token_ai'||node.prefabId==='player_ai';

@@ -8,4 +8,4 @@ export function entityCategory(record){
   if(id==='key_ai'||id==='player_token_ai'||record?.components?.key||record?.tile?.terrain==='key'||record?.configuration?.terrain==='key'||record?.tile?.kind==='player-token'||record?.configuration?.kind==='player-token')return 'item';
   return 'terrain';
 }
-export const isPlaceableEntity=record=>record?.static?.placeable!==false&&entityCategory(record)!=='creature'&&record?.id!=='void_ai';
+export const isPlaceableEntity=record=>record?.static?.placeable!==false&&record?.id!=='player_ai'&&record?.id!=='void_ai';

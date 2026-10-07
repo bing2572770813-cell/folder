@@ -140,6 +140,35 @@ async function main() {
       assert.equal(restored.tiles.flat().filter(Boolean).length,1);
       await capture('desktop-draft-start-reload');
       results.push({name:'new-draft-preview-placement-undo-redo-start-and-reload',status:'pass'});
+      const enemyMap={version:2,width:7,height:7,entities:[],transforms:[],cellTags:{},metadata:{spawn:{r:0,c:0,dir:0},exit:null,name:'敌人机关验收',description:'',maxSteps:0,bestSteps:null}};
+      for(let r=0;r<7;r++)for(let c=0;c<7;c++){
+        const id=r+'-'+c;enemyMap.cellTags[r+','+c]={regionTag:'A'};
+        enemyMap.transforms.push({id:'t-'+id,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+        enemyMap.entities.push({id,prefabId:'paper_ai',transformId:'t-'+id,components:{surface:{height:.09,color:'white'},collision:{blocked:false}},tags:r===0&&c===0?{spawn:true}:{},static:{entityType:'terrain'}});
+      }
+      await page.locator('#mapFile').setInputFiles({name:'enemy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(enemyMap))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='敌人机关验收');
+      await page.evaluate(()=>window.foldField.enableDiagnostics());
+      await page.locator('#prefabSummary').click();
+      assert.equal(await page.locator('#prefabGrid [data-prefab="firebird_ai"]').isEnabled(),true);
+      assert.equal(await page.locator('#prefabGrid [data-prefab="ray_emitter_ai"]').isEnabled(),true);
+      assert.equal(await page.locator('#prefabGrid [data-prefab="player_ai"]').isEnabled(),false);
+      await page.locator('#prefabGrid [data-prefab="firebird_ai"]').click();
+      await page.locator('[data-tool="place"]').click();
+      const birdPoint=await page.evaluate(()=>window.foldField.screenPoint(1,1));
+      await page.mouse.move(birdPoint.x,birdPoint.y);await page.mouse.click(birdPoint.x,birdPoint.y);
+      await capture('desktop-enemy-placement');
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),49,'enemy retains its paper support');
+      await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+      const start=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(start.x,start.y);
+      const next=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(next.x,next.y);
+      await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),12);
+      await page.waitForFunction(()=>{const render=JSON.parse(document.getElementById('viewport').dataset.render);return render.flameMarkers===12&&render.replacedFirebirds===1;});
+      await capture('desktop-firebird-flames');
+      await page.locator('#undoBtn').click();
+      assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);
+      results.push({name:'creature-picker-firebird-placement-trigger-flames-and-undo',status:'pass'});
       await closeContext('desktop');
     }
     if (scenario === 'all' || scenario === 'mobile') {

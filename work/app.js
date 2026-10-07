@@ -13,6 +13,7 @@ import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
 import {paperSurface,isPaper} from './render/paper-surface.mjs';
+import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
 import {createFoldMotionView,hingeFor,tabletopHeight} from './render/fold-motion.mjs';
@@ -230,11 +231,9 @@ function buildPaper() {
 
 
     const edgeColor=entityEdgeColor(tile);
-    if(edgeColor&&surface){if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);for(const segment of surface.boundarySegments)for(const p of segment)lines.push(x+p[0],p[1]+.004,z+p[2]);}
-    if(edgeColor&&!surface){
+    if(edgeColor){
       if(!styleEdges.has(edgeColor))styleEdges.set(edgeColor,[]);const lines=styleEdges.get(edgeColor);
-      const bottom=y-tileThickness(tile);const corners=[[x-.5,bottom,z-.5],[x+.5,bottom,z-.5],[x+.5,bottom,z+.5],[x-.5,bottom,z+.5],[x-.5,y+.004,z-.5],[x+.5,y+.004,z-.5],[x+.5,y+.004,z+.5],[x-.5,y+.004,z+.5]];
-      for(const [a,b] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]])lines.push(...corners[a],...corners[b]);
+      for(const segment of entityEdgeSegments(tile,surface))for(const p of segment)lines.push(x+p[0],p[1],z+p[2]);
     }
 
     if(edgeColor){if(!styleCells.has(edgeColor))styleCells.set(edgeColor,[]);const count=((styleEdges.get(edgeColor)?.length??0)-styleStart)/6;for(let i=0;i<count;i++)styleCells.get(edgeColor).push(cell);}

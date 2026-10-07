@@ -33,3 +33,13 @@ const cut=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:['h']}]]},0,0,()=
 assert.ok(Math.abs(cut.points[544][1]-.9)<1e-10,'crease depth 0 presses through the whole slab');
 assert.ok(cut.positions.length<flat.positions.length,'crease depth 0 removes the crease-line faces');
 console.log('PASS: four crease directions, non-additive intersections, normal thickness, crease depth and visibility.');
+
+const {entityEdgeSegments}=await import('./render/entity-edges.mjs');
+for(const flat of [tile(1),{...tile(1),surfaceConnected:true}, {...tile(4),gradualRate:0}]){
+ const segments=entityEdgeSegments(flat,null);assert.equal(segments.length,4);
+ assert.ok(segments.flat().every(p=>p[1]===flat.height+.004),'flat paper borders only its front');
+}
+const curvedEdges=entityEdgeSegments(thin.tiles[0][0],thinSurface);
+assert.deepEqual(curvedEdges,thinSurface.boundarySegments.map(segment=>segment.map(p=>[p[0],p[1]+.004,p[2]])),'curved paper borders only its front boundary');
+assert.equal(entityEdgeSegments({prefabId:'obstacle_ai',height:1},null).length,12,'non-paper keeps its box edges');
+console.log('PASS: flat, custom and curved paper have front-only borders, without underside or vertical edges.');

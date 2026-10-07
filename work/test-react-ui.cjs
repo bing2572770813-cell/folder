@@ -38,6 +38,26 @@ const esbuild = require("esbuild");
   assert.equal(nodeForm.querySelector('[aria-label="阻挡 (components.collision.blocked)"]').getAttribute('type'), 'checkbox');
   assert.ok(nodeForm.querySelector('[aria-label="所需钥匙 1"]'));
   assert.equal(nodeForm.querySelector('textarea'), null);
+  const triggerForm = parseHTML(module.exports.renderInspectorMarkup({
+    values: { components: { rayEmitter: { initialDirection: 'north' }, foldSwitch: { initialState: 0 } } },
+    schema: { components: { children: {
+      rayEmitter: { children: { initialDirection: { tempEditable: true } } },
+      foldSwitch: { children: { initialState: { tempEditable: true } } },
+    } } },
+    mixed: new Set(), onChange: () => {}, onError: () => {}, options: {
+      structured: true, expanded: true,
+      choices: {
+        'components.rayEmitter.initialDirection': [
+          { value: 'north', label: '上（北）' }, { value: 'east', label: '右（东）' },
+        ],
+        'components.foldSwitch.initialState': [
+          { value: 0, label: '0（关闭）' }, { value: 1, label: '1（开启）' },
+        ],
+      },
+    },
+  })).document;
+  assert.equal(triggerForm.querySelector('[aria-label="初始朝向 (components.rayEmitter.initialDirection)"]').tagName, 'SELECT');
+  assert.equal(triggerForm.querySelector('[aria-label="初始状态 (components.foldSwitch.initialState)"]').tagName, 'SELECT');
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');

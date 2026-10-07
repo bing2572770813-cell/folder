@@ -1,6 +1,7 @@
 import {importTreeMap,serializeTreeMap} from './tree-runtime.mjs';
 import {validateMap} from '../core/map-model.mjs';
 import {normalizeTile,foldsAt} from './tile-model.mjs';
+import {entityType} from './visibility-model.mjs';
 import fragilePresence from './fragile-presence.cjs';
 
 const copy=value=>structuredClone(value);
@@ -134,9 +135,12 @@ export class TreeDocument {
           configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds,old);updated.set(node.id,node);
         }
         else {
-          const seed={version:2,width:next.width,height:next.height,entities:[],transforms:[],cellTags:{},metadata:{}};
-          const tree=new TreeDocument(seed);const node=tree.world.serialize()[0],transform=tree.world.transforms.serialize()[0];
-          const id=globalThis.crypto.randomUUID();node.id='entity-'+id;node.transformId=transform.id='transform-'+id;added.push(node);transforms.push(transform);
+          // An editor projection is a cell update, not an empty map import.
+          // Reuse the same field mapping as edits so draft spawn state is untouched.
+          const id=globalThis.crypto.randomUUID(),transformId='transform-'+id;
+          const node={id:'entity-'+id,prefabId:entityType(tile),transformId,components:{surface:{}},tags:{},static:{}};
+          configure(node,tile,folds,{});added.push(node);
+          transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});
         }
       }
       if(!tile&&folds.length){

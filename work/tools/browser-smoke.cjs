@@ -94,6 +94,46 @@ async function main() {
       await page.reload({waitUntil: 'networkidle'});
       assert.equal(await page.locator('#mapName').inputValue(), originalName);
       await capture('desktop-reload');
+      const dimensions=await page.evaluate(()=>{const {width,height}=window.foldField.getState().map;return {width,height};});
+      await page.locator('#newMap').click();
+      await page.waitForFunction(()=>window.foldField.getState().map.tiles.flat().every(tile=>tile===null));
+      const draft=await page.evaluate(()=>window.foldField.getState());
+      assert.equal(draft.mode,'edit');
+      assert.deepEqual({width:draft.map.width,height:draft.map.height},dimensions);
+      assert.deepEqual(draft.map.spawn,{r:Math.floor(dimensions.height/2),c:Math.floor(dimensions.width/2),dir:0});
+      assert.equal(await page.evaluate(()=>{const toast=document.getElementById('toast');return toast.classList.contains('show')&&toast.classList.contains('error');}),false,'draft creation and placement must not show spawn errors');
+      await page.locator('[data-tool="place"]').click();
+      const first={r:1,c:1};
+      const firstPoint=await page.evaluate(({r,c})=>window.foldField.screenPoint(r,c),first);
+      await page.mouse.move(firstPoint.x,firstPoint.y);
+      await page.waitForFunction(({r,c})=>window.foldField.getState().placementPreview?.surfaces.some(cell=>cell.r===r&&cell.c===c),first);
+      await page.mouse.click(firstPoint.x,firstPoint.y);
+      await page.waitForFunction(({r,c})=>window.foldField.getState().map.tiles[r][c]!==null,first);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),1);
+      assert.equal(await page.evaluate(()=>{const toast=document.getElementById('toast');return toast.classList.contains('show')&&toast.classList.contains('error');}),false,'draft creation and placement must not show spawn errors');
+      await capture('desktop-draft-first-placement');
+      await page.locator('#playMode').click();
+      assert.equal(await page.evaluate(()=>window.foldField.getState().mode),'edit','empty drafts must still fail play validation');
+
+      await page.locator('#undoBtn').click();
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),0);
+      await page.locator('#redoBtn').click();
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),1);
+      await page.locator('#tagSummary').click();
+      await page.locator('[data-tool="player"]').click();
+      const startPoint=await page.evaluate(({r,c})=>window.foldField.screenPoint(r,c),first);
+      await page.mouse.click(startPoint.x,startPoint.y);
+      await page.waitForFunction(({r,c})=>window.foldField.getState().map.tiles[r][c]?.tags?.spawn===true,first);
+      await page.locator('#playMode').click();
+      await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+      await page.locator('#editMode').click();
+      await page.waitForFunction(()=>document.getElementById('saveState').textContent==='本地已保存');
+      await page.reload({waitUntil:'networkidle'});
+      const restored=await page.evaluate(()=>window.foldField.getState().map);
+      assert.equal(restored.tiles[first.r][first.c].tags.spawn,true);
+      assert.equal(restored.tiles.flat().filter(Boolean).length,1);
+      await capture('desktop-draft-start-reload');
+      results.push({name:'new-draft-preview-placement-undo-redo-start-and-reload',status:'pass'});
       await closeContext('desktop');
     }
     if (scenario === 'all' || scenario === 'mobile') {

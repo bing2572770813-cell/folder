@@ -9,7 +9,7 @@ test('recommends the narrow scope for one subsystem', () => {
 });
 
 test('widens mixed backend and frontend changes to the full check', () => {
-  const result = classifyFiles(['work/backend/src/app.ts', 'work/app.js']);
+  const result = classifyFiles(['work/backend/src/app.ts', 'work/app.ts']);
   assert.equal(result.scope, 'all');
   assert.deepEqual(Object.keys(result.reasons).sort(), ['backend', 'frontend']);
 });

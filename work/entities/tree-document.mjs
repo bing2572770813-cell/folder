@@ -67,6 +67,18 @@ export class TreeDocument {
     return byCell;
   }
   primaryAt(r,c){return (this.cellNodes().get(r+','+c)??[]).find(visible)??null;}
+  viewCells(cells){
+    const result=new Map();
+    for(const {r,c} of cells){
+      const key=r+','+c;if(result.has(key))continue;
+      const nodes=this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)),primary=nodes.find(visible);
+      if(!primary){result.set(key,null);continue;}
+      const tile=tileOf(primary);tile.tags=mergedTags(nodes);tile.regionTag=this.cellTags[key]?.regionTag??'默认区域';
+      const folds=[...new Set(nodes.flatMap(node=>node.components.fold?.directions??[]))];tile.folds=folds;tile.fold=folds[0]??null;
+      result.set(key,normalizeTile(tile));
+    }
+    return result;
+  }
   view(){
     const {width,height}=this.world.transforms;
     const byCell=this.cellNodes();

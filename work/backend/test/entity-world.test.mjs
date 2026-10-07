@@ -67,4 +67,8 @@ test('runtime positions move lookup and rendering cells without changing seriali
   world.setRuntimePositions([{id:'a',position:{r:4,c:4,dir:0}},{id:'b',position:{r:3,c:4,dir:0}}]);
   assert.deepEqual(world.at(3,4).map(node=>node.id),['b']);
   assert.deepEqual(world.at(4,4).map(node=>node.id),['a']);
+  const clone=world.clone();
+  assert.deepEqual(clone.at(3,4).map(node=>node.id),['b']);
+  clone.resetRuntime();
+  assert.deepEqual(world.at(3,4).map(node=>node.id),['b'],'cloned runtime positions stay independent');
 });

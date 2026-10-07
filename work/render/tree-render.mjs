@@ -1,4 +1,4 @@
-// Detached render views; all coordinates come from the canonical Transform tree.
+// Detached render views; gameplay-only positions are resolved by EntityWorld.
 const terrainTypes=['campfire','ice','fire','eruption','key'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
@@ -19,16 +19,27 @@ function surfaceTile(document,node,r,c,runtime=false){
  return tile;
 }
 
-export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false}={}){
+function projection(document,cells){
+ const byCell=new Map(),nodes=cells
+  ?[...new Map(cells.flatMap(({r,c})=>document.world.at(r,c)).map(node=>[node.id,node])).values()]
+  :document.world.serialize();
+ for(const node of nodes)for(const {r,c} of document.world.cells(node.id)){
+  const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
+ }
+ for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
+ return {byCell,nodes};
+}
+
+export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>false,runtime=false,cells}={}){
  const surfaceCells=[],terrainCells=[],tagCells=[],tokenCells=[];
- const nodes=document.world.serialize().sort((a,b)=>a.id.localeCompare(b.id));
+ const allowed=cells&&new Set(cells.map(({r,c})=>r+','+c)),{byCell,nodes}=projection(document,cells);nodes.sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.cells(node.id)){
-   if(cellHidden(r,c))continue;
+   if((allowed&&!allowed.has(r+','+c))||cellHidden(r,c))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
-    const primary=document.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(surfaceVisible);
+   const primary=(byCell.get(r+','+c)??[]).find(surfaceVisible);
     surfaceCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime),primary:primary?.id===node.id});
    }
    for(const type of terrainTypes)if(Object.hasOwn(node.components,type))terrainCells.push({nodeId:node.id,r,c,type,tile:{...surfaceTile(document,node,r,c,runtime),terrain:type,terrainConfig:structuredClone(node.components[type]),...(type==='key'?{keyName:node.components.key.name??'钥匙'}:{})}});
@@ -44,8 +55,13 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
 
 /** Keep neighboring primary geometry so paper seams and hidden-cell rules still work. */
 export function mapForSurface(document,nodeId,runtime=false,baseMap=null){
- const map=baseMap?structuredClone(baseMap):document.view(),node=document.world.get(nodeId);
+ const source=baseMap??document.view();
+ const map=baseMap?{...source,tiles:source.tiles.slice()}:source,node=document.world.get(nodeId);
  if(!hasSurface(node))return map;
- for(const {r,c} of document.world.cells(node.id))map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+ const rows=new Set();
+ for(const {r,c} of document.world.cells(node.id)){
+   if(!rows.has(r)){map.tiles[r]=map.tiles[r].slice();rows.add(r);}
+   map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+ }
  return map;
 }

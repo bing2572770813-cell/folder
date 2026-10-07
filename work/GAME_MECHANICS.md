@@ -404,3 +404,7 @@ Player Token 道具只渲染带眼睛的十二面体，不渲染旧配置中的�
 
 性能复查命令：`node work/bench-fold-start.mjs`（7/31 格折痕，实际纸面几何的 CPU 准备与缓存启动耗时，包含实体读取次数，不代表 GPU 帧耗时）。浏览器 `#viewport` 的 `data-render.foldStart` 提供最近一次准备/启动毫秒数与缓存命中状态，供跨 agent 回归诊断。
 
+
+### visual 资源预扫描
+
+构建时扫描资源目录解析后的所有实体 prefab 的 `visual`，将每个引用的 FBX 和 `visual.textures` 中声明的 PNG 去重后内嵌到编辑器及游戏 HTML，不按实体 ID 或模型文件名设白名单。新增实体或修改模型、贴图引用后重新 build 即可，无需改渲染代码；独立导出使用同一资源路径收集规则。`scale`、`offset`、`rotation` 由 prefab 配置，须与模型实际单位和原点相符；缺失引用文件会使构建失败并指出资源路径。3D 模型仍只在游玩模式加载。

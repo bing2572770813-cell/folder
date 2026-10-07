@@ -162,11 +162,17 @@ async function main() {
       await capture('desktop-enemy-placement');
       assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),49,'enemy retains its paper support');
       await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+      const currentBirdModel=await page.evaluate(()=>window.__FOLD_FIELD_PREFABS__.find(prefab=>prefab.id==='firebird_ai')?.visual?.model);
+      if(currentBirdModel){
+        await page.waitForFunction(model=>JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
+        await capture('desktop-firebird-model');
+      }
       const start=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(start.x,start.y);
       const next=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(next.x,next.y);
       await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),12);
       await page.waitForFunction(()=>{const render=JSON.parse(document.getElementById('viewport').dataset.render);return render.flameMarkers===12&&render.replacedFirebirds===1;});
+      if(currentBirdModel)await page.waitForFunction(model=>!JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
       await capture('desktop-firebird-flames');
       await page.locator('#undoBtn').click();
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);
@@ -193,6 +199,13 @@ async function main() {
       await page.locator('#undoBtn').click();
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+Math.PI/2)<1e-6));
       results.push({name:'emitter-fbx-legacy-models-runtime-facing-and-undo',status:'pass'});
+      await page.locator('#editMode').click();
+      const offlineActors=structuredClone(emitterMap);offlineActors.metadata.name='模型预扫描离线验收';
+      offlineActors.transforms.push({id:'t-bird',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:3,height:3,occupied:Array(9).fill(true)}});
+      offlineActors.entities.push({id:'offline-bird',prefabId:'firebird_ai',transformId:'t-bird',components:{firebird:{direction:'east'},collision:{blocked:true}},tags:{},static:{entityType:'creature'},configuration:{}});
+      await page.locator('#mapFile').setInputFiles({name:'offline-actors.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(offlineActors))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='模型预扫描离线验收');
+      await page.locator('#playMode').click();
       const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportGame').click()]);
       const exportedEmitter=path.join(directory,'emitter-offline-game.html');await download.saveAs(exportedEmitter);
       await page.locator('#editMode').click();
@@ -276,6 +289,7 @@ async function main() {
       await open({width:1280,height:800},pathToFileURL(exportedEmitter).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());
       await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected));},currentEmitterModel);
+      if(currentBirdModel)await page.waitForFunction(model=>JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
       await capture('offline-current-emitter-model');
       results.push({name:'exported-game-resolves-current-prefab-model-without-server',status:'pass'});
       await closeContext('offline-emitter');

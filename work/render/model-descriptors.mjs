@@ -7,6 +7,7 @@ export function collectModelDescriptors(document, {nodeHidden=()=>false, cellHid
   const prefab=getPrefab(node.prefabId);
   const visual=normalizeVisual(prefab?.visual!==undefined?prefab.visual:node.configuration?.visual);
   if(!visual||node.static?.render===false||nodeHidden(node))continue;
+  if(runtime&&node.components?.firebird&&document.world.runtime(node.id,'firebird').replaced)continue;
   const cells=document.world.transforms.worldCells(node.transformId).filter(({r,c})=>!cellHidden(r,c)).map(cell=>({...cell,nodeId:node.id}));
   if(!cells.length)continue;
   const center=cells.reduce((sum,{r,c})=>{sum.x+=wx(c);sum.z+=wz(r);sum.y=Math.max(sum.y,tileTop(r,c));return sum;},{x:0,y:0,z:0});

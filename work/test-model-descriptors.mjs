@@ -30,3 +30,8 @@ const oldOffset=[4.6652925885,.0319734826,-4.5407583767];
 enemy.configuration.visual={model:'model/emitter_ai.fbx',offset:oldOffset};
 assert.deepEqual(collectModelDescriptors(enemyDocument,{getPrefab})[0].visual.offset,[0,0,0]);
 assert.deepEqual(enemy.configuration.visual.offset,oldOffset,'legacy origin correction must not modify saved configuration');
+
+const bird={...enemy,components:{firebird:{direction:'east'}}};
+const birdDocument={world:{...enemyDocument.world,serialize:()=>[bird],runtime:()=>({replaced:true})}};
+assert.equal(collectModelDescriptors(birdDocument,{getPrefab,runtime:true}).length,0,'replaced bird uses the existing replacement marker instead of the creature model');
+assert.equal(collectModelDescriptors(birdDocument,{getPrefab}).length,1,'play state does not hide the configured editor entity');

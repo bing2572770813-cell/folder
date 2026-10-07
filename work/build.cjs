@@ -8,11 +8,12 @@ async function build() {
   const catalog = await require("./prefab-catalog.cjs").readCatalog();
   if (catalog.errors.length) console.warn("Prefab warnings:", catalog.errors);
   const {visualAssetPaths}=await import('./resources/visual-assets.mjs');
-  const builtinVisuals=catalog.prefabs.filter(prefab=>['player_ai','ray_emitter_ai'].includes(prefab.id)).map(prefab=>prefab.visual);
+  const builtinVisuals=catalog.prefabs.map(prefab=>prefab.visual);
   const builtinAssets=Object.fromEntries(visualAssetPaths(builtinVisuals).map(asset=>[
     asset,'data:'+(asset.endsWith('.png')?'image/png':'application/octet-stream')+';base64,'+
       fs.readFileSync(path.join(root,'../assets',asset)).toString('base64'),
   ]));
+  console.log('Prescanned visual assets: '+Object.keys(builtinAssets).length+' files across '+catalog.prefabs.length+' entity prefabs');
   const shared = {
     bundle: true,
     write: false,

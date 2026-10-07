@@ -18,14 +18,17 @@ assert.equal(mixed.url('texture/key_ai.png'),embedded['texture/key_ai.png']);
 console.log('PASS: built-in model/texture data coexist with live external assets.');
 
 const {readFile}=await import('node:fs/promises');
+const {default:catalogModule}=await import('./prefab-catalog.cjs');
+const catalog=await catalogModule.readCatalog(),paths=visualAssetPaths(catalog.prefabs.map(prefab=>prefab.visual));
 for(const name of ['index.html','game.html']){
  const html=await readFile(new URL('../outputs/'+name,import.meta.url),'utf8');
  const match=html.match(/window\.__FOLD_FIELD_BUILTIN_ASSETS__\?\?=(\{.*?\});/);
- assert.ok(match,'built '+name+' must embed the player model');
- const assets=JSON.parse(match[1]),model=await readFile(new URL('../assets/model/player_witch_ai.fbx',import.meta.url));
- assert.deepEqual(Buffer.from(assets['model/player_witch_ai.fbx'].split(',')[1],'base64'),model,'embedded model bytes must match the actual witch FBX');
- const prefab=JSON.parse(await readFile(new URL('../assets/prefab/entity/ray_emitter_ai.json',import.meta.url),'utf8'));
- const emitter=await readFile(new URL('../assets/'+prefab.visual.model,import.meta.url));
- assert.deepEqual(Buffer.from(assets[prefab.visual.model].split(',')[1],'base64'),emitter,'embedded emitter bytes must follow its current prefab reference');
+ assert.ok(match,'built '+name+' must contain prescanned visual assets');
+ const assets=JSON.parse(match[1]);
+ assert.deepEqual(Object.keys(assets).sort(),[...paths].sort(),'all prefab visuals must be bundled, without an entity ID whitelist');
+ for(const path of paths){
+  const actual=await readFile(new URL('../assets/'+path,import.meta.url));
+  assert.deepEqual(Buffer.from(assets[path].split(',')[1],'base64'),actual,'embedded bytes must match '+path);
+ }
 }
-console.log('PASS: editor and game HTML contain the actual playable witch model bytes.');
+console.log('PASS: both HTML builds prescan every entity prefab model and declared texture, including new references.');

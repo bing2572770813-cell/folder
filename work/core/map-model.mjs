@@ -1,5 +1,4 @@
 import {normalizeTile,blocked,normalizeFoldCells} from '../entities/tile-model.mjs';
-import {migrateRegions} from '../tags/regions.mjs';
 import {normalizeMapName} from './map-name.mjs';
 export function validateMap(data,allowDraft=false) {
   if (!data || data.version !== 1 || !Number.isInteger(data.width) || !Number.isInteger(data.height) || data.width<3 || data.width>128 || data.height<3 || data.height>128) throw new Error('地图尺寸须为 3–128，格式版本须为 1');
@@ -13,5 +12,5 @@ export function validateMap(data,allowDraft=false) {
   if(!Number.isInteger(maxSteps)||maxSteps<0||maxSteps>999)throw new Error('最大步数须为 0–999 的整数');
   const bestSteps=data.bestSteps==null?null:Number(data.bestSteps);
   if(bestSteps!==null&&(!Number.isInteger(bestSteps)||bestSteps<0||bestSteps>9999))throw new Error('最佳步数无效');
-  return migrateRegions({version:1,width:data.width,height:data.height,tiles,foldCells:normalizeFoldCells(data.foldCells,data.width,data.height),spawn:{r:s.r,c:s.c,dir:s.dir},exit:exit?{r:exit.r,c:exit.c}:null,name:normalizeMapName(data.name),description:typeof data.description==='string'?data.description.slice(0,240):'',maxSteps,bestSteps});
+  return {version:1,width:data.width,height:data.height,tiles,foldCells:normalizeFoldCells(data.foldCells,data.width,data.height),spawn:{r:s.r,c:s.c,dir:s.dir},exit:exit?{r:exit.r,c:exit.c}:null,name:normalizeMapName(data.name),description:typeof data.description==='string'?data.description.slice(0,240):'',maxSteps,bestSteps};
 }

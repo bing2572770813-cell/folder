@@ -36,7 +36,7 @@ console.log('PASS: additive sparse selections, untouched gaps/folds, independent
 
 // Exercise the production pointer-up selection guard for surface-free canonical nodes.
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
-const pointerSource=readFileSync(new URL('./app.js',import.meta.url),'utf8').split('\n').find(line=>line.startsWith("renderer.domElement.addEventListener('pointerup'"));
+const pointerSource=readFileSync(new URL('./app.ts',import.meta.url),'utf8').split('\n').find(line=>line.startsWith("renderer.domElement.addEventListener('pointerup'"));
 function pointerSelection(nodes){
  let handler,selected=[{r:9,c:9}];
  const context={renderer:{domElement:{addEventListener:(event,fn)=>handler=fn}},finishGesture:()=>{},activePointers:new Set([1]),pointerDown:{button:0,x:10,y:10},manualPan:false,multiTouch:false,dragEdited:false,lastEditKey:null,syncState:()=>{},P:{mode:'edit'},hitAt:()=>({r:0,c:0,nodeId:nodes[0]?.id}),documentModel:{primaryAt:()=>null,world:{at:()=>nodes}},refreshTreePanel:()=>{},map:{tiles:[[null]]},tool:'select',setSelectedCells:value=>selected=value,drawEditSelection:()=>{},editAt:(r,c)=>selected=[{r,c}]};

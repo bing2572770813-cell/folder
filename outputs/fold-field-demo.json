@@ -558,7 +558,9 @@
           "blocked": false
         }
       },
-      "tags": {},
+      "tags": {
+        "spawn": true
+      },
       "static": {},
       "configuration": {
         "color": "green",
@@ -1852,7 +1854,7 @@
       "regionTag": "默认区域"
     }
   },
-  "legacyMetadata": {
+  "metadata": {
     "spawn": {
       "r": 8,
       "c": 4,

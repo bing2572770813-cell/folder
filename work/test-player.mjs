@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import runtime from './player.cjs';
 import {blocked,foldsAt} from './tile-model.mjs';
-import {validateRegions,taggedCells,regionOf,migrateRegions} from './regions.mjs';
+import {validateRegions,taggedCells,regionOf} from './regions.mjs';
 import {uniqueFoldAxes,foldGroupAt,inFoldRange} from './fold-geometry.mjs';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction,validateTerrains} from './special-terrain.mjs';
 const map={width:5,height:5,tiles:Array.from({length:5},()=>Array(5).fill(null)),spawn:{r:0,c:0,dir:2},exit:null,maxSteps:0,bestSteps:null};

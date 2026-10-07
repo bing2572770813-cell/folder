@@ -1,6 +1,6 @@
 # TypeScript 后端
 
-后端服务使用 Fastify + TypeScript，编译输出位于 `backend/dist/`。浏览器端编辑器和玩家逻辑仍由 `app.js`、`player.cjs` 负责；后端不执行 Three.js 或玩家状态机。
+后端服务使用 Fastify + TypeScript，编译输出位于 `backend/dist/`。浏览器端编辑器和玩家逻辑仍由 `app.ts`、`player.cjs` 负责；后端不执行 Three.js 或玩家状态机。
 
 ## 模块边界
 

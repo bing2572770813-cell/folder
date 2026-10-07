@@ -20,7 +20,7 @@
 
 本次迁移不包含：
 
-- `work/app.js` 的 TypeScript 化；
+- `work/app.ts` 的 TypeScript 化；
 - `work/player.cjs` 的迁移或拆分；
 - Three.js 渲染逻辑迁移；
 - 地图玩法规则改动；

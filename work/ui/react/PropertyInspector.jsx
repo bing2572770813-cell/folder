@@ -60,7 +60,21 @@ const names = {
   damage: "过热增量",
   name: "名称",
   tag: "标签组件",
+  triggers: "触发方式",
 };
+const DEFAULT_TRIGGER_CHOICES=[{value:'walk',label:'行走触发'},{value:'teleport',label:'传送触发'}];
+function TriggerChoices({value,path,access,definition,onChange,onError}) {
+  const [draft,setDraft]=useState(value);
+  useEffect(()=>setDraft(value),[JSON.stringify(value)]);
+  const title=definition.label||names[path.at(-1)]||path.at(-1),prefix=names[path[1]]?names[path[1]]+' · ':'';
+  return <div className="inspector-list">
+    <span>{title}</span>
+    {DEFAULT_TRIGGER_CHOICES.map(choice=><UiCheckbox key={choice.value} aria-label={`${prefix}${title} · ${choice.label}`} checked={draft.includes(choice.value)} disabled={!access.tempEditable} onChange={event=>{
+      const next=event.currentTarget.checked?[...new Set([...draft,choice.value])]:draft.filter(item=>item!==choice.value);
+      try{if(!next.length)throw new Error('至少保留一种触发方式');onChange(path,next);setDraft(next);}catch(error){setDraft([...draft]);onError(error);}
+    }} />)}
+  </div>;
+}
 function PrimitiveList({ value, path, access, definition, onChange, onError }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState('');
@@ -218,6 +232,8 @@ function PropertyNode({
   );
   if (!access.readable || (options.hideReadOnly && !access.tempEditable)) return null;
   const objectValue = value && typeof value === "object" && !Array.isArray(value);
+  if (Array.isArray(value) && path.at(-1)==='triggers')
+    return <TriggerChoices value={value} path={path} access={access} definition={definition} onChange={onChange} onError={onError} />;
   if (objectValue && !Object.entries(value).some(([key, item]) => hasVisibleField(item, definition.children?.[key] ?? {}, [...path, key], access, options))) return null;
   if (objectValue)
     return (

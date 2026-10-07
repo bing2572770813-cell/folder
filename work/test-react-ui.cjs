@@ -39,7 +39,7 @@ const esbuild = require("esbuild");
   assert.ok(nodeForm.querySelector('[aria-label="所需钥匙 1"]'));
   assert.equal(nodeForm.querySelector('textarea'), null);
   const triggerForm = parseHTML(module.exports.renderInspectorMarkup({
-    values: { components: { rayEmitter: { initialDirection: 'north' }, foldSwitch: { initialState: 0 } } },
+    values: { components: { rayEmitter: { initialDirection: 'north', triggers: ['walk', 'teleport'] }, foldSwitch: { initialState: 0, triggers: ['walk', 'teleport'] } } },
     schema: { components: { children: {
       rayEmitter: { children: { initialDirection: { tempEditable: true } } },
       foldSwitch: { children: { initialState: { tempEditable: true } } },
@@ -58,6 +58,8 @@ const esbuild = require("esbuild");
   })).document;
   assert.equal(triggerForm.querySelector('[aria-label="初始朝向 (components.rayEmitter.initialDirection)"]').tagName, 'SELECT');
   assert.equal(triggerForm.querySelector('[aria-label="初始状态 (components.foldSwitch.initialState)"]').tagName, 'SELECT');
+  assert.ok(triggerForm.querySelector('[aria-label="方向喷射 · 触发方式 · 行走触发"]'));
+  assert.ok(triggerForm.querySelector('[aria-label="方向喷射 · 触发方式 · 传送触发"]'));
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');

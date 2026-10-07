@@ -62,6 +62,10 @@
             "turnsPerLeg": {
               "label": "单程回合数",
               "tempEditable": true
+            },
+            "triggers": {
+              "label": "触发方式",
+              "tempEditable": true
             }
           }
         }

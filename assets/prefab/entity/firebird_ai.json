@@ -37,6 +37,10 @@
             "direction": {
               "label": "预设方向",
               "tempEditable": true
+            },
+            "triggers": {
+              "label": "触发方式",
+              "tempEditable": true
             }
           }
         }

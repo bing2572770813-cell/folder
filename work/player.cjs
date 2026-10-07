@@ -3,6 +3,7 @@ const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
 const firebirdRules=require('./mechanics/firebird.cjs');
 const flameField=require('./mechanics/flame-field.cjs');
+const {componentTriggerMatches}=require('./mechanics/trigger-list.cjs');
 function rayCells(origin,direction,width,height){
  const delta=rayEmitterConfig.directions[direction];if(!delta)throw new Error('Invalid ray emitter direction');
  const cells=[];for(let step=1;step<=3;step++){const r=origin.r+delta.r*step,c=origin.c+delta.c*step;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;
@@ -159,13 +160,13 @@ function updateFoldSwitches(action){
  const tree=world();if(!tree||action?.source!=='fold')return;
  const axis=action.axis,group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);if(!group)return;
  const used=new Set(group.cells.map(cell=>cell.r+','+cell.c));
- for(const node of tree.serialize())if(node.components.foldSwitch&&tree.transforms.worldCells(node.transformId).some(cell=>used.has(cell.r+','+cell.c))){
+ for(const node of tree.serialize())if(node.components.foldSwitch&&componentTriggerMatches(node.components.foldSwitch,action?.trigger)&&tree.transforms.worldCells(node.transformId).some(cell=>used.has(cell.r+','+cell.c))){
   const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;tree.setRuntime(node.id,'foldSwitch',{state:state===1?0:1});
  }
 }
 function fireRayEmitters(){
  const tree=world(),map=env.getMap();if(!tree)return;
- for(const node of tree.serialize())if(node.components.rayEmitter){
+ for(const node of tree.serialize())if(node.components.rayEmitter&&componentTriggerMatches(node.components.rayEmitter,P.turn.trigger)){
   const origin=tree.transforms.worldCells(node.transformId)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
   const direction=tree.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection;
   const lastShot=rayCells(origin,direction,map.width,map.height);
@@ -177,7 +178,7 @@ function fireRayEmitters(){
 function updateFirebirds(action){
  const tree=world(),map=env.getMap();if(!tree||!action)return;
  let flames=flameField.spreadFlame(P.terrainState.flames??[],[],map.width,map.height);
- for(const node of tree.serialize())if(node.components.firebird&&!tree.runtime(node.id,'firebird').replaced){
+ for(const node of tree.serialize())if(node.components.firebird&&componentTriggerMatches(node.components.firebird,action.trigger)&&!tree.runtime(node.id,'firebird').replaced){
   const origin=tree.position(node.id);if(!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
   const footprint=tree.transforms.get(node.transformId).footprint;
   for(const effect of firebirdRules.resolveFirebird({id:node.id,origin,footprint,config:node.components.firebird},action,P.player,map.width,map.height)){
@@ -194,7 +195,7 @@ function syncLiftHeights(){const tree=world(),map=env.getMap();if(!tree)return f
  return changed;
 }
 function updateLifts(advance=false){const tree=world(),map=env.getMap();if(!tree||P.mode!=='play')return false;let changed=false;
- for(const node of tree.serialize())if(node.components.lift){const config=node.components.lift,cells=tree.transforms.worldCells(node.transformId),occupied=cells.some(cell=>cell.r===P.player.r&&cell.c===P.player.c);
+ for(const node of tree.serialize())if(node.components.lift&&componentTriggerMatches(node.components.lift,advance?P.turn.trigger:undefined)){const config=node.components.lift,cells=tree.transforms.worldCells(node.transformId),occupied=cells.some(cell=>cell.r===P.player.r&&cell.c===P.player.c);
   let state=tree.runtime(node.id,'lift');if(state.height===undefined)state=liftInitial(config);
   const next=advance?advanceLift(state,config,occupied):{...state,occupied,direction:occupied&&state.direction>0?-1:state.direction};tree.setRuntime(node.id,'lift',next);
   for(const cell of cells){const tile=map.tiles[cell.r]?.[cell.c];if(tile&&Math.abs((tile.height??0)-next.height)>1e-9){tile.height=next.height;changed=true;}}

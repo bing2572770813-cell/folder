@@ -1,5 +1,7 @@
 const {spawnSync}=require('node:child_process');
 const path=require('node:path');
+const spatialTest=spawnSync(process.execPath,[path.join(__dirname,'test-spatial-batches.mjs')],{stdio:'inherit'});
+if(spatialTest.status!==0)process.exit(spatialTest.status||1);
 const tagMarkerTest=spawnSync(process.execPath,[path.join(__dirname,'test-tag-markers.mjs')],{stdio:'inherit'});
 if(tagMarkerTest.status!==0)process.exit(tagMarkerTest.status||1);
 const frameTest=spawnSync(process.execPath,[path.join(__dirname,'test-frame-task.mjs')],{stdio:'inherit'});

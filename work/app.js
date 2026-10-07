@@ -13,6 +13,7 @@ import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
+import {createSpatialInstances} from './render/spatial-batches.mjs';
 import {paperSurface,isPaper} from './render/paper-surface.mjs';
 import {isPlaceableEntity} from './entities/entity-category.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
@@ -268,16 +269,12 @@ function buildPaper() {
   for(const [color,bucket] of surfaces){const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(bucket.positions,3));geometry.computeVertexNormals();const mesh=new THREE.Mesh(geometry,materials[color??'white']);mesh.userData.triangleCells=bucket.triangleCells;mesh.userData.surfaceCells=bucket.cells;tileLayer.add(mesh);}
   const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
   for(const [color,cells] of buckets){
-    const mesh=new THREE.InstancedMesh(tileGeo,materials[color??'white'],cells.length);mesh.userData.cells=cells;
-    cells.forEach(({r,c,tile},i)=>{const height=tileHeight(tile);const thickness=tileThickness(tile);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);matrix.compose(position,rotation,scale);mesh.setMatrixAt(i,matrix);});
-    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();tileLayer.add(mesh);
+    for(const mesh of createSpatialInstances(THREE,{cells,geometry:tileGeo,material:materials[color??'white'],matrixFor:({r,c,tile})=>{const height=tileHeight(tile),thickness=tileThickness(tile);position.set(wx(c),height-thickness/2,wz(r));scale.set(1,thickness,1);return matrix.compose(position,rotation,scale);}}))tileLayer.add(mesh);
   }
   for(const [type,cells] of terrains){
     const material=new THREE.MeshBasicMaterial({map:terrainTextures[type],transparent:true,depthWrite:false,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2});
-    const mesh=new THREE.InstancedMesh(markerGeo,material,cells.length);
     const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
-    mesh.userData.cells=cells;cells.forEach(({r,c,index,total,surfaceTop},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});
-    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();terrainLayer.add(mesh);
+    for(const mesh of createSpatialInstances(THREE,{cells,geometry:markerGeo,material,matrixFor:({r,c,index,total,surfaceTop})=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));return matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));}}))terrainLayer.add(mesh);
   }
   for(const mesh of createTagMarkerBatches(THREE,treeCells.tagCells,{geometry:markerGeo,textures:tagTextures,wx,wz,top:cell=>Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)}))tagLayer.add(mesh);
   if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){

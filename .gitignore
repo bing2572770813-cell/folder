@@ -1,3 +1,4 @@
 outputs/overall-plan.md
 work/node_modules/
 work/backend/dist/
+work/.dev-checks/

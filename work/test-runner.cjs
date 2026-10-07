@@ -16,3 +16,13 @@ for(const file of ['test-flat-placement.mjs','test-placement-preview.mjs','test-
   const result=spawnSync(process.execPath,[path.join(__dirname,file)],{stdio:'inherit'});
   if(result.status!==0){process.exit(result.status||1);}
 }
+function runFrontend(cwd=__dirname){
+  for(const file of frontendFiles(cwd)){
+    const result=spawnSync(process.execPath,[path.join(cwd,file)],{cwd,stdio:'inherit',windowsHide:true});
+    if(result.error)console.error(result.error.message);
+    if(result.status!==0)return result.status||1;
+  }
+  return 0;
+}
+if(require.main===module)process.exitCode=runEntityRegressions()||runFrontend();
+module.exports={runFrontend,runEntityRegressions};

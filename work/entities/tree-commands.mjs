@@ -32,6 +32,9 @@ export function renameTreeKeys(document,cells,name,{isHidden=()=>false,nodeHidde
  return candidate;
 }
 function subtree(world,id){return [id,...world.transforms.childrenOf(id).flatMap(child=>subtree(world,child))];}
+function nodesForTransforms(world,ids){
+ return [...new Set(ids)].flatMap(id=>world.forTransform(id));
+}
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   const selected=new Set(ids);
   for(const id of selected)for(const cell of world.transforms.worldCells(id))for(const node of world.at(cell.r,cell.c))if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
@@ -114,11 +117,11 @@ function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
   function instantiate(raw,configuration,local,parentId=null,ancestry=new Set()){
     const record=resolveRecord(raw);if(ancestry.has(record.id))throw new Error('Prefab child cycle');const chain=new Set(ancestry).add(record.id);
     if(record.static?.placeable===false||record.id==='void_ai')throw new Error('实体不可放置');
-    const normalized=normalizeTile({...record.tile,...configuration,prefabId:record.id});delete normalized.instance;
+    const normalized=normalizeTile({...record.tile,...configuration,...(record.visual!==undefined?{visual:record.visual}:{}),prefabId:record.id});delete normalized.instance;
     // Import a standalone node through the legacy adapter without allocating the full map.
     const seed={version:1,width:3,height:3,tiles:Array.from({length:3},()=>Array(3).fill(null))};seed.tiles[0][0]=normalized;
     const node=importTreeMap(seed).world.serialize()[0],uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
-    node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id,...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})};delete node.configuration.regionTag;registry.validate(node);
+    node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id,...(normalized.visual!==undefined?{visual:copy(normalized.visual)}:{}),...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})};delete node.configuration.regionTag;registry.validate(node);
     if(record.tile?.lift&&normalized.lift)node.components.lift=copy(normalized.lift);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});

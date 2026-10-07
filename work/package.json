@@ -10,6 +10,14 @@
     "three": "^0.180.0"
   },
   "scripts": {
+    "check": "node tools/check.cjs",
+    "check:affected": "node tools/affected-check.cjs",
+    "check:tools": "node --test tools/test/*.test.cjs",
+    "check:report": "node tools/check-report.cjs",
+    "preview": "node tools/preview.cjs",
+    "experiment:cost": "node tools/cost-experiments.cjs",
+    "frontend:fast": "node tools/frontend-fast.cjs",
+    "browser:check": "node tools/browser-check.cjs",
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "npm run backend:build && node server.cjs",
@@ -20,6 +28,7 @@
     "@types/node": "^26.6.4",
     "typescript": "^7.0.2",
     "linkedom": "^0.18.13",
+    "playwright-core": "^1.63.0",
     "prettier": "^3.9.9"
   }
 }

@@ -1,4 +1,10 @@
 const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
+const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
+const {isBrokenCell}=require('./entities/fragile-presence.cjs');
+function rayCells(origin,direction,width,height){
+ const delta=rayEmitterConfig.directions[direction];if(!delta)throw new Error('Invalid ray emitter direction');
+ const cells=[];for(let step=1;step<=3;step++){const r=origin.r+delta.r*step,c=origin.c+delta.c*step;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;
+}
 function playerPrefabDefaults(prefab = defaultPlayerPrefab) {
   if (
     prefab.id !== "player_ai" ||
@@ -140,6 +146,27 @@ function resetPrefabState() {
   }
  resetPrefabState();
 function world(){return env.getEntityWorld?.();}
+function activeAt(r,c){const tree=world(),nodes=tree.at(r,c);return isBrokenCell(tree,nodes)?[]:nodes;}
+function switchesOpen(){const tree=world();return !tree||tree.serialize().every(node=>!node.components.foldSwitch||(tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState)===1);}
+function updateFoldSwitches(action){
+ const tree=world();if(!tree||action?.source!=='fold')return;
+ const axis=action.axis,group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);if(!group)return;
+ const used=new Set(group.cells.map(cell=>cell.r+','+cell.c));
+ for(const node of tree.serialize())if(node.components.foldSwitch&&tree.transforms.worldCells(node.transformId).some(cell=>used.has(cell.r+','+cell.c))){
+  const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;tree.setRuntime(node.id,'foldSwitch',{state:state===1?0:1});
+ }
+}
+function fireRayEmitters(){
+ const tree=world(),map=env.getMap();if(!tree)return;
+ for(const node of tree.serialize())if(node.components.rayEmitter){
+  const origin=tree.transforms.worldCells(node.transformId)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
+  const direction=tree.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection;
+  const lastShot=rayCells(origin,direction,map.width,map.height);
+  tree.setRuntime(node.id,'rayEmitter',{direction:rayEmitterConfig.directions[direction].opposite,lastShot,shotDirection:direction});
+  if(lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被方向喷射射线命中，游戏结束';}
+ }
+ env.refreshMechanismSurfaces?.();
+}
 function syncLiftHeights(){const tree=world(),map=env.getMap();if(!tree)return false;let changed=false;
  for(const node of tree.serialize())if(node.components.lift){const state=tree.runtime(node.id,'lift'),height=Number(state.height??node.components.lift.initialHeight);for(const cell of tree.transforms.worldCells(node.transformId)){const tile=map.tiles[cell.r]?.[cell.c];if(tile&&Math.abs((tile.height??0)-height)>1e-9){tile.height=height;changed=true;}}}
  return changed;
@@ -162,15 +189,15 @@ function structuralEntryCheck(r,c){
  if(nodes.some(node=>Object.hasOwn(node.components,'campfire')))return {valid:false,reason:'篝火方块不可进入'};
  return {valid:true,reason:''};
 }
-function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRuntime(),nodes=world().at(position.r,position.c),trigger){
+function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRuntime(),nodes=activeAt(position.r,position.c),trigger){
  return env.componentRegistry.dispatch({type,trigger,nodes,actor,runtime});
 }
 function treeEntryCheck(position,actor=P.terrainState,trigger){
- return env.componentRegistry.checkEntry({trigger,nodes:world().at(position.r,position.c),actor,runtime:world().snapshotRuntime()});
+ return env.componentRegistry.checkEntry({trigger,nodes:activeAt(position.r,position.c),actor,runtime:world().snapshotRuntime()});
 }
 function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)return canEnterTerrain(env.getMap(),{r,c},P.terrainState);
  if(!inside(r,c)||(!ignoreHidden&&env.isHidden(r,c)))return {valid:false,reason:'目标为空格或未揭示区域'};
- const nodes=tree.at(r,c);if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
+ const nodes=activeAt(r,c);if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false))return {valid:false,reason:'目标是阻挡方块'};
  return treeEntryCheck({r,c},P.terrainState,trigger);
 }
@@ -212,7 +239,7 @@ function validateForPlay() {const map=env.getMap();
   return {valid:errors.length===0,errors};
 }
 function exitIsValid() {const map=env.getMap();if(!map.exit||!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r]?.[map.exit.c])return false;return world()?structuralEntryCheck(map.exit.r,map.exit.c).valid:walkable(map.exit.r,map.exit.c);}
-function isAtExit() {const map=env.getMap(); return exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
+function isAtExit() {const map=env.getMap(); return switchesOpen()&&exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
 function foldTargetFor(axis,position=P.player) {const map=env.getMap();
   const t=reflectPoint(position.r,position.c,axis);const same=t.r===position.r&&t.c===position.c;let reason='';
   if(!inFoldRange(foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type),position))reason='超出折线作用半径';else if(!inside(t.r,t.c))reason='目标超出地图';else if(!map.tiles[t.r][t.c])reason='目标为空格';else if(!(world()?entryCheck(t.r,t.c,false,Trigger.Teleport).valid:walkable(t.r,t.c)))reason=world()?entryCheck(t.r,t.c,false,Trigger.Teleport).reason:'目标是阻挡方块';else if(same)reason='玩家位于对称轴上';else if(P.mode==='play')reason=entryCheck(t.r,t.c,false,Trigger.Teleport).reason;
@@ -293,16 +320,19 @@ function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();upda
 function testTeleport(r,c){return turnManager.execute({trigger:Trigger.Teleport,source:'test',r,c});}
 function setFoldHints(enabled){P.foldHints=!!enabled;const axis=P.chosenFold,selected=env.getSelectionRing().visible;if(axis)selectFold(axis.r,axis.c,axis.type);else if(selected)selectPlayer();updateUI();}
 function animatePlayer(from,to,type,turnId){const map=env.getMap();P.moving=true;P.animation={start:performance.now(),duration:type==='teleport'?480:220,fromCell:{...from},toCell:{...to},from:new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,turnId,checkEnd:true};updateUI();}
-function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.revealedRegions.add(target);buildPaper();toast('显示区域：'+target);return false;}const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player,Trigger.Teleport);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
+function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;if(!switchesOpen()){P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';return false;}const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.revealedRegions.add(target);buildPaper();toast('显示区域：'+target);return false;}const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player,Trigger.Teleport);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
 function collectKey(){if(world()){const nodes=world().at(P.player.r,P.player.c).filter(node=>Object.hasOwn(node.components,'key')&&node.static.walkable!==false&&!node.components.collision?.blocked).map(node=>({...node,components:{key:node.components.key}}));if(nodes.length)commitTreeEvent('enter',P.player,nodes);return;}const tile=env.getMap().tiles[P.player.r]?.[P.player.c];if(tile?.terrain!=='key'||blocked(tile))return;const name=tile.keyName?.trim()||'钥匙';P.terrainState.collectedKeys=[...new Set([...P.terrainState.collectedKeys,name])];P.terrainState.hasKey=true;P.terrainState.message='获得钥匙：'+name;}
 function arrive(trigger){
  if(world())enterTree(trigger);
  else{P.terrainState=enterTerrain(env.getMap(),P.player,P.terrainState).state;collectKey();}
 }
-function settleAction(){
+function settleAction(action){
+ updateFoldSwitches(action);
  P.terrainState=finishAction(P.terrainState);
  const transitioned=!P.terrainState.gameOver&&transitionRegion();
  if(transitioned)arrive(Trigger.Teleport);
+ fireRayEmitters();
+ if(!switchesOpen()&&exitIsValid()&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;
 }
@@ -317,6 +347,7 @@ function validateAction(action){
   action.to={r,c,dir:(Math.round(Math.atan2(c-P.player.c,P.player.r-r)/(Math.PI/4))+8)%8};
  }else if(source==='fold'&&trigger===Trigger.Teleport){
   const axis=action.axis??P.chosenFold;if(!axis){toast('请先选择折纸线',true);return false;}
+  action.axis={r:axis.r,c:axis.c,type:axis.type};
   const t=foldTarget(axis);if(!t.valid){toast(t.reason+'，无法掉落',true);return false;}
   const forward=reflectPoint(P.player.r-Math.cos(P.player.dir*Math.PI/4),P.player.c+Math.sin(P.player.dir*Math.PI/4),axis);
   action.to={r:t.r,c:t.c,dir:(Math.round(Math.atan2(forward.c-t.c,t.r-forward.r)/(Math.PI/4))+8)%8};
@@ -340,7 +371,7 @@ const turnManager=createTurnManager({
   if(source==='test')P.revealedRegions.add(regionOf(env.getMap().tiles[to.r][to.c]));
  },
  enter:context=>arrive(context.action.trigger),
- settle:context=>{context.transitioned=settleAction();},
+ settle:context=>{context.transitioned=settleAction(context.action);},
  outcome:()=>{checkRunEnd();return P.levelWon?'win':P.stepLimitHit?(P.terrainState.gameOver?'terrain':'limit'):null;},
  present:context=>{
   clearSelection();if(context.action.source==='test')buildPaper();
@@ -579,4 +610,4 @@ function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150
 function undo(){cancelFoldMotion();if(P.moving||P.mode!=='play')return;const previous=P.playHistory.pop();if(previous)restore(previous);}
 return {foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
 }
-module.exports={playerPrefabDefaults,Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift};
+module.exports={playerPrefabDefaults,Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift,rayCells};

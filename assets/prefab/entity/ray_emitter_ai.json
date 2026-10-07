@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "id": "ray_emitter_ai",
+  "name": "方向喷射方块",
+  "tile": {
+    "followFold": true,
+    "color": "red",
+    "edgeColor": "#adada9",
+    "height": 0.09,
+    "thickness": 0.09,
+    "gradualRate": 0.6666666666666666,
+    "blocked": true,
+    "folds": []
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ],
+  "components": {
+    "rayEmitter": {
+      "initialDirection": "north"
+    }
+  },
+  "propertySchema": {
+    "components": {
+      "children": {
+        "rayEmitter": {
+          "children": {
+            "initialDirection": {
+              "label": "初始朝向",
+              "tempEditable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "static": {
+    "entityType": "terrain",
+    "walkable": false
+  },
+  "BaseEntity": [
+    "paper_ai"
+  ]
+}

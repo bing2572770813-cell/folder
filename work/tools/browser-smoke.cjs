@@ -87,6 +87,12 @@ async function main() {
       assert.equal(await page.locator('#playPanel').isVisible(), true);
       await page.locator('#restartBtn').click();
       assert.equal(await page.locator('#canvasSteps').textContent(), '00');
+      await page.evaluate(()=>window.foldField.enableDiagnostics());
+      const playerModel=await page.evaluate(()=>window.__FOLD_FIELD_PREFABS__.find(prefab=>prefab.id==='player_ai')?.visual?.model);
+      if(playerModel){
+        await page.waitForFunction(model=>{const visual=JSON.parse(document.getElementById('viewport').dataset.render).playerVisual;return visual.model===model&&visual.ready&&!visual.fallback;},playerModel);
+        results.push({name:'runtime-player-prefab-model',status:'pass',model:playerModel});
+      }
       await capture('desktop-play');
       await page.locator('#editMode').click();
       await page.waitForFunction(() => document.getElementById('editMode').getAttribute('aria-pressed') === 'true');

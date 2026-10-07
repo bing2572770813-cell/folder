@@ -1,0 +1,38 @@
+{
+  "id": "player_witch_ai",
+  "sourceConcept": "assets/raw_design/artworks/player_witch_reference.png",
+  "authoringScript": "assets/raw_design/artworks/build_player_witch_ai.py",
+  "blend": "assets/raw_design/artworks/player_witch_ai.blend",
+  "fbx": "assets/model/player_witch_ai.fbx",
+  "glb": "assets/model/player_witch_ai.glb",
+  "previews": [
+    "assets/raw_design/artworks/player_witch_front_ai.png",
+    "assets/raw_design/artworks/player_witch_grid_ai.png"
+  ],
+  "coordinates": "Blender Z-up/+Y front; FBX and GLB Y-up/-Z front; origin at soles",
+  "cellSize": 1,
+  "bounds": {
+    "min": [
+      -0.46,
+      0.0,
+      -0.302
+    ],
+    "max": [
+      0.46,
+      1.47499,
+      0.338
+    ]
+  },
+  "dimensions": {
+    "width": 0.92,
+    "height": 1.47499,
+    "depth": 0.64
+  },
+  "maxHorizontalRadius": 0.460352,
+  "triangles": 1286,
+  "meshes": 19,
+  "materials": 12,
+  "rigged": false,
+  "textures": [],
+  "gameplay": "Visual only; player.cjs and one-cell player occupancy remain unchanged. Studio tiles, camera and lights are not exported."
+}

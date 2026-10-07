@@ -65,7 +65,7 @@ export class TreeDocument {
     for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
     return byCell;
   }
-  primaryAt(r,c){return (this.cellNodes().get(r+','+c)??[]).find(visible)??null;}
+  primaryAt(r,c){return this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(visible)??null;}
   viewCells(cells){
     const result=new Map();
     for(const {r,c} of cells){

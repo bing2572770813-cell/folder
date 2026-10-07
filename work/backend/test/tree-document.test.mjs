@@ -10,6 +10,15 @@ const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tre
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
 function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components={fold:{directions:['v']}};tree.entities.push(node);return new TreeDocument(tree);}
+test('primary lookup uses the cell index and returns detached entities',()=>{
+ const doc=stacked(),expected=doc.cellNodes().get('1,1').find(node=>node.components.surface&&!node.static.transparent);
+ doc.world.serialize=()=>{throw new Error('unexpected full-world scan');};
+ doc.cellNodes=()=>{throw new Error('unexpected full-cell projection');};
+ const actual=doc.primaryAt(1,1);assert.equal(actual.id,expected.id);
+ actual.components.surface.height=99;
+ assert.notEqual(doc.primaryAt(1,1).components.surface.height,99);
+ assert.equal(doc.primaryAt(0,0),null);
+});
 test('view and no-op updates preserve stacked IDs and hierarchy',()=>{
   const doc=stacked(),before=doc.serialize();const view=doc.view();view.tiles[1][1].color='red';assert.equal(doc.view().tiles[1][1].color,'white');
   doc.applyLegacy(doc.view());assert.deepEqual(doc.serialize(),before);

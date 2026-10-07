@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "id": "fold_switch_ai",
+  "name": "折线开关方块",
+  "tile": {
+    "followFold": true,
+    "color": "green",
+    "edgeColor": "#adada9",
+    "height": 0.09,
+    "thickness": 0.09,
+    "gradualRate": 0.6666666666666666,
+    "blocked": true,
+    "folds": []
+  },
+  "size": {
+    "width": 1,
+    "height": 1
+  },
+  "occupied": [
+    true
+  ],
+  "components": {
+    "foldSwitch": {
+      "initialState": 0
+    }
+  },
+  "propertySchema": {
+    "components": {
+      "children": {
+        "foldSwitch": {
+          "children": {
+            "initialState": {
+              "label": "初始状态（0 关闭 / 1 开启）",
+              "tempEditable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "static": {
+    "entityType": "terrain",
+    "walkable": false
+  },
+  "BaseEntity": [
+    "paper_ai"
+  ]
+}

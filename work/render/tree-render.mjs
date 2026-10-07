@@ -1,4 +1,5 @@
 // Detached render views; all coordinates come from the canonical Transform tree.
+import fragilePresence from '../entities/fragile-presence.cjs';
 const terrainTypes=['campfire','ice','fire','eruption','key'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
@@ -36,6 +37,7 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
   if(!rendered(node)||nodeHidden(node))continue;
   for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
    if((allowed&&!allowed.has(r+','+c))||cellHidden(r,c))continue;
+   if(runtime&&fragilePresence.isBrokenCell(document.world,byCell.get(r+','+c)??[]))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
    if(surfaceVisible(node)){
    const primary=(byCell.get(r+','+c)??[]).find(surfaceVisible);

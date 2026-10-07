@@ -13,6 +13,8 @@ import {previewPlacement,previewFootprint} from './entities/placement-preview.mj
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
+import {mechanismMarker,shotMarker} from './render/directional-mechanisms.mjs';
+import rayEmitterConfig from './entities/ray-emitter-config.cjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
 import {paperSurface,isPaper,createPaperSurfaceCache} from './render/paper-surface.mjs';
@@ -104,7 +106,7 @@ window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersisten
 const foldableCells=new Set();
 let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,refreshMechanismSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -199,6 +201,8 @@ function scheduleFoldPreparation(){
 paper.add(boardLayer,gridLayer,tileLayer,foldLayer,effectLayer,entityEdgeLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer);
 let foldAxes=[],axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
+const mechanismLayer=new THREE.Group(),rayLayer=new THREE.Group();paper.add(mechanismLayer,rayLayer);
+let brokenViewKey='';
 
 const visibility={coords:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
@@ -222,7 +226,7 @@ const playerGroup=new THREE.Group(),activeTokenHost=new THREE.Group();let active
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
-const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
+const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,mechanismLayer,rayLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 function renderPlayer() {renderer.shadowMap.needsUpdate=true;const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);}
 
@@ -236,6 +240,7 @@ const paperSurfaceCache=createPaperSurfaceCache();
 const editRefresh=createEditRefresh({rebuild:rebuildPaper,notify:notifyMapChanged,requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle)});
 function buildPaper(){editRefresh.request({scene:true},!!gestureBefore);}
 function rebuildPaper() {
+  if(P.mode==='play')map=documentModel.view({runtime:true});
   hoverDescriptionKey=null;
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();
@@ -279,6 +284,7 @@ function rebuildPaper() {
     }
   }
   paperSurfaceCache.end();
+  refreshMechanismMarkers(treeCells);
   for(const cell of treeCells.tokenCells){const token=makeToken(cell.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(cell.c),Math.max(cell.surfaceTop,cell.tile.height??0),wz(cell.r));token.userData.cell=cell;staticTokenLayer.add(token);}
   for(const marker of treeCells.terrainCells){if(!terrains.has(marker.type))terrains.set(marker.type,[]);terrains.get(marker.type).push(marker);}
   for(const mesh of surfaces.meshes(THREE,color=>materials[color]))tileLayer.add(mesh);
@@ -327,6 +333,27 @@ function refreshLiftSurfaces(){
  for(const mesh of foldLayer.children)if(mesh.userData.exitCell){const {r,c}=mesh.userData.exitCell;mesh.position.y=tileTop(r,c)+.012;}
  axisViewKey=null;rebuildFoldAxes();buildCreaseGuides();buildFoldSelection();
  if(hovered&&hoverOutline.visible)hoverOutline.position.y=tileTop(hovered.r,hovered.c)+.035;
+ refreshMechanismMarkers();
+}
+function refreshMechanismSurfaces(){
+ const key=documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|');
+ if(key!==brokenViewKey){brokenViewKey=key;buildPaper();}else refreshMechanismMarkers();
+}
+function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
+ disposableClear(mechanismLayer);disposableClear(rayLayer);
+ brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
+ for(const cell of cells.surfaceCells){
+  const node=documentModel.world.get(cell.nodeId),components=node.components;
+  if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile)continue;
+  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch')}:{};
+  const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
+  if(components.rayEmitter){
+   const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
+   for(const [last,shots] of [[false,playerRuntime.rayCells(cell,direction,map.width,map.height)],[true,runtime.rayEmitter?.lastShot??[]]])for(const shot of shots){
+    if(cellHidden(shot.r,shot.c))continue;const mesh=shotMarker(THREE,{last});mesh.position.set(wx(shot.c),tileTop(shot.r,shot.c)+.025,wz(shot.r));rayLayer.add(mesh);
+   }
+  }
+ }
 }
 function addAxisLabels(maxHeight){
   const w=map.width,h=map.height,size=Math.min(4096,Math.max(w,h)*32+64);
@@ -775,6 +802,7 @@ function prefabPreview(prefab){
    const tile=new THREE.Mesh(new THREE.BoxGeometry(.98,tileThickness(previewTile),.98),new THREE.MeshStandardMaterial({color:COLORS[previewTile.color]??COLORS.white}));tile.position.set(p.c-(prefab.size.width-1)/2,height-tileThickness(previewTile)/2,p.r-(prefab.size.height-1)/2);if(previewTile.kind!=='player-token'&&(prefab.tile||Object.hasOwn(prefab.components??{},'surface')))world.add(tile);
    if(previewTile.edgeColor&&previewTile.kind!=='player-token'){const edge=new THREE.LineSegments(new THREE.EdgesGeometry(tile.geometry),new THREE.LineBasicMaterial({color:previewTile.edgeColor}));edge.position.copy(tile.position);world.add(edge);}
    if(previewTile.kind==='player-token'){const token=makeToken(previewTile.color);token.rotation.y=-Math.PI*.75;token.position.copy(tile.position);token.position.y=height;world.add(token);}
+   const mechanism=mechanismMarker(THREE,prefab.components??{});mechanism.position.copy(tile.position);mechanism.position.y=height+.04;world.add(mechanism);
    for(const type of (prefab.tile?.terrain?[prefab.tile.terrain]:['campfire','ice','fire','eruption','key'].filter(type=>Object.hasOwn(prefab.components??{},type)))){const marker=new THREE.Mesh(new THREE.PlaneGeometry(.72,.72),new THREE.MeshBasicMaterial({map:terrainTextures[type],transparent:true,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.copy(tile.position);marker.position.y=height+.012;world.add(marker);}
  }
  previewRenderer.render(world,cam);const url=previewRenderer.domElement.toDataURL('image/png');world.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});previewCache.set(key,url);return url;
@@ -816,6 +844,7 @@ function drawPlacementPreview(hit){
    const material=new THREE.MeshStandardMaterial({color:COLORS[p.tile.color??'white'],transparent:true,opacity:.65,depthWrite:false,depthTest:false,roughness:.86,flatShading:true});
    const body=createSurfacePreview(THREE,view,p,material,cellHidden);body.position.x=wx(p.c);body.position.z=wz(p.r);body.position.y+=.012;body.renderOrder=10;placementLayer.add(body);
    if(p.tile.lift)marker(liftTexture,p.r,p.c,tileHeight(p.tile),.58);
+   const mechanism=mechanismMarker(THREE,candidate.world.get(p.nodeId).components);mechanism.position.set(wx(p.c),tileHeight(p.tile)+.05,wz(p.r));placementLayer.add(mechanism);
 
   }
   for(const p of projection.tokenCells.filter(p=>affected.has(p.r+','+p.c))){const token=makeToken(p.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(p.c),Math.max(p.surfaceTop,p.tile.height??0),wz(p.r));placementLayer.add(token);}
@@ -849,7 +878,7 @@ function refreshTreePanel(){
  const panel=$('treeNodes');if(!panel)return;const point=lastClickTile??selectedCells[0],nodes=entityTreeContext(documentModel.world,selectedNodeId,point);
  renderTreeNodes(panel,nodes.map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
  const node=nodes.find(item=>item.id===selectedNodeId);$('treeFields').hidden=!node;if(!node){clearPropertyInspector($('nodeConfiguration'));return;}const transform=documentModel.world.transforms.get(node.transformId),world=documentModel.world.transforms.world(node.transformId);$('nodeLocalR').value=transform.local.r;$('nodeLocalC').value=transform.local.c;$('nodeLocalDir').value=transform.local.dir;renderTreeParents($('nodeParent'),entityParentChoices(documentModel.world,node.id).map(other=>({...other,disabled:nodeHidden(other)||documentModel.world.transforms.worldCells(other.transformId).some(p=>cellHidden(p.r,p.c))})));$('nodeParent').value=nodes.find(item=>item.transformId===transform.parentId)?.id??'';const schema=nodeSchema(node),readable=inspectNodeValues(node,schema);$('nodeComponents').value=JSON.stringify(readable.components??{},null,2);$('nodeTags').value=JSON.stringify(readable.tags??{},null,2);$('nodeIdentity').textContent=node.id;$('nodeWorldPosition').textContent='地图位置 '+coord(world.r,world.c)+' · 朝'+FACE_NAMES[world.dir];
- renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,choices:{'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
+ renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,choices:{'components.rayEmitter.initialDirection':Object.entries(rayEmitterConfig.directions).map(([value,entry])=>({value,label:entry.label})),'components.foldSwitch.initialState':[{value:0,label:'0 · 关闭出口'},{value:1,label:'1 · 开启出口'}],'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
  const locked=nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c));$('treeFields').disabled=locked;for(const id of ['moveNode','reparentNode','applyNodeConfig'])$(id).disabled=locked;const protectedNode=documentModel.world.transforms.childrenOf(node.transformId).length||documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>owner!=='entity:'+node.id);$('deleteNode').disabled=locked||!!protectedNode;$('deleteNode').title=protectedNode?'实体有子节点或外部引用，暂不能删除':'删除当前实体';
 }
 function treeAction(action){try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');commitTree(action());$('nodeEditStatus').textContent='已应用';}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}}

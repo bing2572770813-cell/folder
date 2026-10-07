@@ -1,0 +1,23 @@
+{
+ "version":2,"name":"机制验收地图","width":5,"height":5,
+ "legacyMetadata":{"name":"机制验收地图","spawn":{"r":2,"c":1,"dir":2},"exit":{"r":4,"c":4},"maxSteps":0},
+ "cellTags":{},
+ "transforms":[
+  {"id":"p","parentId":null,"local":{"r":2,"c":1,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"q","parentId":null,"local":{"r":2,"c":2,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"e","parentId":null,"local":{"r":3,"c":0,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"s","parentId":null,"local":{"r":0,"c":2,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"l","parentId":null,"local":{"r":2,"c":3,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"x","parentId":null,"local":{"r":4,"c":4,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}},
+  {"id":"f","parentId":null,"local":{"r":1,"c":2,"dir":0},"footprint":{"width":1,"height":1,"occupied":[true]}}
+ ],
+ "entities":[
+  {"id":"fragile","prefabId":"fragile_paper_ai","transformId":"p","components":{"surface":{"height":0.09,"color":"white"},"fragile":{}},"tags":{"spawn":true},"static":{"entityType":"terrain"}},
+  {"id":"paper","prefabId":"paper_ai","transformId":"q","components":{"surface":{"height":0.09,"color":"white"},"fold":{"directions":["v"]}},"tags":{},"static":{"entityType":"terrain"}},
+  {"id":"emitter","prefabId":"ray_emitter_ai","transformId":"e","components":{"surface":{"height":0.09,"color":"red"},"collision":{"blocked":true},"rayEmitter":{"initialDirection":"east"}},"tags":{},"static":{"entityType":"terrain","walkable":false}},
+  {"id":"switch","prefabId":"fold_switch_ai","transformId":"s","components":{"surface":{"height":0.09,"color":"green"},"collision":{"blocked":true},"fold":{"directions":["v"]},"foldSwitch":{"initialState":0}},"tags":{},"static":{"entityType":"terrain","walkable":false}},
+  {"id":"lift","prefabId":"lift_paper_ai","transformId":"l","components":{"surface":{"height":0.09,"color":"white"},"lift":{"minHeight":0.09,"maxHeight":0.75,"initialHeight":0.09,"turnsPerLeg":3}},"tags":{},"static":{"entityType":"terrain"}},
+  {"id":"exit","prefabId":"paper_ai","transformId":"x","components":{"surface":{"height":0.09,"color":"white"}},"tags":{},"static":{"entityType":"terrain"}},
+  {"id":"crease","prefabId":"void_ai","transformId":"f","components":{"fold":{"directions":["v"]}},"tags":{},"static":{}}
+ ]
+}

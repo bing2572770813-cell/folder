@@ -55,8 +55,8 @@ assets/prefab/                   # prefab 数据来源
 
 ```text
 磁盘 prefab → TS catalog → GET /api/prefabs → 前端目录与放置工具
-地图 v1/v2 → importTreeMap → TreeDocument / EntityWorld / TransformManager
-规范实体树 → tiles 兼容视图 → 现有 UI 与 Three.js 渲染
+v2 树地图 → importTreeMap → TreeDocument / EntityWorld / TransformManager
+规范实体树 → tiles 编辑投影 → 现有 UI 与 Three.js 渲染
 玩家动作 → player.cjs TurnManager → ComponentRegistry → 运行时与表现
 规范实体树 → serializeTreeMap → localStorage / JSON / 独立 HTML 导出
 ```
@@ -67,7 +67,7 @@ assets/prefab/                   # prefab 数据来源
 
 ### 地图、空间和配置
 
-- 导入接受 version:1 与 version:2；当前保存使用 version:2 的实体、Transform、固定格标签和元数据。
+- 导入和保存只接受 version:2 的实体、Transform、固定格标签和 metadata。
 - `TransformManager` 是空间坐标、父子引用与占格索引的唯一管理者。前端不得维护第二套空间树。
 - `EntityWorld` 管理实体配置及独立运行时。运行时、监听器和临时索引不写入地图或 prefab。
 - `TreeDocument` 是编辑器规范数据来源；`tiles` 是兼容视图。直接改投影而不更新实体树，会在重建或保存时丢失改动。
@@ -103,7 +103,7 @@ type CatalogResult = {
 - `ComponentRegistry.checkEntry` 只做组件校验与进入限制；实际到达使用 `dispatch` 提交返回的 actor/runtime/messages。
 - 回合顺序为 `validate → snapshot → leave → action → enter → settle → outcome → present → complete`。
 - 行走到区域出口以 `walk` 到达出口，再以 `teleport` 到达目标入口；属于同一回合，只推进一次周期和升降机制。
-- `turnsPerLeg` 控制升降每单程的回合数；旧 `durationMs` 导入为默认 3 回合并移除。等待与动画帧不推进升降。
+- `turnsPerLeg` 控制升降每单程的回合数；durationMs 直接拒绝，不参与回合计算。等待与动画帧不推进升降。
 - 无效行动不计回合；处理中或动画未完成时拒绝新行动。逻辑结算失败回滚快照，表现完成标识防止旧动画回调结束新回合。
 - 撤销恢复玩家、回合、揭示区域和实体运行时；重开与模式切换重置回合。
 
@@ -180,7 +180,7 @@ npm --prefix work start
 最低验收范围：
 
 1. API：目录结构、错误隔离、405、缓存头和静态路径边界保持一致。
-2. 数据：v1 导入、v2 往返、固定格区域、纸张拆分与叠加校验通过。
+2. 数据：v2 导入/保存往返、固定格区域、纸张拆分与叠加校验通过。
 3. 编辑：树选择、重挂载、删除、粘贴、撤销/重做和权限限制无回归。
 4. 游玩：行走与传送触发可区分，预览不执行到达效果，区域传送只结算一回合。
 5. 生命周期：忙碌输入拒绝、失败回滚、终局时序、撤销/重开和旧动画标识失效通过。

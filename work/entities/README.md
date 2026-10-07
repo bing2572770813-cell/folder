@@ -8,7 +8,7 @@ inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回�
 
 验证：node work/test-cell-entity.mjs。玩家状态机仍位于 work/player.cjs。
 
-升降组件必须属于单格纸张本体，不能作为独立叠加实体。同格最多一个纸张，因此最多一个升降控制来源。version:2 的 components 是升降配置的唯一来源，configuration.lift 只同步组件快照；删除组件时同时移除快照，导入不得从快照恢复已删除能力。version:1 的旧配置仍由兼容转换提升为组件。
+升降组件必须属于单格纸张本体，不能作为独立叠加实体。同格最多一个纸张，因此最多一个升降控制来源。version:2 的 components 是升降配置的唯一来源，configuration.lift 只同步组件快照；删除组件时同时移除快照，导入不得从快照恢复已删除能力。version:2 组件是唯一配置来源。
 
 批量钥匙改名由 tree-commands.renameTreeKeys 读取选中格中的全部 key 组件，包括独立叠加钥匙。只有地图中不再存在可收集的旧名钥匙时才更新出口引用；每个钥匙和出口拥有者均检查隐藏及属性权限，整次操作原子提交。
 
@@ -24,9 +24,9 @@ behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对�
 
 节点 JSON 编辑遵循 readable/tempEditable/serializable 权限：不可见字段保留，禁止改写只读字段，非持久字段不进入 canonical 地图。子树方向相加，不旋转坐标偏移。
 
-node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。
+node-permissions.mjs 双向合并 投影字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。网格高度/区域编辑保留非投影代表的组合组件。
 
-升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。旧地图的 `durationMs` 导入为默认 3 回合，保存时移除旧字段。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。默认不连接相邻纸面时，方块本体是厚度不变的独立网格，升降图案附着其上；显式开启连接后，升降高度变化会局部更新自身及相邻纸面的网格与边线。回合变化不重建整张地图或清除玩家选择。移动动画端点也读取平台当前高度。
+升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。`durationMs` 直接拒绝，不迁移为回合数。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。默认不连接相邻纸面时，方块本体是厚度不变的独立网格，升降图案附着其上；显式开启连接后，升降高度变化会局部更新自身及相邻纸面的网格与边线。回合变化不重建整张地图或清除玩家选择。移动动画端点也读取平台当前高度。
 
 placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType 与 BaseEntity 原子检查，地形清空占格后替换，道具保留支持实体并去除兼容 tile 的 surface。拒绝隐藏占格、多格覆盖和间接越界删除；区域固定格数据及标签/折线保留。旧 replaceTreePrefab/placeTreePrefab 仅供旧数据与受控树工具兼容。
 

@@ -2,13 +2,6 @@ import {legalKeyNames} from './keys.mjs';
 import {blocked} from '../entities/tile-model.mjs';
 export const DEFAULT_REGION='默认区域';
 export const regionOf=tile=>tile?.regionTag??DEFAULT_REGION;
-export function migrateRegions(map){
- const legacy=!map.tiles.flat().some(t=>t&&(t.regionTag!==undefined||t.tags!==undefined));
- for(const row of map.tiles)for(const tile of row)if(tile)tile.regionTag??=DEFAULT_REGION;
- const tagged=map.tiles.flat().some(t=>t?.tags?.spawn);
- if(!tagged&&legacy&&map.spawn&&map.tiles[map.spawn.r]?.[map.spawn.c])map.tiles[map.spawn.r][map.spawn.c].tags={...map.tiles[map.spawn.r][map.spawn.c].tags,spawn:true};
- return map;
-}
 export function regionNames(map,cellTags){
  const tags=cellTags??map.cellTags;
  if(tags===undefined)return [...new Set(map.tiles.flat().filter(Boolean).map(regionOf))].sort();

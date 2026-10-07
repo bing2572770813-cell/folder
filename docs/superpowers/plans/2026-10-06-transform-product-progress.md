@@ -9,7 +9,7 @@
 | FR-04、FR-07、FR-09 | 显式叠加开关；每个节点独立绘制 surface/terrain/tag 并带节点拾取 ID。纸张几何仍使用 paperSurface，渲染投影不保存新空间索引。 |
 | FR-08 | 受控 prefab 继承、数组替换、子 prefab 递归实例化；native components-only 定义可从磁盘目录/API 进入调色板并实际放置，不生成缺省 surface/collision；继承组件与 children 默认值均保留。 |
 | FR-10、FR-11 | player.cjs 统一编排 enter/leave/interact；交互按钮已接入，运行时快照、重启和无效起点组件预检有回归。 |
-| FR-12、FR-13 | v1 导入、v2 保存、完整子树与稀疏占格剪贴板、独立 ID、HTML 导出后 file:// 启动；双向权限桥接过滤 legacy/canonical 重复字段。 |
+| FR-12、FR-13 | v2 保存、完整子树与稀疏占格剪贴板、独立 ID、HTML 导出后 file:// 启动；投影/canonical 字段按权限过滤。 |
 
 局部 dir 沿父链叠加；当前旋转不旋转子节点坐标偏移或 footprint。JSON 编辑先验证 readable/tempEditable，保留不可见字段；serializable:false 的修改只保存在编辑调试覆盖中，不进入 canonical 地图、历史、剪贴板和导出，并在模式切换、新图与重启时清除。失败的覆盖、擦除和缩图先在候选文档校验，不新增历史记录。
 

@@ -1,4 +1,4 @@
-import {EntityWorld,TransformManager,importTreeMap,serializeTreeMap} from './tree-runtime.mjs';
+import {importTreeMap,serializeTreeMap} from './tree-runtime.mjs';
 import {validateMap} from '../core/map-model.mjs';
 import {normalizeTile,foldsAt} from './tile-model.mjs';
 
@@ -51,9 +51,7 @@ export class TreeDocument {
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
   }
   clone(){
-    const {width,height}=this.world.transforms;
-    const transforms=new TransformManager(width,height,this.world.transforms.serialize());
-    const world=new EntityWorld(transforms,this.world.serialize());
+    const world=this.world.clone();
     const candidate=Object.create(TreeDocument.prototype);
     candidate.world=world;candidate.metadata=copy(this.metadata);candidate.cellTags=copy(this.cellTags);
     return candidate;

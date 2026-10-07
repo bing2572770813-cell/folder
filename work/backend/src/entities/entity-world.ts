@@ -23,6 +23,13 @@ export class EntityWorld {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;
   }
+  clone():EntityWorld {
+    const result=new EntityWorld(this.transforms.clone());
+    result.entities=new Map([...this.entities].map(([id,node])=>[id,structuredClone(node)]));
+    result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
+    result.states=new Map([...this.states].map(([id,states])=>[id,new Map([...states].map(([component,state])=>[component,structuredClone(state)]))]));
+    return result;
+  }
   add(node:EntityNode):void {
     if(this.entities.has(node.id))throw new Error('Duplicate entity ID');
     const validated=this.validate(node);this.transforms.retain(node.transformId,'entity:'+node.id);this.entities.set(node.id,validated);

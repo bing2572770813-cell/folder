@@ -193,6 +193,29 @@ async function main() {
       await page.locator('#undoBtn').click();assert.notEqual(await page.evaluate(()=>window.foldField.getState().map.tiles[0][0]),null);
       await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');
       results.push({name:'fragile-departure-no-camera-shake-undo-restart',status:'pass',screenDrift:Math.max(...trace)-Math.min(...trace)});
+      for(const source of ['paper','lift']){
+        await page.locator('#editMode').click();
+        const entryMap=structuredClone(enemyMap);delete entryMap.entities[0].components.fragile;
+        entryMap.entities[1].components.fragile={};entryMap.metadata.name='易碎入格 '+source;
+        if(source==='lift')entryMap.entities[0].components.lift={minHeight:.7,maxHeight:1.7,initialHeight:.7,turnsPerLeg:1};
+        await page.locator('#mapFile').setInputFiles({name:'fragile-entry.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(entryMap))});
+        await page.waitForFunction(name=>window.foldField.getState().map.name===name,entryMap.metadata.name);
+        await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+        await page.evaluate(()=>new Promise(resolve=>{let frames=0;const settle=()=>{if(++frames===10)resolve();else requestAnimationFrame(settle);};requestAnimationFrame(settle);}));
+        const start=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(start.x,start.y);
+        await page.evaluate(()=>{window.__fragileCameraTrace=[];const sample=()=>{window.__fragileCameraTrace.push(window.foldField.screenPoint(6,6).y);if(window.__fragileCameraTrace.length<50)requestAnimationFrame(sample);};requestAnimationFrame(sample);});
+        const target=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(target.x,target.y);
+        await page.waitForFunction(()=>window.__fragileCameraTrace.length===50&&!window.foldField.getState().moving);
+        const samples=await page.evaluate(()=>window.__fragileCameraTrace),drift=Math.max(...samples)-Math.min(...samples);
+        fs.writeFileSync(path.join(directory,'fragile-entry-'+source+'-trace.json'),JSON.stringify(samples));
+        assert.ok(drift<1,'entering fragile paper from '+source+' must not shake camera: '+drift);
+        assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),1);
+        assert.notEqual(await page.evaluate(()=>window.foldField.getState().map.tiles[0][1]),null,'entry must not break fragile paper');
+        await capture('desktop-fragile-entry-'+source);
+        await page.locator('#undoBtn').click();assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),0);
+        await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');
+        results.push({name:'fragile-entry-'+source+'-no-camera-shake',status:'pass',screenDrift:drift});
+      }
       await closeContext('desktop');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());

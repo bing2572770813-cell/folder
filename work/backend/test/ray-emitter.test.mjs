@@ -8,7 +8,7 @@ import {defaultComponents} from '../dist/entities/components.js';
 import {validateTerrainStacking} from '../dist/entities/terrain-stacking.js';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction} from '../../special-terrain.mjs';
 
-function fixture(direction='east',origin={r:3,c:0}){
+function fixture(direction='east',origin={r:3,c:0},heightAt=()=>0){
  const map={width:7,height:7,tiles:Array.from({length:7},()=>Array.from({length:7},()=>({height:.09,regionTag:'A',tags:{}}))),spawn:{r:2,c:1,dir:2},exit:null,maxSteps:0};
  map.tiles[2][1].tags.spawn=true;
  const world=new EntityWorld(new TransformManager(7,7));
@@ -23,7 +23,7 @@ function fixture(direction='east',origin={r:3,c:0}){
   taggedCells:(_map,tag)=>map.tiles.flatMap((row,r)=>row.flatMap((tile,c)=>tile.tags[tag]?[{r,c,tile}]:[])),regionOf:tile=>tile.regionTag,
   foldsAt:()=>[],inFoldRange:()=>true,foldGroupAt:(...args)=>env.resolveFoldGroup?.(...args),getFoldAxes:()=>[],coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,
   record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer:noop,disposableClear:noop,overlay:noop,tileOutline:noop,
-  wx:c=>c,wz:r=>r,tileTop:()=>0,getSelectionRing:()=>ring,getPlayerGroup:()=>group,getEffectLayer:()=>group,invalidateAxes:noop};
+  wx:c=>c,wz:r=>r,tileTop:heightAt,getSelectionRing:()=>ring,getPlayerGroup:()=>group,getEffectLayer:()=>group,invalidateAxes:noop};
  controller=player.createPlayerController(env);controller.setMode('play');
  const move=(r,c)=>{controller.selectPlayer();const ok=controller.movePlayer(r,c);controller.tick(performance.now()+1000);return ok;};
  return {world,map,state,controller,move,add,env};
@@ -74,6 +74,19 @@ function birdFixture(){
  f.world.add({id:'bird',prefabId:'firebird_ai',transformId:'t-bird',components:{firebird:{direction:'east'},collision:{blocked:true}},tags:{},static:{entityType:'creature',walkable:false}});
  return f;
 }
+test('entering fragile paper keeps departure height even when the source lift advances',()=>{
+ let sourceHeight=.7;
+ const f=fixture('east',{r:3,c:0},(r,c)=>r===2&&c===1?sourceHeight:.7);f.world.remove('emitter');
+ f.add('source-lift',2,1,{lift:{minHeight:.7,maxHeight:1.7,initialHeight:.7,turnsPerLeg:1}});
+ f.add('destination-fragile',2,2,{fragile:{}});
+ f.env.getPlayerGroup().position.set(1,.718,2);
+ f.env.refreshLiftSurfaces=()=>{sourceHeight=f.world.runtime('source-lift','lift').height;};
+ f.controller.selectPlayer();assert.equal(f.controller.movePlayer(2,2),true);
+ assert.equal(sourceHeight,1.7);
+ f.controller.tick(f.state.animation.start+20);
+ assert.equal(f.state.animation.from.y,.718,'departed terrain must not drag the player animation or camera upward');
+ assert.deepEqual(f.world.runtime('destination-fragile','fragile'),{},'entering must not break the target');
+});
 test('fragile scene refresh cannot lower the departure animation or shake camera tracking',()=>{
  const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
  const position=new THREE.Vector3(1,.718,2);

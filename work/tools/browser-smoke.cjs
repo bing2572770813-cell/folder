@@ -171,6 +171,28 @@ async function main() {
       await page.locator('#undoBtn').click();
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);
       results.push({name:'creature-picker-firebird-placement-trigger-flames-and-undo',status:'pass'});
+      await page.locator('#editMode').click();
+      for(const node of enemyMap.entities)node.components.surface.height=.7;
+      enemyMap.entities[0].components.fragile={};enemyMap.metadata.name='易碎镜头验收';
+      await page.locator('#mapFile').setInputFiles({name:'fragile-camera.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(enemyMap))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='易碎镜头验收');
+      await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+      await page.evaluate(()=>new Promise(resolve=>{let frames=0;const settle=()=>{if(++frames===10)resolve();else requestAnimationFrame(settle);};requestAnimationFrame(settle);}));
+      const fragileStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(fragileStart.x,fragileStart.y);
+      await page.evaluate(()=>{
+        window.__fragileCameraTrace=[];
+        const sample=()=>{window.__fragileCameraTrace.push(window.foldField.screenPoint(6,6).y);if(window.__fragileCameraTrace.length<50)requestAnimationFrame(sample);};requestAnimationFrame(sample);
+      });
+      const fragileNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(fragileNext.x,fragileNext.y);
+      await page.waitForFunction(()=>window.__fragileCameraTrace.length===50&&!window.foldField.getState().moving);
+      const trace=await page.evaluate(()=>window.__fragileCameraTrace);
+      fs.writeFileSync(path.join(directory,'fragile-camera-trace.json'),JSON.stringify(trace));
+      assert.ok(Math.max(...trace)-Math.min(...trace)<1,'equal-height fragile departure must not shake the camera: '+(Math.max(...trace)-Math.min(...trace)));
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[0][0]),null);
+      await capture('desktop-fragile-camera-stable');
+      await page.locator('#undoBtn').click();assert.notEqual(await page.evaluate(()=>window.foldField.getState().map.tiles[0][0]),null);
+      await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');
+      results.push({name:'fragile-departure-no-camera-shake-undo-restart',status:'pass',screenDrift:Math.max(...trace)-Math.min(...trace)});
       await closeContext('desktop');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());

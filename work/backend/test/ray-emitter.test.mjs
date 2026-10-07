@@ -74,6 +74,18 @@ function birdFixture(){
  f.world.add({id:'bird',prefabId:'firebird_ai',transformId:'t-bird',components:{firebird:{direction:'east'},collision:{blocked:true}},tags:{},static:{entityType:'creature',walkable:false}});
  return f;
 }
+test('fragile scene refresh cannot lower the departure animation or shake camera tracking',()=>{
+ const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
+ const position=new THREE.Vector3(1,.718,2);
+ f.env.getPlayerGroup().position.copy(position);
+ f.env.refreshMechanismSurfaces=()=>{if(f.world.runtime('fragile','fragile').broken)f.map.tiles[2][1]=null;};
+ f.controller.selectPlayer();assert.equal(f.controller.movePlayer(2,2),true);
+ assert.equal(f.map.tiles[2][1],null);
+ assert.deepEqual(f.state.animation.from.toArray(),position.toArray(),'capture the rendered departure pose before destruction');
+ f.controller.tick(f.state.animation.start+20);
+ assert.deepEqual(f.state.animation.from.toArray(),position.toArray(),'animation frames must not resample a destroyed departure surface');
+ assert.equal(f.world.runtime('fragile','fragile').broken,true);
+});
 test('placed firebird activates once after arrival, with undo/restart restoring its runtime',()=>{
  const f=birdFixture(),before=f.controller.snapshot();
  assert.equal(f.controller.canMoveTo(4,4),false);

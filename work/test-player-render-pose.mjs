@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {Group} from 'three';
+const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8').match(/^function renderPlayer\(\) \{[^\r\n]+/m)[0];
+const playerGroup=new Group(),spawnMarkerGroup=new Group();
+playerGroup.position.set(1,.6,3);playerGroup.rotation.set(0,.4,0);
+const context={playerGroup,spawnMarkerGroup,renderer:{shadowMap:{}},playerVisual:{update:()=>{}},getPlayerPrefab:()=>({}),map:{spawn:{r:0,c:0,dir:0}},P:{player:{r:2,c:4,dir:2},animation:{}},wx:c=>c,wz:r=>r,tileTop:()=>.7};
+runInNewContext(source,context);context.renderPlayer();
+assert.deepEqual(playerGroup.position.toArray(),[1,.6,3],'scene refresh preserves the moving player pose');
+assert.equal(playerGroup.rotation.y,.4);
+context.P.animation=null;context.renderPlayer();
+assert.deepEqual(playerGroup.position.toArray(),[4,.718,2]);
+assert.equal(playerGroup.rotation.y,-Math.PI/2);
+console.log('PASS: scene refresh preserves active animation position/facing and renders the final pose afterward.');

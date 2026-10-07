@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 import {importTreeMap,serializeTreeMap} from '../dist/entities/tree-serialization.js';
-import {loadTree} from '../dist/entities/legacy-map.js';
+import {loadTree} from '../dist/entities/tree-map.js';
 
 const bundled = await build({
   stdin: {contents: "export {TreeDocument} from './entities/tree-document.mjs';export {moveNode,reparentNode,deleteNode,configureNode,placeTreePrefab,replaceTreePrefab,renameTreeKeys} from './entities/tree-commands.mjs';export {copyTree,pasteTree} from './entities/tree-clipboard.mjs';", resolveDir:fileURLToPath(new URL('../../',import.meta.url))},

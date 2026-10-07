@@ -2,7 +2,7 @@
 
 记录日期：2026-10-06。原代码基线：`editor` 分支 `e44caae`；纸张渲染章节及属性合同已按增量 `c6b51d8`、`446c875`、`84c158a` 更新。本文件描述已核实实现；当前已接入字段权限、entity/tag prefab、四 Tab、检视与模块化重构。后续修改机制时应同步更新本文件，并与对应功能一起提交。
 
-> 当前规则以 `docs/entity-transform-tree-product-design.md` 及本文的更新为准。下文 version:1 JSON 和旧实例字段是兼容格式示例，实际地图保存为 version:2 实体/Transform/固定格标签。旧开发方案仅用于追溯，不应作为新实现依据。
+> 当前规则以 `docs/entity-transform-tree-product-design.md` 及本文的更新为准。地图只使用 version:2 实体/Transform/固定格标签；旧地图格式不属于运行时或编辑器输入。
 
 ## 1. 项目定位与术语
 
@@ -273,8 +273,8 @@ ID 为 1–80 位字母、数字、下划线或连字符；name 为非空字符�
 | 文件 | 职责 |
 | --- | --- |
 | player.cjs | 所有玩家状态机与交互：选中、移动、朝向、折纸、测试传送、钥匙收集、区域推进、动画、结束、重启和游玩历史。 |
-| app.js | 场景与 DOM 适配、渲染、编辑工具、相机、地图导入导出；不可重新分散 player 状态机。 |
-| editor.html / ui/react / react-entry.jsx | 文档及样式外壳、React/Mantine 编辑器组件、挂载入口。 |
+| app.ts | 场景与 DOM 适配、渲染、编辑工具、相机、地图导入导出；不可重新分散 player 状态机。 |
+| editor.html / ui/react / react-entry.tsx | 文档及样式外壳、React/Mantine 编辑器组件、挂载入口。 |
 | tile-model.mjs | 格子/prefab 校验归一化、兼容字段、逐格折线操作。 |
 | render/crease-guides.mjs | 贴合静态折痕表面的点线交替虚线提示几何；保持棋盘原位，不随折叠旋转。 |
 | render/table-scene.mjs | 内联 Blender 桌游桌几何，桌面顶面对齐最低纸张底面。 |
@@ -317,7 +317,7 @@ npm --prefix work start
 
 ### React 前端迁移
 
-前端采用 React 19 / Mantine 9：结构拆为 JSX 组件，Tab、属性检视、动态实体及 checklist 由 React 管理。Three.js canvas、地图模型、批量事务及 player.cjs 的行为规则保持。app.js 仍提供固定 ID 的地图/场景适配，不再搬动 Tab 控件。HTML 外壳只保留样式和 React 宿主；构建服务端输出静态结构供检验，并内嵌全部 JS/CSS，独立游戏无需 CDN。用户的这一请求覆盖此前原生 UI 的架构决定。
+前端采用 React 19 / Mantine 9：结构拆为 JSX 组件，Tab、属性检视、动态实体及 checklist 由 React 管理。Three.js canvas、地图模型、批量事务及 player.cjs 的行为规则保持。app.ts 仍提供固定 ID 的地图/场景适配，不再搬动 Tab 控件。HTML 外壳只保留样式和 React 宿主；构建服务端输出静态结构供检验，并内嵌全部 JS/CSS，独立游戏无需 CDN。用户的这一请求覆盖此前原生 UI 的架构决定。
 
 ### 游玩属性与多格实体交互补充
 
@@ -401,3 +401,4 @@ Player Token 道具只渲染带眼睛的十二面体，不渲染旧配置中的�
 折叠启动性能：选中折痕后，在浏览器空闲时预计算固定/旋转网格，拖拽直接挂载已经准备好的对象。回弹后复用同一份网格；只缓存一组折叠结果。地图/图层重建时释放缓存，源几何、实例矩阵、折痕和作用区域变化时重新计算。准备阶段不改变地图、玩家、选区、回合或当前可见对象。折叠资格每实体读取一次，整侧三角面直接复制 typed array，仅跨轴三角面做插值裁切；可折叠格索引随场景重建刷新。
 
 性能复查命令：`node work/bench-fold-start.mjs`（7/31 格折痕，实际纸面几何的 CPU 准备与缓存启动耗时，包含实体读取次数，不代表 GPU 帧耗时）。浏览器 `#viewport` 的 `data-render.foldStart` 提供最近一次准备/启动毫秒数与缓存命中状态，供跨 agent 回归诊断。
+

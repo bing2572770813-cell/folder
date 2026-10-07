@@ -2,9 +2,9 @@
 
 实体数据、占格放置、显示分类与机制纯规则分别位于 tile-model.mjs、placement-model.mjs、visibility-model.mjs、mechanism-rules.mjs。根目录同名旧模块仅转发，保留已有测试和外部调用兼容；新代码使用本目录。机制规则仍由 player.cjs 协调，不在实体模块另建玩家状态机。
 
-cell-entity.mjs 将现有地图格读取为独立检视对象。VoidEntity 完全透明、blocked、placeable=false，具有坐标和虚空折线标记；toJSON 返回 null，兼容 version:1 的空格表示，折线仍由 map.foldCells 保存。
+cell-entity.mjs 将树文档的派生格读取为独立检视对象。VoidEntity 完全透明、blocked、placeable=false，具有坐标和虚空折线标记；toJSON 返回 null。
 
-inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回，不能通过检视对象反向修改地图。TreeDocument 保留唯一 canonical EntityWorld，旧格子仅为独立投影视图。tree-commands 提供受保护节点移动、重挂载、删除、组件配置和显式叠加；tree-clipboard 保存完整子树与稀疏占格，粘贴生成独立 ID，区域始终取目标格且不复制唯一起点/入口。行为与组件均通过受控注册表验证。
+inspectCell 先检查范围与隐藏状态，实体属性以独立副本返回，不能通过检视对象反向修改地图。TreeDocument 保留唯一 canonical EntityWorld，网格仅为独立投影视图。tree-commands 提供受保护节点移动、重挂载、删除、组件配置和显式叠加；tree-clipboard 保存完整子树与稀疏占格，粘贴生成独立 ID，区域始终取目标格且不复制唯一起点/入口。行为与组件均通过受控注册表验证。
 
 验证：node work/test-cell-entity.mjs。玩家状态机仍位于 work/player.cjs。
 
@@ -41,3 +41,4 @@ TreeDocument.serialize 直接从起点标签拥有者的实际占格派生唯一
 编辑器 commitTree 复用变化比较时的旧文档快照作为历史输入，不重复序列化；历史仍使用独立副本。提交过程中不提前刷新 UI，最终由场景更新刷新一次；无变化不写历史、不重建、不通知保存。
 
 放置验证复用一次实体快照完成组件、地形与标签检查；隐藏保护和删除目标通过 Transform 空间索引查找。EntityWorld/TransformManager 的克隆仅复用内部从不原地修改的记录，写入替换记录，外部 getter/序列化仍返回独立副本；引用集合及运行时状态保持独立，完整校验和原子提交规则不变。
+

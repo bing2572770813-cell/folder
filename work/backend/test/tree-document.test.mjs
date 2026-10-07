@@ -32,7 +32,7 @@ test('production persistence keeps the committed world and saves metadata withou
  const before=documentModel.serialize(),runtime=world.snapshotRuntime();
  map.name='新地图';map.spawn.dir=3;map.bestSteps=6;
  let notifications=0;
- const source=readFileSync(new URL('../../app.js',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../../app.ts',import.meta.url),'utf8');
  const persistSource=source.slice(source.indexOf('function notifyMapChanged()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
  const context={documentModel,map,console,gestureBefore:null,editRefresh:{request:()=>context.notifyMapChanged()},applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
  runInNewContext(persistSource,context);for(let i=0;i<20;i++)context.persist();
@@ -161,3 +161,4 @@ test('old lift duration maps are rejected without modifying input',()=>{
  const snapshotOnly=structuredClone(v2);snapshotOnly.entities[0].configuration.lift={minHeight:.09,maxHeight:1,initialHeight:.09,durationMs:1800};
  assert.throws(()=>new TreeDocument(snapshotOnly),/durationMs/);
 });
+

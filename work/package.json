@@ -13,6 +13,8 @@
     "check": "node tools/check.cjs",
     "check:tools": "node --test tools/test/*.test.cjs",
     "preview": "node tools/preview.cjs",
+    "experiment:cost": "node tools/cost-experiments.cjs",
+    "frontend:fast": "node tools/frontend-fast.cjs",
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "npm run backend:build && node server.cjs",

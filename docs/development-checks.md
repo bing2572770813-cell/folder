@@ -25,3 +25,15 @@ Run `npm --prefix work run preview` to compile the backend, rebuild editor/game 
 For unattended environment checks, run `npm --prefix work run preview -- --smoke`. It performs the same build and HTTP checks, records their timings, then closes the temporary server. Requests time out after five seconds; missing pages, invalid page types and empty or erroneous catalogs fail. This checks HTTP readiness only, not browser execution, rendering or interaction correctness.
 
 Do not run these commands concurrently in one checkout because HTML and compiled backend outputs are shared. Use separate worktrees for parallel development.
+
+## Cost Experiments
+
+Run `npm --prefix work run experiment:cost -- 3` to compare the existing frontend runner, isolated serial execution, two/four isolated test workers, and normal/incremental backend compilation. It builds first, records a separate warm-up for every variant, rotates sample order and reports median/min/max. Failed variants abort rather than being counted as savings. Full logs and `comparison.json` remain under `.dev-checks/experiment-*`.
+
+The parallel variant discovers root `test-*.mjs`, `test-*.cjs` and `verify-*.cjs` files, excluding the runner itself. A tool test compares that set against the existing runner. Test processes have isolated globals; the currently inspected filesystem-writing tests use unique temporary directories. New tests must preserve isolation before being run in parallel. Every test still runs; results are not cached.
+
+Use `npm --prefix work run frontend:fast -- 4` for optional faster frontend feedback after building. This is partial verification; default full checks remain unchanged. Try two workers if four increase contention on another machine.
+
+Three measured warm samples on this checkout gave frontend medians of 3566ms (existing serial), 3561ms (isolated serial), 1934ms (two workers), and 1379ms (four workers). Four workers reduced the test stage by about 61%; this excludes HTML build time and is not a reduction in total development time. Normal compilation was 236ms versus 148ms incremental, saving only 88ms. Incremental compilation is therefore experimental and does not replace the default compiler.
+
+Compiler experiments emit to independent directories and compare emitted JavaScript hashes. They measure unchanged-source rebuilds, not correctness after source edits or missing outputs. Machine load, source changes and dependency versions affect all timings; remeasure before relying on these numbers.

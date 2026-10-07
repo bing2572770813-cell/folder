@@ -61,3 +61,12 @@ test('player tokens render without their legacy slab, preserving support and vis
  assert.equal(renderTreeCells(document,{cellHidden:()=>true}).tokenCells.length,0);
  assert.ok(document.world.get('token').components.surface,'read-only render projection preserves legacy map data');
 });
+
+test('runtime item position changes marker projection without moving its saved transform',()=>{
+ const {document,add}=fixture();add('movable-key',{key:{name:'铜'},physics:{canDropOnFold:true}},{entityType:'item'});
+ const before=document.world.transforms.serialize();
+ document.world.setRuntimePosition('movable-key',{r:1,c:2,dir:0});
+ const projection=renderTreeCells(document);
+ assert.deepEqual(projection.terrainCells.filter(cell=>cell.nodeId==='movable-key').map(cell=>[cell.r,cell.c]),[[1,2]]);
+ assert.deepEqual(document.world.transforms.serialize(),before);
+});

@@ -16,6 +16,8 @@ const names = {
   height: "高度",
   thickness: "厚度",
   gradualRate: "过渡比例",
+  physics: "折叠属性",
+  followFold: "可跟随折叠",
   connected: "连接相邻纸面",
   surfaceConnected: "连接相邻纸面",
   blocked: "阻挡",

@@ -1,6 +1,5 @@
 import React from "react";
-import { UiButton, UiSection, UiRadio, UiIcon } from "./controls.jsx";
-import { Replace, Layers2 } from "lucide";
+import { UiButton, UiSection } from "./controls.jsx";
 
 export const MapTools = React.memo(function MapTools() {
   return (
@@ -9,13 +8,6 @@ export const MapTools = React.memo(function MapTools() {
         {"地图工具"}
         <small>{"TOOLS"}</small>
       </h2>
-      <fieldset className="placement-options">
-        <legend>放置方式</legend>
-        <UiRadio id="replacePlacement" name="placementMode" value="replace" defaultChecked
-          label={<span><UiIcon icon={Replace} />替换</span>} aria-label="替换放置" />
-        <UiRadio id="stackPlacement" name="placementMode" value="stack"
-          label={<span><UiIcon icon={Layers2} />叠加</span>} aria-label="叠加放置" />
-      </fieldset>
       <div className="tool-grid">
         <UiButton id="clearMap" className="tool-btn" data-tip="清空地图" aria-label="清空地图">
           <i data-lucide="trash-2" />
@@ -100,6 +92,24 @@ export const MapTools = React.memo(function MapTools() {
         >
           <i data-lucide="grid-2x2" />
           {"网格"}
+        </UiButton>
+        <UiButton
+          className="tool-btn wide"
+          id="tableToggle"
+          aria-pressed="true"
+          data-tip="显示或隐藏承载地图的桌游桌"
+        >
+          <i data-lucide="table-2" />
+          {"桌子"}
+        </UiButton>
+        <UiButton
+          className="tool-btn wide"
+          id="creaseDashToggle"
+          aria-pressed="true"
+          data-tip="显示或隐藏折痕处的点线交替虚线"
+        >
+          <i data-lucide="minus" />
+          {"折痕虚线"}
         </UiButton>
         <UiButton
           className="tool-btn"

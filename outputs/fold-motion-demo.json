@@ -1,0 +1,587 @@
+{
+  "version": 1,
+  "name": "物理折纸验证",
+  "description": "点击第4行的折痕，在玩家所在的第3行方格向上拖拽；目标变蓝时松开。",
+  "width": 7,
+  "height": 7,
+  "spawn": {
+    "r": 2,
+    "c": 3,
+    "dir": 0
+  },
+  "exit": null,
+  "foldCells": [],
+  "maxSteps": 0,
+  "bestSteps": null,
+  "tiles": [
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {
+          "spawn": true
+        }
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [
+          "h"
+        ],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ],
+    [
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      },
+      {
+        "prefabId": "paper_ai",
+        "color": "white",
+        "height": 0.09,
+        "thickness": 0.025,
+        "gradualRate": 0.6666666666666666,
+        "blocked": false,
+        "folds": [],
+        "regionTag": "测试区域",
+        "tags": {}
+      }
+    ]
+  ]
+}

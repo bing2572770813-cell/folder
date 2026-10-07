@@ -16,5 +16,6 @@ export class ReplaceCellBehavior {
   toJSON(){return copyJson(this.descriptor);}
 }
 // Script identity is resolved through code, never through JSON-provided import paths.
-const factories=new Map([['replace-cell',descriptor=>new ReplaceCellBehavior(descriptor)]]);
+// Placed player prefabs are passive tokens; only player.cjs creates the controlled runtime instance.
+const factories=new Map([['replace-cell',descriptor=>new ReplaceCellBehavior(descriptor)],['player-controller',descriptor=>new ReplaceCellBehavior(descriptor)]]);
 export function createEntityBehavior(value){const descriptor=normalizeBehavior(value),factory=factories.get(descriptor.scriptId);if(!factory)throw new Error('未注册的实体行为：'+descriptor.scriptId);return factory(descriptor);}

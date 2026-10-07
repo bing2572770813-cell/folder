@@ -5,12 +5,14 @@ export function nodePermissions(node,legacy={}){
  const components=schema.components??={},children=components.children??={};schema.components=components;
  const field=(component,key,definition)=>{const branch=children[component]??={},fields=branch.children??={};children[component]=branch;fields[key]=intersect(fields[key],definition);};
  for(const key of ['height','thickness','gradualRate','color','edgeColor'])if(schema[key])field('surface',key,schema[key]);
+ if(schema.followFold)field('physics','followFold',schema.followFold);
  if(schema.surfaceConnected)field('surface','connected',schema.surfaceConnected);
  for(const key of ['minHeight','maxHeight','initialHeight','turnsPerLeg'])if(schema[key])field('lift',key,schema[key]);
  if(schema.blocked)field('collision','blocked',schema.blocked);if(schema.folds)field('fold','directions',schema.folds);
  const terrain=node.configuration?.terrain;if(terrain&&schema.terrainConfig)children[terrain]=intersect(children[terrain],schema.terrainConfig);if(terrain==='key'&&schema.keyName)field('key','name',schema.keyName);
  const effective=(component,key)=>{const branch=children[component]??{};return intersect(intersect(components,branch),key?branch.children?.[key]:{});};
  for(const key of ['height','thickness','gradualRate','color','edgeColor'])schema[key]=intersect(schema[key],effective('surface',key));
+ schema.followFold=intersect(schema.followFold,effective('physics','followFold'));
  schema.surfaceConnected=intersect(schema.surfaceConnected,effective('surface','connected'));
  for(const key of ['minHeight','maxHeight','initialHeight','turnsPerLeg'])schema[key]=intersect(schema[key],effective('lift',key));
  schema.blocked=intersect(schema.blocked,effective('collision','blocked'));schema.folds=intersect(schema.folds,effective('fold','directions'));

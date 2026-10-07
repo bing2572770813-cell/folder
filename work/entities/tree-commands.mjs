@@ -2,7 +2,8 @@ import {TreeDocument} from './tree-document.mjs';
 import {importTreeMap,defaultComponents,validateTerrainStacking} from './tree-runtime.mjs';
 import {normalizeTile} from './tile-model.mjs';
 import {normalizeBaseEntity,createEntityBehavior} from './behaviors.mjs';
-import {placeEntity} from './placement-model.mjs';
+import {placeEntity,footprint} from './placement-model.mjs';
+import {entityCategory,isPlaceableEntity} from './entity-category.mjs';
 import {projectProperties,updateProperty,mergeSerializableProperties} from '../core/property-model.mjs';
 import {legalKeyNames} from '../tags/keys.mjs';
 
@@ -106,13 +107,13 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});
     // Legacy terrain/item prefabs include a paper surface; stacking reuses the destination paper.
-    if(record.tile?.terrain&&candidate.world.transforms.worldCells(transformId).some(cell=>candidate.world.at(cell.r,cell.c).some(other=>Object.hasOwn(other.components,'surface'))))delete node.components.surface;
+    if(options.item===true||(!options.replaceTerrain&&record.tile?.terrain&&candidate.world.transforms.worldCells(transformId).some(cell=>candidate.world.at(cell.r,cell.c).some(other=>Object.hasOwn(other.components,'surface')))))delete node.components.surface;
     check(candidate.world,[transformId],options.isHidden,options.nodeHidden);
     const bases=normalizeBaseEntity(record.BaseEntity);createEntityBehavior(record.behavior);
     for(const cell of candidate.world.transforms.worldCells(transformId)){
       const existing=candidate.world.at(cell.r,cell.c);
       if(existing.some(other=>options.nodeHidden?.(other)))throw new Error('不能覆盖隐藏实体');
-      if(bases&&!(existing.length?existing.some(other=>bases.includes(other.prefabId)):bases.includes('void_ai')))throw new Error('实体不允许放置在目标实体上');
+      if(!options.baseChecked&&bases&&!(existing.length?existing.some(other=>bases.includes(other.prefabId)):bases.includes('void_ai')))throw new Error('实体不允许放置在目标实体上');
       const key=cell.r+','+cell.c;candidate.cellTags[key]??={regionTag:normalized.regionTag??'默认区域'};
     }
     candidate.world.add(node);check(candidate.world,[transformId],options.isHidden,options.nodeHidden);
@@ -123,4 +124,41 @@ export function placeTreePrefab(document,prefab,tile,r,c,options={}){
     return node.id;
   }
   instantiate(prefab,tile,{r,c,dir:0});return validateTreeDocument(candidate);
+}
+
+/** Unified placement: terrain replaces its cell; items retain their required support. */
+export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
+ if(!isPlaceableEntity(prefab))throw new Error('生物由游玩模式自动生成，不能主动放置');
+ const category=entityCategory(prefab),cells=footprint(prefab,r,c),world=document.world;
+ if(cells.some(p=>p.r<0||p.c<0||p.r>=world.transforms.height||p.c>=world.transforms.width))throw new Error('实体实际占用格超出地图');
+ if(cells.some(p=>options.isHidden?.(p.r,p.c)))throw new Error('不能修改隐藏区域');
+ const targets=new Map(cells.flatMap(p=>world.at(p.r,p.c)).map(node=>[node.id,node]));
+ if([...targets.values()].some(node=>options.nodeHidden?.(node)))throw new Error('不能覆盖隐藏实体');
+ const bases=normalizeBaseEntity(prefab.BaseEntity);
+ if(bases?.length===0)throw new Error('实体没有合法 BaseEntity');
+ const ground=category==='terrain'&&bases?.includes('void_ai');
+ for(const cell of cells){
+  const existing=world.at(cell.r,cell.c).filter(node=>node.prefabId!=='void_ai');
+  if(category==='item'&&!existing.length)throw new Error('道具不能放置在虚空中');
+  if(!ground&&bases&&!existing.some(node=>bases.includes(node.prefabId)))throw new Error('放置条件不符：需要 '+bases.map(id=>options.resolve?.(id)?.name??id).join('、')+' 作为基底');
+ }
+ let candidate=forkTreeDocument(document),configuration=copy(tile);
+ if(category==='terrain'){
+  const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
+  const removed=world.serialize().filter(node=>ids.has(node.transformId));
+  check(world,[...ids],options.isHidden,options.nodeHidden);
+  for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
+  if(ids.size){
+   const area=new Set(cells.map(p=>p.r+','+p.c));
+   if([...ids].some(id=>world.transforms.worldCells(id).some(p=>!area.has(p.r+','+p.c))))throw new Error('不能间接覆盖放置区域外的实体');
+  }
+  // Cell-level region identity stays fixed; tags and crease markers survive replacement.
+  if(cells.length===1){const old=document.view().tiles[r][c];configuration.tags=copy(old?.tags??{});configuration.folds=[...new Set([...targets.values()].flatMap(node=>node.components.fold?.directions??[]))];}
+  if((configuration.tags?.spawn||configuration.tags?.entry)&&(configuration.blocked||configuration.terrain==='campfire'))throw new Error('不能用不可通行实体覆盖玩家起点或区域入口');
+  for(const node of removed)candidate.world.remove(node.id);
+  const deleteTransform=id=>{for(const child of candidate.world.transforms.childrenOf(id))if(ids.has(child))deleteTransform(child);candidate.world.transforms.remove(id);};
+  for(const id of ids)if(!ids.has(world.transforms.get(id).parentId))deleteTransform(id);
+ }
+ candidate=placeTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain'});
+ return candidate;
 }

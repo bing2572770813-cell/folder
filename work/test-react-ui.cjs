@@ -20,8 +20,8 @@ const esbuild = require("esbuild");
   const { parseHTML } = await import("linkedom");
   const { document } = parseHTML(module.exports.renderEditorMarkup());
   assert.ok(document.querySelector('#nodeConfiguration'));
-  assert.equal(document.querySelector('#stackPlacement').getAttribute('type'), 'radio');
-  assert.equal(document.querySelector('#replacePlacement').getAttribute('name'), 'placementMode');
+  assert.equal(document.querySelector('#stackPlacement'),null);
+  assert.equal(document.querySelector('#replacePlacement'),null);
   assert.equal(document.querySelector('#freeTeleportToggle').getAttribute('role'), 'switch');
   assert.equal(document.querySelector('#foldHintsToggle').getAttribute('role'), 'switch');
   assert.ok(document.querySelector('#playerKeyChoices'));
@@ -40,6 +40,8 @@ const esbuild = require("esbuild");
   assert.equal(nodeForm.querySelector('textarea'), null);
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
+  assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');
+  assert.equal(document.getElementById('tabPhysics').textContent,'物理属性');
   for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])
     assert.equal(document.getElementById(id).closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.ok(document.querySelector('#cellPropertyInspector'));
@@ -156,6 +158,13 @@ const esbuild = require("esbuild");
   ).document;
   assert.ok(multi.querySelector('[value="alpha"]').hasAttribute("checked"));
   assert.ok(!multi.querySelector('[value="beta"]').hasAttribute("checked"));
+  const typedItems=[{id:'paper_ai',name:'纸张',preview:'paper.png'},{id:'key_ai',name:'钥匙',preview:'key.png'},{id:'player_ai',name:'Player',preview:'player.png',static:{entityType:'creature',placeable:false}}];
+  const typed=parseHTML(module.exports.renderEntityOptionsMarkup(false,{items:typedItems,selected:'paper_ai'})).document;
+  assert.deepEqual([...typed.querySelectorAll('.icon-option-group-title')].map(el=>el.textContent),['地形','道具','生物']);
+  assert.ok(typed.querySelector('[aria-label="Player"]').hasAttribute('disabled'));
+  const typedMulti=parseHTML(module.exports.renderEntityOptionsMarkup(true,{items:typedItems,hidden:new Set(['key_ai'])})).document;
+  assert.equal(typedMulti.querySelectorAll('.icon-option-group-title').length,3);
+  assert.ok(!typedMulti.querySelector('[value="key_ai"]').hasAttribute('checked'));
   console.log(
     "PASS: React/Mantine shell, unique IDs, mounted panels, ARIA linkage, tool placement, mixed fields and property permissions.",
   );

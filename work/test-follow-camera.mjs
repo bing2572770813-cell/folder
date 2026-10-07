@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {OrthographicCamera,Vector3} from 'three';
-import {squareViewSpan,followTarget,regionFocusTarget,regionFocusPhase} from './render/follow-camera.mjs';
+import {squareViewSpan,followTarget} from './render/follow-camera.mjs';
 for(const aspect of [.5,1,2])for(const offset of [new Vector3(0,24,.001),new Vector3(12,17.04,15)]){
   const camera=new OrthographicCamera(-1,1,1,-1,.1,1200),controls={target:new Vector3()},target=new Vector3(7,3,-5);
   followTarget(camera,controls,target,offset);const span=squareViewSpan(camera,target,9,aspect);
@@ -15,17 +15,8 @@ assert.deepEqual(boundedFollowTarget(new Vector3(0,1,0),14,10).toArray(),[0,1,0]
 assert.deepEqual(boundedFollowTarget(new Vector3(2,1,-2),5,5).toArray(),[0,1,0]);
 assert.deepEqual(boundedFollowTarget(new Vector3(6,1,4),14,10,4.5).toArray(),[4.75,1,2.75]);
 console.log('PASS: boundary clamping, small-map centering and zoom-aware follow limits.');
-const focus=regionFocusTarget([{r:2,c:4},{r:4,c:2}],cell=>new Vector3(cell.c,cell.r*.5,cell.r));
-assert.deepEqual(focus.toArray(),[3,1.5,3]);
-assert.equal(regionFocusTarget([],()=>new Vector3()),null);
-assert.deepEqual(regionFocusPhase(100,100),{phase:'focus',progress:0});
-assert.equal(regionFocusPhase(100,340).phase,'hold');
-assert.equal(regionFocusPhase(100,1339).phase,'hold');
-assert.deepEqual(regionFocusPhase(100,1340),{phase:'return',progress:0});
-assert.equal(regionFocusPhase(100,1660),null);
-console.log('PASS: region camera focus centers revealed cells, holds for one second and returns smoothly.');
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
 const appSource=readFileSync(new URL('./app.js',import.meta.url),'utf8');const tickSource=appSource.slice(appSource.indexOf('function tick(now)'),appSource.indexOf('\nresetRegions();',appSource.indexOf('function tick(now)')));
-let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,updateRegionFocus:()=>false,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
+let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
 runInNewContext(tickSource,context);context.tick(0);assert.equal(corrections,0,'idle player must not undo manual pan');position.x=2;context.tick(1);assert.equal(corrections,1,'movement corrects camera');context.manualPan=true;context.P.moving=true;context.tick(2);assert.equal(corrections,1,'active right drag is respected');context.manualPan=false;context.tick(3);assert.equal(corrections,2,'correction resumes after pan');
 console.log('PASS: production camera loop preserves idle pan and corrects after movement.');

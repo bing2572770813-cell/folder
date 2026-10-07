@@ -20,20 +20,3 @@ export function boundedFollowTarget(position,width,height,size=9){
   const xLimit=Math.max(0,(width-size)/2),zLimit=Math.max(0,(height-size)/2);
   return new Vector3(Math.max(-xLimit,Math.min(xLimit,position.x))||0,position.y,Math.max(-zLimit,Math.min(zLimit,position.z))||0);
 }
-
-export function regionFocusTarget(cells,positionForCell){
-  if(!cells.length)return null;
-  const target=new Vector3();
-  for(const cell of cells)target.add(positionForCell(cell));
-  return target.multiplyScalar(1/cells.length);
-}
-
-export function regionFocusPhase(start,now,{focusMs=240,holdMs=1000,returnMs=320}={}){
-  const elapsed=Math.max(0,now-start);
-  if(elapsed<focusMs)return {phase:'focus',progress:smooth(elapsed/focusMs)};
-  if(elapsed<focusMs+holdMs)return {phase:'hold',progress:1};
-  if(elapsed<focusMs+holdMs+returnMs)return {phase:'return',progress:smooth((elapsed-focusMs-holdMs)/returnMs)};
-  return null;
-}
-
-function smooth(value){const t=Math.max(0,Math.min(1,value));return t*t*(3-2*t);}

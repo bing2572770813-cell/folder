@@ -6,7 +6,7 @@ import sys
 import tempfile
 import bpy
 import bmesh
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 ROOT = Path(__file__).resolve().parents[3]
 ART = ROOT / "assets/raw_design/artworks"
@@ -72,11 +72,11 @@ ice_light = material("ice_cyan", "#9de8f5")
 ice_blue = material("ice_blue", "#48a9d5")
 ice_shadow = material("ice_shadow", "#24658f")
 ice_deep = material("ice_deep", "#17486f")
-eye = material("serpent_eyes", "#122131", roughness=0.3)
+eye = material("serpent_eyes", "#071018", roughness=0.3)
 mouth = material("mouth_shadow", "#143348", roughness=0.6)
 fang = material("fangs", "#f4ffff", roughness=0.5)
-fx_shell = material("frost_breath_shell", "#a8f1ff", alpha=0.18, emission="#54dfff", emission_strength=1.5)
-fx_core = material("frost_breath_core", "#d8fbff", alpha=0.3, emission="#8defff", emission_strength=2.2)
+fx_shell = material("frost_breath_shell", "#a8f1ff", alpha=0.10, emission="#54dfff", emission_strength=1.5)
+fx_core = material("frost_breath_core", "#d8fbff", alpha=0.18, emission="#8defff", emission_strength=2.2)
 fx_crystal = material("frost_crystal_glow", "#7ee6ff", alpha=0.78, emission="#48cfff", emission_strength=1.7)
 fx_ring = material("frost_rings", "#c9f8ff", alpha=0.42, emission="#5fe4ff", emission_strength=2.0)
 grid_tile = material("grid_tile", "#e6e1d3", roughness=0.96)
@@ -220,31 +220,101 @@ def orient_to(obj, direction):
 
 
 base_points = [
-    (0.82, 0.30, 0.17), (0.87, 0.06, 0.16), (0.74, -0.20, 0.16), (0.46, -0.36, 0.16),
-    (0.10, -0.42, 0.16), (-0.28, -0.36, 0.17), (-0.58, -0.17, 0.18), (-0.66, 0.09, 0.18),
-    (-0.54, 0.34, 0.18), (-0.28, 0.48, 0.18), (0.04, 0.47, 0.18), (0.31, 0.32, 0.18),
-    (0.39, 0.08, 0.19), (0.29, -0.12, 0.20), (0.06, -0.18, 0.22), (-0.15, -0.09, 0.24),
-    (-0.24, 0.08, 0.26), (-0.14, 0.24, 0.28), (0.06, 0.27, 0.30)
+    (0.06, 0.27, 0.29), (0.06, 0.08, 0.25), (-0.16, -0.12, 0.22), (-0.48, -0.22, 0.20),
+    (-0.75, -0.08, 0.18), (-0.82, 0.17, 0.17), (-0.70, 0.38, 0.17), (-0.42, 0.49, 0.18),
+    (-0.08, 0.48, 0.19), (0.22, 0.36, 0.20), (0.38, 0.16, 0.21), (0.31, -0.06, 0.22),
+    (0.08, -0.20, 0.22), (-0.18, -0.17, 0.22), (-0.34, 0.00, 0.22), (-0.25, 0.19, 0.23),
+    (-0.05, 0.27, 0.24), (0.21, 0.28, 0.24), (0.40, 0.38, 0.25)
 ]
-base_radii = [0.055, 0.075, 0.115, 0.155, 0.18, 0.18, 0.17, 0.165, 0.16, 0.155, 0.15, 0.145, 0.14, 0.135, 0.13, 0.125, 0.12, 0.115, 0.11]
+base_radii = [0.115, 0.135, 0.16, 0.18, 0.19, 0.19, 0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.125, 0.12, 0.115, 0.11, 0.105, 0.10, 0.095]
 tube("coiled_serpent_body", base_points, base_radii, [ice, ice_light, ice_blue, ice_shadow, ice_deep], model_collection, 9)
 
-neck_points = [(0.06, 0.27, 0.29), (0.08, 0.22, 0.40), (0.08, 0.15, 0.58), (0.06, 0.08, 0.77), (0.01, 0.00, 0.96), (-0.07, -0.07, 1.12)]
-neck_radii = [0.115, 0.13, 0.135, 0.13, 0.12, 0.105]
+tail_points = [
+    (0.40, 0.42, 0.25), (0.54, 0.44, 0.32), (0.74, 0.44, 0.50), (0.88, 0.44, 0.75),
+    (0.87, 0.44, 1.00), (0.75, 0.44, 1.16), (0.56, 0.44, 1.19), (0.40, 0.44, 1.04),
+    (0.36, 0.44, 0.82), (0.45, 0.44, 0.66), (0.60, 0.44, 0.66), (0.70, 0.44, 0.78),
+    (0.69, 0.44, 0.93), (0.59, 0.44, 1.04), (0.49, 0.44, 1.00), (0.47, 0.44, 0.87),
+    (0.56, 0.44, 0.79), (0.65, 0.44, 0.84), (0.63, 0.44, 0.93), (0.57, 0.44, 0.96)
+]
+tail_radii = [0.14, 0.125, 0.11, 0.095, 0.08, 0.068, 0.058, 0.05, 0.043, 0.037, 0.032, 0.027, 0.022, 0.018, 0.014, 0.011, 0.008, 0.005, 0.003, 0.001]
+tail_mesh = tube("raised_spiral_tail", tail_points, tail_radii, [ice, ice_light, ice_blue, ice_shadow, ice_deep], model_collection, 8)
+tail_direction = Vector(tail_points[-1]) - Vector(tail_points[-2])
+oriented_cone("sharp_spiral_tail_tip", Vector(tail_points[-1]) + tail_direction.normalized() * 0.015, tail_direction, 0.021, 0.075, ice_light, model_collection, 5, 0.0)
+
+neck_points = [(0.06, 0.27, 0.29), (0.02, 0.18, 0.40), (0.01, 0.10, 0.62), (-0.02, 0.02, 0.82), (-0.12, -0.02, 1.02), (-0.24, -0.06, 1.17)]
+neck_radii = [0.12, 0.135, 0.14, 0.135, 0.12, 0.105]
 tube("raised_serpent_neck", neck_points, neck_radii, [ice_light, ice, ice_blue, ice_shadow, ice_deep], model_collection, 8)
 
-head_center = Vector((-0.20, -0.12, 1.22))
-head_forward = Vector((-0.94, -0.34, 0.04)).normalized()
+head_center = Vector((-0.28, -0.12, 1.27))
+head_forward = Vector((-0.88, -0.31, -0.16)).normalized()
 head_side = Vector((-head_forward.y, head_forward.x, 0.0)).normalized()
-ico("faceted_serpent_head", head_center, (0.28, 0.22, 0.24), ice, model_collection, 1)
-wedge("angular_upper_snout", head_center + head_forward * 0.11 + Vector((0.0, 0.0, 0.015)), head_forward, 0.19, 0.135, 0.15, 0.105, 0.32, [ice_light, ice, ice_blue], model_collection)
-wedge("open_lower_jaw", head_center + head_forward * 0.12 + Vector((0.0, 0.0, -0.115)), head_forward, 0.13, 0.095, 0.045, 0.028, 0.25, [mouth, ice_shadow, ice_deep], model_collection)
+
+def faceted_head(name, center, forward, side):
+    vertical = Vector((0.0, 0.0, 1.0))
+    side_axis = Vector((-forward.y, forward.x, 0.0)).normalized()
+    up_axis = forward.cross(side_axis).normalized()
+    sections = [(-0.18, 0.12, 0.10, -0.08), (-0.02, 0.16, 0.14, -0.105), (0.14, 0.105, 0.08, -0.065), (0.28, 0.048, 0.022, -0.022), (0.43, 0.006, 0.004, -0.004)]
+    vertices = []
+    for distance, width, top, bottom in sections:
+        point = Vector((0.0, distance, 0.0))
+        vertices.extend([
+            point + Vector((0.0, 0.0, top)),
+            point + Vector((width * 0.82, 0.0, top * 0.62)),
+            point + Vector((width, 0.0, bottom * 0.42)),
+            point + Vector((0.0, 0.0, bottom)),
+        ])
+    faces = []
+    indices = []
+    for ring in range(len(sections) - 1):
+        first = ring * 4
+        next_ring = (ring + 1) * 4
+        for index in range(3):
+            next_index = index + 1
+            faces.append((first + index, first + next_index, next_ring + next_index, next_ring + index))
+            indices.append([0, 1, 2][index])
+    last = (len(sections) - 1) * 4
+    faces.extend([(0, 1, 2, 3), (last, last + 3, last + 2, last + 1)])
+    indices.extend([0, 1])
+    data = bpy.data.meshes.new(name + "_mesh_ai")
+    data.from_pydata(vertices, [], faces)
+    data.update()
+    obj = bpy.data.objects.new(name + "_ai", data)
+    model_collection.objects.link(obj)
+    for surface in (ice, ice_light, ice_blue, ice_shadow):
+        data.materials.append(surface)
+    for polygon, index in zip(data.polygons, indices):
+        polygon.material_index = index
+    editable = bmesh.new()
+    editable.from_mesh(data)
+    bmesh.ops.remove_doubles(editable, verts=list(editable.verts), dist=0.000001)
+    bmesh.ops.recalc_face_normals(editable, faces=list(editable.faces))
+    editable.to_mesh(data)
+    editable.free()
+    for polygon in data.polygons:
+        polygon.use_smooth = False
+    basis = Matrix(((side_axis.x, forward.x, up_axis.x), (side_axis.y, forward.y, up_axis.y), (side_axis.z, forward.z, up_axis.z)))
+    obj.location = center
+    obj.rotation_mode = "QUATERNION"
+    obj.rotation_quaternion = basis.to_quaternion()
+    mirror = obj.modifiers.new("Mirror head symmetry", "MIRROR")
+    mirror.use_axis[0] = True
+    mirror.use_clip = True
+    mirror.use_mirror_merge = True
+    mirror.merge_threshold = 0.0001
+    obj["symmetry"] = "Mirror modifier across local X head centerline"
+    return obj
+
+faceted_head("faceted_serpent_head", head_center, head_forward, head_side)
+wedge("sharp_upper_snout", head_center + head_forward * 0.31 + Vector((0.0, 0.0, 0.005)), head_forward, 0.07, 0.008, 0.045, 0.006, 0.31, [ice_light, ice, ice_blue], model_collection)
+wedge("open_lower_jaw", head_center + head_forward * 0.23 + Vector((0.0, 0.0, -0.12)), head_forward, 0.12, 0.028, 0.042, 0.012, 0.27, [mouth, ice_shadow, ice_deep], model_collection)
 
 for side_sign in (-1, 1):
-    eye_position = head_center + head_forward * 0.12 + head_side * side_sign * 0.145 + Vector((0.0, 0.0, 0.10))
-    ico("serpent_eye_" + ("left" if side_sign < 0 else "right"), eye_position, (0.032, 0.018, 0.045), eye, model_collection, 1)
-    fang_position = head_center + head_forward * 0.24 + head_side * side_sign * 0.075 + Vector((0.0, 0.0, -0.105))
-    oriented_cone("serpent_fang_" + ("left" if side_sign < 0 else "right"), fang_position + Vector((0.0, 0.0, -0.065)), (0.0, 0.0, 1.0), 0.034, 0.15, fang, model_collection, 5, 0.0)
+    eye_center = head_center + head_forward * 0.06 + head_side * side_sign * 0.145 + Vector((0.0, 0.0, 0.085))
+    eye_mesh = ico("serpent_eye_" + ("left" if side_sign < 0 else "right"), eye_center, (0.042, 0.018, 0.024), eye, model_collection, 1)
+    eye_mesh.rotation_mode = "QUATERNION"
+    eye_mesh.rotation_quaternion = Vector((0.0, 0.0, 1.0)).rotation_difference(head_side * side_sign)
+    fang_position = head_center + head_forward * 0.35 + head_side * side_sign * 0.045 + Vector((0.0, 0.0, -0.035))
+    oriented_cone("serpent_fang_" + ("left" if side_sign < 0 else "right"), fang_position, (0.0, 0.0, -1.0), 0.032, 0.17, fang, model_collection, 5, 0.0)
 
 for index, (position, scale, rotation) in enumerate([
     ((-0.03, 0.14, 0.54), (0.055, 0.035, 0.17), (0.2, -0.4, 0.0)),
@@ -282,7 +352,7 @@ fx_root["skill_name"] = "Frost Breath"
 fx_root["skill_name_zh"] = "冰霜吐息"
 fx_root["effect_type"] = "cone_beam_crystals"
 fx_root["grid_scaled"] = True
-breath_origin = head_center + head_forward * 0.29 + Vector((0.0, 0.0, -0.02))
+breath_origin = head_center + head_forward * 0.52 + Vector((0.0, 0.0, -0.02))
 breath_direction = Vector((-0.88, -0.45, 0.03)).normalized()
 breath_end = breath_origin + breath_direction * 1.02
 oriented_cone("frost_breath_outer_cone", breath_origin + breath_direction * 0.51, breath_direction, 0.075, 1.02, fx_shell, fx_collection, 8, 0.29)
@@ -374,8 +444,8 @@ camera = bpy.data.objects.new("frost_serpent_camera", camera_data)
 studio_collection.objects.link(camera)
 camera.data.type = "ORTHO"
 camera.data.ortho_scale = 2.85
-camera.location = (2.65, -4.6, 2.55)
-point_at(camera, (-0.02, -0.02, 0.68))
+camera.location = (-3.25, -4.8, 2.45)
+point_at(camera, (-0.02, -0.02, 0.70))
 scene.camera = camera
 scene.render.filepath = str(PREVIEW)
 scene.render.film_transparent = False

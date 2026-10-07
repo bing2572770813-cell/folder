@@ -6,14 +6,14 @@
   "footprint": "2x2 cells",
   "modelBounds": {
     "min": [
-      -0.82449,
-      -0.6,
-      -0.01725
+      -1.00889,
+      -0.39959,
+      -0.01707
     ],
     "max": [
-      0.94406,
-      0.63125,
-      1.46
+      0.96494,
+      0.65783,
+      1.37011
     ]
   },
   "skillEffect": "FX_ICE_BREATH / Frost Breath / animated pulse frames 1-24",

@@ -66,7 +66,7 @@ const DEFAULT_TRIGGER_CHOICES=[{value:'walk',label:'行走触发'},{value:'telep
 function TriggerChoices({value,path,access,definition,onChange,onError}) {
   const [draft,setDraft]=useState(value);
   useEffect(()=>setDraft(value),[JSON.stringify(value)]);
-  const title=definition.label||names[path.at(-1)]||path.at(-1),prefix=names[path[1]]?names[path[1]]+' · ':'';
+  const title=definition.label||names[path.at(-1)]||path.at(-1),prefix=path[0]==='mechanism'?'':(names[path[1]]?names[path[1]]+' · ':'');
   return <div className="inspector-list">
     <span>{title}</span>
     {DEFAULT_TRIGGER_CHOICES.map(choice=><UiCheckbox key={choice.value} aria-label={`${prefix}${title} · ${choice.label}`} checked={draft.includes(choice.value)} disabled={!access.tempEditable} onChange={event=>{

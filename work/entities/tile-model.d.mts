@@ -24,7 +24,7 @@ export function tileHeight(tile: Tile | null | undefined): number;
 export function tileThickness(tile: Tile | null | undefined): number;
 export function tileGradualRate(tile: Tile | null | undefined): number;
 export function normalizeTile(tile: Tile): Tile;
-export function normalizePrefab(data: unknown): unknown;
+export function normalizePrefab(data: unknown): Prefab;
 export function columnLabel(column: number): string;
 export function lineCells(map: { width: number; height: number }, row: number, column: number, type: string): Array<{ r: number; c: number }>;
 export function normalizeFoldCells(data: unknown, width: number, height: number): Array<{ r: number; c: number; type: string }>;

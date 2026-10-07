@@ -535,10 +535,17 @@ function refreshFoldTarget(motion){
     $("teleportBtn").disabled = true;
     env.syncFoldState?.();
   }
+function maxFoldAngle(){
+    const value=env.getLighting?.()?.foldMaxAngle??179;
+    return Math.max(0,Math.min(180,Number.isFinite(value)?value:179))*Math.PI/180;
+  }
 function updateFoldMotion(now){
     const motion=P.foldMotion;
     if(!motion||motion.phase!=='drag')return;
     const maxSpeed=env.getLighting?.()?.foldMaxSpeed??Math.PI*2;
+    const previousAngle=motion.angle,limit=maxFoldAngle();
+    motion.dragAngle=Math.min(motion.dragAngle,limit);
+    motion.angle=Math.min(motion.angle,limit);
     const last=motion.lastTick??now;
     let dt=(now-last)/1000;
     if(!(dt>0))dt=1/60;
@@ -546,8 +553,8 @@ function updateFoldMotion(now){
     motion.lastTick=now;
     const diff=motion.dragAngle-motion.angle;
     const step=Math.sign(diff)*Math.min(Math.abs(diff),maxSpeed*dt);
-    if(step){
-      motion.angle+=step;
+    motion.angle+=step;
+    if(motion.angle!==previousAngle){
       env.foldView.setAngle(motion.angle*motion.sign);
     }
     refreshFoldTarget(motion);
@@ -561,7 +568,7 @@ function updateFoldDrag(clientY, dragSpan = 240) {
     motion.dragAngle = Math.max(
       0,
       Math.min(
-        Math.PI,
+        maxFoldAngle(),
         ((motion.startY - clientY) / Math.max(1, dragSpan)) * Math.PI,
       ),
     );

@@ -7,6 +7,7 @@ import {blocked,foldsAt} from './entities/tile-model.mjs';
 import {validateRegions,taggedCells,regionOf} from './tags/regions.mjs';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction,validateTerrains} from './entities/mechanism-rules.mjs';
 import {paperSurface} from './render/paper-surface.mjs';
+import {lightingDefaults,validateLighting} from './render/lighting.mjs';
 
 function fixture(type='h'){
  const map={width:7,height:7,spawn:{r:2,c:3,dir:0},tiles:Array.from({length:7},()=>Array.from({length:7},()=>({prefabId:'paper_ai',height:.09,thickness:.025,color:'white',folds:[],tags:{},regionTag:'A'}))),foldCells:[],maxSteps:0,bestSteps:null,exit:null};
@@ -28,6 +29,23 @@ function fixture(type='h'){
 // The rendered angle eases toward the pointer under a bounded angular speed,
 // so tests advance the clock instead of expecting an instantaneous pose.
 const settle=(f,seconds=1)=>{const start=performance.now();for(let elapsed=0;elapsed<=seconds*1000;elapsed+=16)f.controller.tick(start+elapsed);};
+assert.equal(lightingDefaults.foldMaxAngle,179);
+for(const invalid of [-1,181,NaN])assert.throws(()=>validateLighting({...lightingDefaults,foldMaxAngle:invalid}),/折叠最大旋转角/);
+for(const type of ['h','v','d1','d2'])for(const degrees of [0,45,179,180]){
+ const f=fixture(type),settings={...lightingDefaults,foldMaxAngle:degrees};
+ f.env.getLighting=()=>settings;
+ assert.equal(f.controller.beginFoldDrag(f.P.player.r,f.P.player.c,300),true);
+ f.controller.updateFoldDrag(-1000,240);settle(f);
+ assert.ok(Math.abs(f.P.foldMotion.angle-degrees*Math.PI/180)<1e-9,'rendered angle respects the configured limit');
+ assert.ok(Math.abs(f.P.foldMotion.dragAngle-degrees*Math.PI/180)<1e-9,'pointer target respects the configured limit');
+ settings.foldMaxAngle=0;f.controller.tick(performance.now()+2000);
+ assert.equal(f.P.foldMotion.angle,0,'lowering the limit updates an ongoing fold');
+ assert.equal(f.P.foldMotion.dragAngle,0);
+ f.controller.cancelFoldMotion();
+}
+const defaultAngle=fixture();defaultAngle.controller.beginFoldDrag(2,3,300);defaultAngle.controller.updateFoldDrag(-1000);settle(defaultAngle);
+assert.ok(Math.abs(defaultAngle.P.foldMotion.angle-179*Math.PI/180)<1e-9,'missing settings use the 179 degree default');defaultAngle.controller.cancelFoldMotion();
+console.log('PASS: fold angle limits support 0–180 degrees, default to 179 and update during dragging.');
 for(const type of ['h','v','d1','d2']){
  const f=fixture(type),before=JSON.stringify(f.map),source={...f.P.player};
  assert.deepEqual(f.selectionChanges.at(-1),{r:3,c:3,type},'selection notifies rendering immediately');

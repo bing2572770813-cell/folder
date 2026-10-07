@@ -42,6 +42,11 @@ const esbuild = require("esbuild");
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');
   assert.equal(document.getElementById('tabPhysics').textContent,'物理属性');
+  const angleInput=document.getElementById('lighting-foldMaxAngle');
+  assert.equal(angleInput.closest('[role="tabpanel"]').id,'panelPhysics');
+  assert.equal(angleInput.getAttribute('min'),'0');
+  assert.equal(angleInput.getAttribute('max'),'180');
+  assert.equal(angleInput.getAttribute('value'),'179');
   for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])
     assert.equal(document.getElementById(id).closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.ok(document.querySelector('#cellPropertyInspector'));

@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Composition boundary: app.ts wires the typed entry point to focused domain modules.
+// Narrowing this file is a later migration step; do not add new domain rules here.
+
 import {nodeFollowsFold,nodeCanDropOnFold} from './entities/fold-properties.mjs';
 import {renderTreeNodes,renderTreeParents} from './ui/react/TreeInspector.jsx';
 import {renderTestModifiers} from './ui/react/PlayPanel.jsx';
@@ -5,7 +9,7 @@ import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mj
 import {nodePermissions} from './entities/node-permissions.mjs';
 import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
-import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,placeCategorizedPrefab,configureNode,forkTreeDocument,renameTreeKeys} from './entities/tree-commands.mjs';
+import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,placeCategorizedPrefab,configureNode,forkTreeDocument,renameTreeKeys,validateTreeDocument} from './entities/tree-commands.mjs';
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
@@ -37,7 +41,7 @@ import playerRuntime from './player.cjs';
 import * as THREE from 'three';
 import { normalizeTile, normalizePrefab, hasColor, foldsOf, blocked, tileHeight, tileThickness, tileGradualRate, columnLabel, applyFoldLine, foldsAt, normalizeFoldCells } from './entities/tile-model.mjs';
 import { uniqueFoldAxes, foldGroupAt, inFoldRange, axisKey } from './tags/fold-geometry.mjs';
-import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
+import {regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
 import {footprint,removeEntity} from './entities/placement-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
 import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
@@ -65,11 +69,53 @@ import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2 } from 'lucide';
 
 const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Copy, ClipboardPaste, Redo2 };
-for (const node of document.querySelectorAll('[data-lucide]')) {
-  const name=node.dataset.lucide.replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
-  const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
+for (const node of document.querySelectorAll<HTMLElement>('[data-lucide]')) {
+  const name=(node.dataset.lucide??'').replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
+  const icon=icons[name as keyof typeof icons];
+  if(!icon)continue;
+  const svg=createElement(icon);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
-const $ = id => document.getElementById(id);
+type EditorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+interface EditorElements {
+  viewport: HTMLDivElement;
+  blockHeight: HTMLInputElement;
+  blockThickness: HTMLInputElement;
+  blockGradualRate: HTMLInputElement;
+  keyName: HTMLInputElement;
+  playerRow: HTMLInputElement;
+  playerColumn: HTMLInputElement;
+  playerDirection: HTMLSelectElement;
+  playerMaxUp: HTMLInputElement;
+  playerMaxDown: HTMLInputElement;
+  playerFoldVertical: HTMLInputElement;
+  playerFoldHorizontal: HTMLInputElement;
+  playerCanDropOnFold: HTMLInputElement;
+  playerOverheat: HTMLInputElement;
+  playerFrozen: HTMLInputElement;
+  playerActions: HTMLInputElement;
+  playerCollectedKeys: HTMLTextAreaElement;
+  mapName: HTMLInputElement;
+  mapWidth: HTMLInputElement;
+  mapHeight: HTMLInputElement;
+  regionChoice: HTMLSelectElement;
+  regionName: HTMLInputElement;
+  nodeLocalR: HTMLInputElement;
+  nodeLocalC: HTMLInputElement;
+  nodeLocalDir: HTMLSelectElement;
+  nodeParent: HTMLSelectElement;
+  preserveWorld: HTMLInputElement;
+  nodeComponents: HTMLTextAreaElement;
+  nodeTags: HTMLTextAreaElement;
+  requiredKeyList: HTMLDivElement;
+  playerKeyChoices: HTMLDivElement;
+}
+function $(id: keyof EditorElements): EditorElements[typeof id];
+function $(id: string): HTMLElement;
+function $(id: string): HTMLElement {
+  const element=document.getElementById(id);
+  if(!element)throw new Error(`缺少编辑器元素：${id}`);
+  return element;
+}
 const onEditorTab=event=>{if(event.detail==='inspect'){setTool('select');scheduleInspection();}};
 document.addEventListener('fold:editor-tab',onEditorTab);
 const editorTabs={dispose:()=>document.removeEventListener('fold:editor-tab',onEditorTab)};
@@ -128,7 +174,7 @@ function coord(r,c) { return columnLabel(c)+(r+1); }
 const voidPlaneTop=(r,c)=>Math.max(tileTop(r,c),sceneryTop);
 function validateMap(data,allowDraft=false){return normalizeMap(data,allowDraft);}
 
-function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(documentModel.view(),next,visibility);if(P?.mode==='edit'){const before=documentModel.view();for(let r=0;r<before.height;r++)for(let c=0;c<before.width;c++)if(JSON.stringify(before.tiles[r][c])!==JSON.stringify(next.tiles[r]?.[c]??null)||JSON.stringify(foldsAt(before,r,c))!==JSON.stringify(r<next.height&&c<next.width?foldsAt(next,r,c):[])){if(cellHidden(r,c)||documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能间接修改隐藏实体或区域');}}const candidate=forkTreeDocument(documentModel);candidate.applyLegacy(next);return candidate;}
+function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(documentModel.view(),next,visibility);if(P?.mode==='edit'){const before=documentModel.view();for(let r=0;r<before.height;r++)for(let c=0;c<before.width;c++)if(JSON.stringify(before.tiles[r][c])!==JSON.stringify(next.tiles[r]?.[c]??null)||JSON.stringify(foldsAt(before,r,c))!==JSON.stringify(r<next.height&&c<next.width?foldsAt(next,r,c):[])){if(cellHidden(r,c)||documentModel.world.at(r,c).some(nodeHidden))throw new Error('不能间接修改隐藏实体或区域');}}const candidate=forkTreeDocument(documentModel);candidate.applyProjection(next);return validateTreeDocument(candidate);}
 function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
@@ -470,7 +516,7 @@ document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.da
 $('gridToggle').onclick=()=>{showGrid=!showGrid;$('gridToggle').setAttribute('aria-pressed',String(showGrid));$('gridToggle').classList.toggle('active',showGrid);applyVisibility();syncState();};
 $('tableToggle').onclick=()=>{showTable=!showTable;$('tableToggle').setAttribute('aria-pressed',String(showTable));$('tableToggle').classList.toggle('active',showTable);applyVisibility();syncState();};
 $('creaseDashToggle').onclick=()=>{showCreaseDashes=!showCreaseDashes;$('creaseDashToggle').setAttribute('aria-pressed',String(showCreaseDashes));$('creaseDashToggle').classList.toggle('active',showCreaseDashes);applyVisibility();syncState();};
-$('clearMap').onclick=()=>{try{const legacy=clearMapCells(map,cellHidden,visibility);for(const node of documentModel.world.serialize()){if(nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)))throw new Error('清空会删除隐藏实体，请先显示全部实体与区域');if(documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>!documentModel.world.serialize().some(item=>'entity:'+item.id===owner)))throw new Error('Transform has external references');}const snapshot=documentModel.serialize();snapshot.entities=[];snapshot.transforms=[];snapshot.legacyMetadata={...snapshot.legacyMetadata,exit:legacy.exit};commitTree(new TreeDocument(snapshot));setSelectedCells([]);editRect=null;pendingRegion=null;debugOverrides.clear();nodeDebug.clear();clearInspection();controller.resetProgress();buildPaper();persist();toast('地图已清空 · 可撤销');}catch(error){toast(error.message,true);}};
+$('clearMap').onclick=()=>{try{const projection=clearMapCells(map,cellHidden,visibility);for(const node of documentModel.world.serialize()){if(nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)))throw new Error('清空会删除隐藏实体，请先显示全部实体与区域');if(documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>!documentModel.world.serialize().some(item=>'entity:'+item.id===owner)))throw new Error('Transform has external references');}const snapshot=documentModel.serialize();snapshot.entities=[];snapshot.transforms=[];snapshot.metadata={...snapshot.metadata,exit:projection.exit};commitTree(new TreeDocument(snapshot));setSelectedCells([]);editRect=null;pendingRegion=null;debugOverrides.clear();nodeDebug.clear();clearInspection();controller.resetProgress();buildPaper();persist();toast('地图已清空 · 可撤销');}catch(error){toast(error.message,true);}};
 function editAt(r,c){
   if(cellHidden(r,c)){toast('隐藏区域或实体禁止编辑',true);return;}
   if(tool==='inspect'){try{inspectAtCell(r,c);}catch(error){toast(error.message,true);}return;}
@@ -510,7 +556,7 @@ function inspectedPropertySchema(r,c,tile){
   return projectedCellSchema(node,documentModel.world.at(r,c),tile,nodeSchema,entityPropertySchema(tile,tagCatalog));
 }
 function applyPropertyMap(next){
- const checked=forkTreeDocument(documentModel);checked.applyLegacy(next);
+ const checked=forkTreeDocument(documentModel);checked.applyProjection(next);
  assertNodePropertyChanges(documentModel,checked,nodeSchema);
  applyMap(next,true);
 }
@@ -564,7 +610,7 @@ function applyInspectedProperty(path,value,scope='entity'){
     if(path[0]==='regionTag'){assertTagAttachment(tagCatalog,'tag-region',candidate,r,c);next=assignRegion(candidate,[{r,c}],merged.regionTag,regionNames(candidate,documentModel.cellTags).includes(merged.regionTag),documentModel.cellTags);}
     if(path[0]==='tags'){
       const tag=path[1];if(['spawn','entry','exitTo'].includes(tag)&&merged.tags[tag]){assertTagAttachment(tagCatalog,tag==='spawn'?'tag-spawn':tag==='entry'?'tag-entry':'tag-exit',candidate,r,c);tagCell(next,r,c,tag,merged.tags[tag]);}
-      const checkedTree=forkTreeDocument(documentModel);checkedTree.applyLegacy(next);const errors=validateRegions(next,checkedTree.world).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
+      const checkedTree=forkTreeDocument(documentModel);checkedTree.applyProjection(next);const errors=validateRegions(next,checkedTree.world).filter(message=>message.startsWith('区域入口不能')||message.startsWith('区域只能')||message.startsWith('出口所需钥匙不存在'));if(errors.length)throw new Error(errors.join('；'));
     }
     if(path[0]==='folds'||path[0]==='fold')assertTagAttachment(tagCatalog,'tag-fold',candidate,r,c);
     assertHiddenContentUnchanged(candidate,next,visibility);
@@ -643,7 +689,7 @@ let renaming=false;
 $('mapName').oninput=()=>{if(!renaming){editHistory.push(editSnapshot());trimHistory(editHistory);redoHistory=[];renaming=true;}map.name=normalizeMapName($('mapName').value);persist();updateUI();};
 $('mapName').onblur=()=>{renaming=false;$('mapName').value=map.name;};
 $('mapName').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('mapName').blur();}};
-$('newMap').onclick=()=>{setMode('edit');const snapshot=documentModel.serialize();snapshot.entities=[];snapshot.transforms=[];snapshot.cellTags={};snapshot.legacyMetadata={...snapshot.legacyMetadata,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null};replaceMap(snapshot);toast('已新建空白地图');};
+$('newMap').onclick=()=>{setMode('edit');const snapshot=documentModel.serialize();snapshot.entities=[];snapshot.transforms=[];snapshot.cellTags={};snapshot.metadata={...snapshot.metadata,spawn:{r:Math.floor(map.height/2),c:Math.floor(map.width/2),dir:0},exit:null,name:'未命名关卡',description:'',maxSteps:0,bestSteps:null};replaceMap(snapshot);toast('已新建空白地图');};
 $('resizeMap').onclick=()=>{const width=Number($('mapWidth').value),height=Number($('mapHeight').value);if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||width>128||height>128){toast('宽度和高度须为 3–128 的整数',true);return;}if(width===map.width&&height===map.height)return;for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if((r>=height||c>=width)&&cellHidden(r,c)){toast('缩小地图会删除隐藏区域，请先显示该区域',true);return;}const tiles=Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>r<map.height&&c<map.width?clone(map.tiles[r][c]):blankTile()));const spawn={r:Math.min(map.spawn.r,height-1),c:Math.min(map.spawn.c,width-1),dir:map.spawn.dir};if(!tiles[spawn.r][spawn.c]||blocked(tiles[spawn.r][spawn.c]))tiles[spawn.r][spawn.c]=blankTile();const exit=map.exit&&map.exit.r<height&&map.exit.c<width?{...map.exit}:null;try{applyMap({...map,version:1,width,height,tiles,foldCells:(map.foldCells??[]).filter(p=>p.r<height&&p.c<width),spawn,exit,name:map.name,description:map.description,maxSteps:map.maxSteps,bestSteps:map.bestSteps},true);controller.resetPosition();buildPaper();fitCamera();persist();updateUI();toast('地图尺寸已更新');}catch(error){toast(error.message,true);}};
 $('exportMap').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(savedMap(),null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=mapFilename(map.name);a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('地图已导出');};
 $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>16000000)throw new Error('地图文件过大');const next=JSON.parse(await file.text());new TreeDocument(next);setMode('edit');replaceMap(next);toast('地图导入完成');}catch(err){toast('导入失败：'+err.message,true);}e.target.value='';};

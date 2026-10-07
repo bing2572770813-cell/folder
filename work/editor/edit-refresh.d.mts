@@ -1,0 +1,1 @@
+export function createEditRefresh(options: { rebuild: () => void; notify: () => void; requestFrame: (callback: () => void) => number; cancelFrame: (handle: number) => void }): { request(effects: { scene?: boolean; save?: boolean }, defer?: boolean): void; flush(): void };

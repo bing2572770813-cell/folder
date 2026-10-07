@@ -9,6 +9,9 @@ import {legalKeyNames} from '../tags/keys.mjs';
 
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
+const terrainComponentIds=['campfire','ice','fire','eruption','rayEmitter','foldSwitch','firebird','flame'];
+const isTerrainNode=node=>node.static.entityType==='terrain'||Object.hasOwn(node.components,'surface')||terrainComponentIds.some(id=>Object.hasOwn(node.components,id));
+const matchesBase=(node,bases)=>bases?.some(base=>base==='paper_ai'?Object.hasOwn(node.components,'surface'):base===node.prefabId);
 export function forkTreeDocument(document){
   return document.clone();
 }
@@ -44,7 +47,7 @@ export function validateTreeDocument(candidate){
  const nodes=candidate.world.serialize();validateTerrainStacking(candidate.world,nodes);const registry=defaultComponents();
  for(const node of nodes){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
  const spawns=[],entries=new Map(),byCell=candidate.cellNodes(nodes);
- // Only occupied cells contribute entity tags; avoid allocating a full legacy map.
+ // Only occupied cells contribute entity tags; avoid allocating a full grid projection.
  for(const [key,nodes] of byCell){
   const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){
    if(name!=='requiredKeys'&&Object.hasOwn(tags,name)&&JSON.stringify(tags[name])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+name);tags[name]=value;
@@ -100,7 +103,7 @@ export function replaceTreePrefab(document,prefab,tile,r,c,options={}){
   if(!Object.keys(node.components).length&&!Object.keys(node.tags).length)candidate.world.remove(node.id,true);
   else{candidate.world.remove(node.id);candidate.world.add(node);}
  }
- candidate.applyLegacy(result.map);
+ candidate.applyProjection(result.map);
  return validateTreeDocument(candidate);
 }
 export function placeTreePrefab(document,prefab,tile,r,c,options={}){
@@ -118,10 +121,20 @@ function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
     const record=resolveRecord(raw);if(ancestry.has(record.id))throw new Error('Prefab child cycle');const chain=new Set(ancestry).add(record.id);
     if(record.static?.placeable===false||record.id==='void_ai')throw new Error('实体不可放置');
     const normalized=normalizeTile({...record.tile,...configuration,...(record.visual!==undefined?{visual:record.visual}:{}),prefabId:record.id});delete normalized.instance;
-    // Import a standalone node through the legacy adapter without allocating the full map.
-    const seed={version:1,width:3,height:3,tiles:Array.from({length:3},()=>Array(3).fill(null))};seed.tiles[0][0]=normalized;
-    const node=importTreeMap(seed).world.serialize()[0],uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
-    node.id='entity-'+uuid;node.transformId=transformId;node.components=merge(record.tile?node.components:{},record.components);node.tags=merge(record.tags,normalized.tags);node.static=copy(record.static??{});node.configuration=record.tile?copy(normalized):{prefabId:record.id,...(normalized.visual!==undefined?{visual:copy(normalized.visual)}:{}),...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})};delete node.configuration.regionTag;registry.validate(node);
+    // Build the standalone node directly. A temporary empty TreeDocument would
+    // fail map validation because it has no walkable spawn; placement validation
+    // belongs to the candidate document after the node is attached.
+    const uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
+    const tileComponents=record.tile?{
+      surface:{height:normalized.height,thickness:normalized.thickness,gradualRate:normalized.gradualRate,...(normalized.color?{color:normalized.color}:{}),...(normalized.surfaceConnected!==undefined?{connected:normalized.surfaceConnected}: {})},
+      collision:{blocked:normalized.blocked},
+      ...(normalized.followFold!==undefined||normalized.canDropOnFold!==undefined?{physics:{...(normalized.followFold!==undefined?{followFold:normalized.followFold}:{}),...(normalized.canDropOnFold!==undefined?{canDropOnFold:normalized.canDropOnFold}:{})}}:{}),
+      ...(normalized.folds?.length?{fold:{directions:copy(normalized.folds)}}:{}),
+      ...(normalized.lift?{lift:copy(normalized.lift)}:{}),
+      ...(normalized.terrain?{[normalized.terrain]:{...copy(normalized.terrainConfig??{}),...(normalized.terrain==='key'?{name:normalized.keyName}: {})}}:{})
+    }:{};
+    const node={id:'entity-'+uuid,prefabId:record.id,transformId,components:merge(tileComponents,record.components),tags:merge(record.tags,normalized.tags),static:copy(record.static??{}),configuration:record.tile?copy(normalized):{prefabId:record.id,...(normalized.visual!==undefined?{visual:copy(normalized.visual)}:{}),...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})}};
+    delete node.configuration.regionTag;registry.validate(node);
     if(record.tile?.lift&&normalized.lift)node.components.lift=copy(normalized.lift);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);
     candidate.world.transforms.create({id:transformId,parentId,local,footprint:{...size,occupied:copy(occupied)}});
@@ -159,12 +172,18 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  for(const cell of cells){
   const existing=world.at(cell.r,cell.c).filter(node=>node.prefabId!=='void_ai');
   if(category==='item'&&!existing.length)throw new Error('道具不能放置在虚空中');
-  if(!ground&&bases&&!existing.some(node=>bases.includes(node.prefabId)))throw new Error('放置条件不符：需要 '+bases.map(id=>options.resolve?.(id)?.name??id).join('、')+' 作为基底');
+  if(!ground&&bases&&!existing.some(node=>matchesBase(node,bases)))throw new Error('放置条件不符：需要 '+bases.map(id=>options.resolve?.(id)?.name??id).join('、')+' 作为基底');
  }
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){
-  const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
-  const removed=[...new Map([...ids].flatMap(id=>world.transforms.worldCells(id).flatMap(cell=>world.at(cell.r,cell.c))).filter(node=>ids.has(node.transformId)).map(node=>[node.id,node])).values()];
+  // Terrain replacement removes the paper and old terrain only. Items and
+  // creatures are independent overlays and must survive the replacement.
+  const removedMap=new Map();
+  for(const root of [...targets.values()].filter(isTerrainNode))
+   for(const transformId of subtree(world,root.transformId))
+    for(const node of world.forTransform(transformId))if(isTerrainNode(node))removedMap.set(node.id,node);
+  const removed=[...removedMap.values()];
+  const ids=new Set(removed.map(node=>node.transformId));
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
   if(ids.size){
@@ -175,8 +194,12 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
   if(cells.length===1){const old=document.viewCells(cells).get(r+','+c);configuration.tags=copy(old?.tags??{});configuration.folds=[...new Set([...targets.values()].flatMap(node=>node.components.fold?.directions??[]))];}
   if((configuration.tags?.spawn||configuration.tags?.entry)&&(configuration.blocked||configuration.terrain==='campfire'))throw new Error('不能用不可通行实体覆盖玩家起点或区域入口');
   for(const node of removed)candidate.world.remove(node.id);
-  const deleteTransform=id=>{for(const child of candidate.world.transforms.childrenOf(id))if(ids.has(child))deleteTransform(child);candidate.world.transforms.remove(id);};
-  for(const id of ids)if(!ids.has(world.transforms.get(id).parentId))deleteTransform(id);
+  const deleteTransform=id=>{
+   if(candidate.world.forTransform(id).length)return;
+   for(const child of candidate.world.transforms.childrenOf(id))deleteTransform(child);
+   if(!candidate.world.transforms.childrenOf(id).length&&!candidate.world.transforms.referenceOwners(id).length)candidate.world.transforms.remove(id);
+  };
+  for(const id of ids)deleteTransform(id);
  }
  candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
  return validateTreeDocument(candidate);

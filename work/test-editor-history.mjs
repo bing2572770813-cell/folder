@@ -19,7 +19,7 @@ const only=[{map:{width:400,height:400}}];trimHistory(only);assert.equal(only.le
 console.log('PASS: editor snapshots isolate nested config/void folds/selection, history limits preserve newest undo points.');
 
 // Exercise the production commit/history boundary, including its no-op path.
-const source=readFileSync(new URL('./app.js',import.meta.url),'utf8');
+const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8');
 const functions=source.slice(source.indexOf('function editSnapshot('),source.indexOf('function finishGesture('))+source.slice(source.indexOf('function commitTree('),source.indexOf('function refreshTreePanel('));
 const counts={before:0,after:0,build:0,ui:0,persist:0};
 const original={serialize(){counts.before++;return {version:2,width:3,height:3,value:{height:1}};}},next={serialize(){counts.after++;return {version:2,width:3,height:3,value:{height:2}};},view(){return {width:3,height:3};}};

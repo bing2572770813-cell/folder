@@ -1,8 +1,7 @@
 import {EntityWorld} from './entity-world.js';
 import {jsonObject,type JsonObject} from './entity-model.js';
-import {legacyMapToTree,loadTree,type TreeMap} from './legacy-map.js';
+import {loadTree,type TreeMap} from './tree-map.js';
 import {validateTerrainStacking} from './terrain-stacking.js';
-import {migratePaperTiles} from './paper-tiles.js';
 
 export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Record<string,JsonObject>}
 
@@ -10,16 +9,10 @@ export interface ImportedTree {world:EntityWorld;metadata:JsonObject;cellTags:Re
 export function importTreeMap(input:unknown):ImportedTree {
   const data=jsonObject(input);
   if(!Number.isInteger(data.width)||!Number.isInteger(data.height)||Number(data.width)<3||Number(data.width)>128||Number(data.height)<3||Number(data.height)>128)throw new Error('Map dimensions must be 3–128');
-  let tree:TreeMap;
-  if(data.version===1){
-    // Legacy conversion validates grid shape; browser normalization remains responsible for old field semantics.
-    tree=legacyMapToTree(data as unknown as Parameters<typeof legacyMapToTree>[0]);
-  }else if(data.version===2){
-    if(!Array.isArray(data.entities)||!Array.isArray(data.transforms))throw new Error('Tree map requires entity and transform arrays');
-    tree=data as unknown as TreeMap;
-    tree.legacyMetadata=jsonObject(tree.legacyMetadata??{});
-  }else throw new Error('Unsupported map version');
-  tree=migratePaperTiles(tree);
+  if(data.version!==2)throw new Error('Unsupported map version; expected version 2');
+  if(!Array.isArray(data.entities)||!Array.isArray(data.transforms))throw new Error('Tree map requires entity and transform arrays');
+  const tree=data as unknown as TreeMap;
+  tree.metadata=jsonObject(tree.metadata??{});
   for(const node of tree.entities){
     const snapshot=node.configuration?.lift;
     if(snapshot&&typeof snapshot==='object'&&!Array.isArray(snapshot)&&Object.hasOwn(snapshot,'durationMs'))throw new Error('durationMs is unsupported; use turnsPerLeg');
@@ -37,13 +30,13 @@ export function importTreeMap(input:unknown):ImportedTree {
     if(tags.regionTag!==undefined&&(typeof tags.regionTag!=='string'||!tags.regionTag.trim()||tags.regionTag.length>80))throw new Error('Invalid cell regionTag');
     cellTags[key]=tags;
   }
-  return {world,metadata:jsonObject(tree.legacyMetadata),cellTags};
+  return {world,metadata:jsonObject(tree.metadata),cellTags};
 }
 
 export interface TreeSerializationOptions {
   /** Persistence boundaries supply core/property-model.mjs; omitted for complete editor snapshots. */
   projectProperties?:(values:JsonObject,schema:JsonObject,flag:'serializable')=>JsonObject;
-  /** Resolve inherited/catalog permissions; defaults to the legacy configuration's propertySchema. */
+  /** Resolve inherited/catalog permissions; defaults to the configuration propertySchema. */
   schemaFor?:(node:ReturnType<EntityWorld['serialize']>[number])=>JsonObject;
   /** Resolve cell permissions independently of movable entity configuration. */
   schemaForCell?:(r:number,c:number,tags:JsonObject)=>JsonObject;
@@ -58,7 +51,7 @@ export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTa
     const project=(values:JsonObject)=>jsonObject(options.projectProperties!(values,schema,'serializable'));
     if(configuration){
       node.configuration=project(configuration);
-      // These fields identify the legacy instance and its permission contract on import.
+      // These fields identify the instance and its permission contract on import.
       for(const key of ['prefabId','instance','kind','terrain','propertySchema'])if(Object.hasOwn(configuration,key))node.configuration[key]=configuration[key];
       if(configuration.folds!==undefined){
         if(node.configuration.folds===undefined)delete node.configuration.fold;
@@ -108,6 +101,6 @@ export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTa
   }
   return {
     version:2,width:world.transforms.width,height:world.transforms.height,
-    entities,transforms:world.transforms.serialize(),cellTags:serializedCellTags,legacyMetadata:jsonObject(metadata),
+    entities,transforms:world.transforms.serialize(),cellTags:serializedCellTags,metadata:jsonObject(metadata),
   };
 }

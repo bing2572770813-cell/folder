@@ -19,7 +19,7 @@ function merge(base:JsonObject,next:JsonObject):JsonObject {
   return result;
 }
 
-/** Resolves disk prefab records using the same merge contract, preserving legacy tile fields. */
+/** Resolves disk prefab records using the same merge contract, preserving current prefab fields. */
 export function resolvePrefabRecord(id:string,definitions:Map<string,JsonObject>,visited=new Set<string>()):JsonObject {
   if(visited.has(id))throw new Error('Prefab inheritance cycle');visited.add(id);
   const raw=definitions.get(id);if(!raw)throw new Error('Unknown prefab: '+id);

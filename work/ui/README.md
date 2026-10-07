@@ -1,6 +1,6 @@
 # React 编辑器 UI
 
-前端采用 React 19 + Mantine 9，保留 Three.js 和 JavaScript 游戏逻辑。入口 react-entry.jsx 先同步挂载 EditorShell，再启动 app.js 场景适配；player.cjs 仍集中承载玩家状态与交互。
+前端采用 React 19 + Mantine 9，保留 Three.js 和 JavaScript 游戏逻辑。入口 react-entry.tsx 先同步挂载 EditorShell，再启动 app.ts 场景适配；player.cjs 仍集中承载玩家状态与交互。
 
 ## 组件边界
 
@@ -10,7 +10,7 @@ Tab 使用 keepMountedMode="display-none"，保证所有 ID 在初始化时存�
 
 ## React 与地图适配
 
-React 创建界面结构并管理 Tab 与动态列表/Inspector 的状态。Three.js canvas 只挂在 Viewport 的稳定宿主中。app.js 暂保留固定 ID 的事件/状态适配以及下拉摘要、地图状态和显示标记更新；不因此将游戏状态复制进 React。静态结构组件 memo 化，不在地图刷新时重建。动态宿主只能由对应 React renderer 写入，清空 Inspector 使用 clearPropertyInspector，禁止在其 React root 上 replaceChildren。
+React 创建界面结构并管理 Tab 与动态列表/Inspector 的状态。Three.js canvas 只挂在 Viewport 的稳定宿主中。app.ts 暂保留固定 ID 的事件/状态适配以及下拉摘要、地图状态和显示标记更新；不因此将游戏状态复制进 React。静态结构组件 memo 化，不在地图刷新时重建。动态宿主只能由对应 React renderer 写入，清空 Inspector 使用 clearPropertyInspector，禁止在其 React root 上 replaceChildren。
 
 静态放置参数为非受控输入，由适配层验证并提交。Inspector 使用 React 本地草稿，失焦或 Enter 提交，checkbox 立即提交；错误保留输入，权限和批量事务仍由原数据模块检查。
 

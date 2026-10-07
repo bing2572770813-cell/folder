@@ -44,11 +44,11 @@ function configure(node,tile,folds,previous){
   if(!equal(node.components.fold?.directions??[],folds)){if(folds.length)node.components.fold={...node.components.fold,directions:copy(folds)};else delete node.components.fold;}
 }
 
-/** Canonical tree storage with detached compatibility projections for legacy tools. */
+/** Canonical tree storage with an editor projection for grid-based commands. */
 export class TreeDocument {
   constructor(input){
-    const source=input.version===1?{...copy(input),...validateMap(input,true)}:copy(input);
-    const imported=importTreeMap(source);
+    if(input?.version!==2)throw new Error('Unsupported map version; expected version 2');
+    const imported=importTreeMap(copy(input));
     this.world=imported.world;this.metadata=imported.metadata;this.cellTags=imported.cellTags;
     const checked=validateMap(this.view(),true);
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
@@ -100,10 +100,10 @@ export class TreeDocument {
     const owners=options?.projectProperties?this.world.serialize():null;
     const snapshot=serializeTreeMap(this.world,this.metadata,this.cellTags,options),spawns=new Map();
     for(const node of owners??snapshot.entities)if(node.tags.spawn)for(const {r,c} of this.world.transforms.worldCells(node.transformId))spawns.set(r+','+c,{r,c});
-    if(spawns.size===1)snapshot.legacyMetadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
+    if(spawns.size===1)snapshot.metadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
     return snapshot;
   }
-  applyLegacy(input){
+  applyProjection(input){
     const next={...copy(input),...validateMap(input,true)},before=this.view(),snapshot=this.serialize();
     snapshot.width=next.width;snapshot.height=next.height;
     const removed=new Set(),updated=new Map(),added=[],transforms=copy(snapshot.transforms),cellTags=copy(this.cellTags);
@@ -134,8 +134,8 @@ export class TreeDocument {
           configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds,old);updated.set(node.id,node);
         }
         else {
-          const seed={version:1,width:next.width,height:next.height,tiles:Array.from({length:next.height},()=>Array(next.width).fill(null)),foldCells:[]};seed.tiles[r][c]=tile;
-          const tree=importTreeMap(seed).world;const node=tree.serialize()[0],transform=tree.transforms.serialize()[0];
+          const seed={version:2,width:next.width,height:next.height,entities:[],transforms:[],cellTags:{},metadata:{}};
+          const tree=new TreeDocument(seed);const node=tree.world.serialize()[0],transform=tree.world.transforms.serialize()[0];
           const id=globalThis.crypto.randomUUID();node.id='entity-'+id;node.transformId=transform.id='transform-'+id;added.push(node);transforms.push(transform);
         }
       }
@@ -181,7 +181,7 @@ export class TreeDocument {
       else instanceRoots.set(instanceId,{id:transform.id,...transform.local});
     }
     for(const key of Object.keys(cellTags)){const [r,c]=key.split(',').map(Number);if(r>=next.height||c>=next.width)delete cellTags[key];}
-    snapshot.cellTags=cellTags;snapshot.legacyMetadata=this.cleanMetadata({...this.metadata,...next});
+    snapshot.cellTags=cellTags;snapshot.metadata=this.cleanMetadata({...this.metadata,...next});
     const committed=importTreeMap(snapshot);
     const oldTransformIds=new Set(this.world.transforms.serialize().map(node=>node.id));
     const entityOwners=new Set(this.world.serialize().map(node=>'entity:'+node.id));

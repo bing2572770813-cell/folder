@@ -17,9 +17,8 @@ test('visual configuration inherits and can be disabled without changing entity 
 });
 
 test('placed prefab retains visual through native persistence, copy/paste and map reload',()=>{
- const tiles=Array.from({length:3},()=>Array.from({length:3},()=>({prefabId:'paper_ai',height:.09})));
- tiles[2][2]=null;
- const document=new TreeDocument({version:1,width:3,height:3,tiles,spawn:{r:0,c:0,dir:0}});
+ const entities=[],transforms=[];for(let r=0;r<3;r++)for(let c=0;c<3;c++){if(r===2&&c===2)continue;const id=`paper-${r}-${c}`,transformId=`${id}-transform`;entities.push({id,prefabId:'paper_ai',transformId,components:{surface:{height:.09},collision:{blocked:false}},tags:{},static:{walkable:true}});transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});}
+ const document=new TreeDocument({version:2,width:3,height:3,entities,transforms,cellTags:{},metadata:{spawn:{r:0,c:0,dir:0}}});
  const prefab=normalizePrefab({version:1,id:'model_key_ai',name:'Key',tile:{terrain:'key'},static:{entityType:'item'},BaseEntity:['paper_ai'],visual:{model:'model/key_ai.fbx',offset:[0,.2,0]}});
  const placed=placeCategorizedPrefab(document,prefab,prefab.tile,1,1);
  const node=placed.world.at(1,1).find(node=>node.prefabId===prefab.id);
@@ -28,4 +27,21 @@ test('placed prefab retains visual through native persistence, copy/paste and ma
  const pasted=pasteTree(loaded,copyTree(loaded,[{r:1,c:1}]),2,2);
  assert.deepEqual(pasted.world.at(2,2).find(node=>node.prefabId===prefab.id).configuration.visual,prefab.visual);
  const invalid=placed.serialize();invalid.entities.find(item=>item.id===node.id).configuration.visual.model='../secret.fbx';assert.throws(()=>new TreeDocument(invalid));
+});
+
+test('terrain replacement preserves independent item overlays',()=>{
+ const entities=[],transforms=[];
+ for(let r=0;r<3;r++)for(let c=0;c<3;c++){
+  const id=`paper-${r}-${c}`,transformId=`transform-${r}-${c}`;
+  entities.push({id,prefabId:'paper_ai',transformId,components:{surface:{height:.09},collision:{blocked:false}},tags:{},static:{entityType:'terrain'}});
+  transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ }
+ transforms.push({id:'transform-key',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}});
+ entities.push({id:'key',prefabId:'key_ai',transformId:'transform-key',components:{key:{name:'铜'}},tags:{},static:{entityType:'item'}});
+ const document=new TreeDocument({version:2,width:3,height:3,entities,transforms,cellTags:{},metadata:{spawn:{r:0,c:0,dir:0}}});
+ const fire=normalizePrefab({version:1,id:'fire_ai',name:'火焰',tile:{color:'red',height:.09,terrain:'fire'},static:{entityType:'terrain'},BaseEntity:['paper_ai']});
+ const replaced=placeCategorizedPrefab(document,fire,fire.tile,1,1);
+ const nodes=replaced.world.at(1,1);
+ assert.ok(nodes.some(node=>node.id==='key'),'item overlay must survive terrain replacement');
+ assert.ok(nodes.some(node=>node.components.fire&&node.components.surface),'new terrain must replace the paper surface');
 });

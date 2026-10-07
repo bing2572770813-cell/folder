@@ -2,7 +2,7 @@
 
 `model-library.mjs` 管理共享 FBX 模板；同一模型及贴图映射只加载一次，实体克隆拥有独立变换，几何、材质和贴图由模板统一释放。包含骨骼的模型使用 SkeletonUtils 克隆，但动画不推进游戏状态。`model-view.mjs` 管理实例的异步生命周期：已删除或更换引用的加载结果被忽略，完成加载仅请求刷新，下一次安全 `update()` 才挂载。未加载或加载失败时保留现有外观作为占位；错误交给调用方报告 prefab 和资源路径。两模块均需在会话结束时 `dispose()`。
 
-`fbx-model-loader.mjs` 读取 FBX 并保留作者材质；外部贴图必须在 `visual.textures` 中按 FBX 文件名明确映射到 PNG，避免任意地址加载。`resources/visual-assets.mjs` 缓存原始字节，按使用的 visual 收集模型与贴图用于单 HTML 导出；离线资源缺失时报告错误，不尝试网络补读。`app.js` 通过 `model-descriptors.mjs` 投影实体引用，交给共享模型库和异步模型视图；模型层参与拾取、隐藏和折叠场景生命周期。导出入口将当前地图使用的模型和贴图嵌入独立 HTML。
+`fbx-model-loader.mjs` 读取 FBX 并保留作者材质；外部贴图必须在 `visual.textures` 中按 FBX 文件名明确映射到 PNG，避免任意地址加载。`resources/visual-assets.mjs` 缓存原始字节，按使用的 visual 收集模型与贴图用于单 HTML 导出；离线资源缺失时报告错误，不尝试网络补读。`app.ts` 通过 `model-descriptors.mjs` 投影实体引用，交给共享模型库和异步模型视图；模型层参与拾取、隐藏和折叠场景生命周期。导出入口将当前地图使用的模型和贴图嵌入独立 HTML。
 `spatial-batches.mjs` 将普通纸张和地形实例按 16×16 格分块，各块独立计算包围球，由 Three.js 的视锥裁剪决定提交范围。曲面纸张按颜色和同样的空间分块合并缓冲区，保留生成的全部顶点、外壳和三角形所属格。相机变化不重写实例矩阵或几何；折叠拆分与射线拾取沿用原机制。网格和勾线仍使用已有批次，尚未空间分块。
 `tag-markers.mjs` 将区域入口和出口按两种共享贴图生成 InstancedMesh，实例保留 cell/nodeId 供拾取使用；升降通过实例矩阵更新高度，不生成新贴图。共享贴图不随单次地图重建销毁。
 `fold-motion.mjs` 仅拆分和临时变换可见网格；折痕所在实体沿轴切分三角面，玩家挂在旋转组上。作用范围、落点检测、释放与回弹状态机统一位于 `player.cjs`，不得写入静态地图。`lighting.mjs` 管理会话级光照调试与阴影相机范围。

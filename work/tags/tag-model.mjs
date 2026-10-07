@@ -18,7 +18,7 @@ export function entityPropertySchema(tile,catalog){
   for(const definition of catalog){for(const [key,descriptor] of Object.entries(definition.properties)){
     if(key==='regionTag')result.regionTag=combine(result.regionTag,descriptor);
     else if(key==='direction'){result.folds=combine(result.folds,descriptor);result.fold={...combine(result.fold,descriptor),tempEditable:false};}
-    else if(['spawn','entry','exitTo','requiredKeys'].includes(key)){result.tags??={};result.tags.children??={};result.tags.children[key]=combine(result.tags.children[key],descriptor);}
+    else if(['spawn','entry','exitTo','requiredKeys','requiredSwitches'].includes(key)){result.tags??={};result.tags.children??={};result.tags.children[key]=combine(result.tags.children[key],descriptor);}
   }}return result;
 }
 export function assertTagAttachment(catalog,scriptId,map,r,c){

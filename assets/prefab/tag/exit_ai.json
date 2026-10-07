@@ -30,6 +30,12 @@
       "serializable": true,
       "readable": true,
       "tempEditable": true
+    },
+    "requiredSwitches": {
+      "serializable": true,
+      "readable": true,
+      "tempEditable": true,
+      "label": "绑定开关"
     }
   }
 }

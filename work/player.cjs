@@ -154,7 +154,7 @@ function resetPrefabState() {
  resetPrefabState();
 function world(){return env.getEntityWorld?.();}
 function activeAt(r,c){const tree=world(),nodes=tree.at(r,c);return isBrokenCell(tree,nodes)?[]:nodes;}
-function switchesOpen(){const tree=world();return !tree||tree.serialize().every(node=>!node.components.foldSwitch||(tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState)===1);}
+function switchesOpen(tags={}){const tree=world(),required=tags.requiredSwitches??[];if(!required.length)return true;if(!tree)return false;const nodes=new Map(tree.serialize().map(node=>[node.id,node]));return required.every(id=>{const node=nodes.get(id);return node?.components.foldSwitch&&(tree.runtime(id,'foldSwitch').state??node.components.foldSwitch.initialState)===1;});}
 function updateFoldSwitches(action){
  const tree=world();if(!tree||action?.source!=='fold')return;
  const axis=action.axis,group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);if(!group)return;
@@ -262,6 +262,9 @@ function validateForPlay() {const map=env.getMap();
       for(const node of nodes)if(Object.hasOwn(node.components,'key')&&(!Array.isArray(node.static.events)||node.static.events.includes('enter')))keys.add(String(node.components.key.name??'钥匙').trim());
     }
     for(const cell of taggedCells(map,'exitTo'))for(const key of cell.tile.tags.requiredKeys??[])if(!keys.has(key))regionErrors.push('出口所需钥匙不存在或不可收集：'+key);
+    const switchIds=new Set(world().serialize().filter(node=>node.components.foldSwitch).map(node=>node.id));
+    const exits=[...taggedCells(map,'exitTo'),...(map.exit?[{tile:map.tiles[map.exit.r]?.[map.exit.c]}]:[])];
+    for(const cell of exits)for(const id of cell.tile?.tags?.requiredSwitches??[])if(!switchIds.has(id))regionErrors.push('出口绑定的开关不存在：'+id);
     for(const cell of taggedCells(map,'entry')){const check=structuralEntryCheck(cell.r,cell.c);if(!check.valid)regionErrors.push('区域入口不可通行：'+regionOf(cell.tile)+'（'+check.reason+'）');}
   }
   const errors=[...validateTerrains(map),...new Set(regionErrors)];
@@ -270,7 +273,7 @@ function validateForPlay() {const map=env.getMap();
   return {valid:errors.length===0,errors};
 }
 function exitIsValid() {const map=env.getMap();if(!map.exit||!inside(map.exit.r,map.exit.c)||!map.tiles[map.exit.r]?.[map.exit.c])return false;return world()?structuralEntryCheck(map.exit.r,map.exit.c).valid:walkable(map.exit.r,map.exit.c);}
-function isAtExit() {const map=env.getMap(); return switchesOpen()&&exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
+function isAtExit() {const map=env.getMap(); return switchesOpen(map.exit?map.tiles[map.exit.r]?.[map.exit.c]?.tags:undefined)&&exitIsValid()&&P.player.r===map.exit.r&&P.player.c===map.exit.c; }
 function foldTargetFor(axis,position=P.player) {const map=env.getMap();
   const t=reflectPoint(position.r,position.c,axis);const same=t.r===position.r&&t.c===position.c;let reason='';
   if(!P.canDropOnFold)reason='玩家不可在折叠时掉落';else if(!inFoldRange(foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type),position))reason='超出折线作用半径';else if(!inside(t.r,t.c))reason='目标超出地图';else if(!map.tiles[t.r][t.c])reason='目标为空格';else if(!(world()?entryCheck(t.r,t.c,false,Trigger.Teleport).valid:walkable(t.r,t.c)))reason=world()?entryCheck(t.r,t.c,false,Trigger.Teleport).reason:'目标是阻挡方块';else if(same)reason='玩家位于对称轴上';else if(P.mode==='play')reason=entryCheck(t.r,t.c,false,Trigger.Teleport).reason;
@@ -351,7 +354,7 @@ function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();upda
 function testTeleport(r,c){return turnManager.execute({trigger:Trigger.Teleport,source:'test',r,c});}
 function setFoldHints(enabled){P.foldHints=!!enabled;const axis=P.chosenFold,selected=env.getSelectionRing().visible;if(axis)selectFold(axis.r,axis.c,axis.type);else if(selected)selectPlayer();updateUI();}
 function animatePlayer(from,to,type,turnId,fromPosition){const map=env.getMap();P.moving=true;P.animation={start:performance.now(),duration:type==='teleport'?480:220,fromCell:{...from},toCell:{...to},from:fromPosition?.clone()??new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,turnId,checkEnd:true};updateUI();}
-function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;if(!switchesOpen()){P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';return false;}const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.revealedRegions.add(target);buildPaper();toast('显示区域：'+target);return false;}const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player,Trigger.Teleport);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
+function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;if(!switchesOpen(tile.tags)){P.terrainState.message='出口绑定的开关尚未全部开启';return false;}const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.revealedRegions.add(target);buildPaper();toast('显示区域：'+target);return false;}const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player,Trigger.Teleport);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
 function collectKey(){if(world()){const tree=world(),nodes=tree.at(P.player.r,P.player.c).filter(node=>Object.hasOwn(node.components,'key')&&node.static.walkable!==false&&!node.components.collision?.blocked&&!tree.runtime(node.id,'key').collected).map(node=>({...node,components:{key:node.components.key}}));if(nodes.length)commitTreeEvent('enter',P.player,nodes);return;}const tile=env.getMap().tiles[P.player.r]?.[P.player.c];if(tile?.terrain!=='key'||blocked(tile))return;const name=tile.keyName?.trim()||'钥匙';P.terrainState.collectedKeys=[...new Set([...P.terrainState.collectedKeys,name])];P.terrainState.hasKey=true;P.terrainState.message='获得钥匙：'+name;}
 function arrive(trigger){
  if(world())enterTree(trigger);
@@ -364,7 +367,7 @@ function settleAction(action){
  if(transitioned)arrive(Trigger.Teleport);
  fireRayEmitters();
  updateFirebirds(action);
- if(!switchesOpen()&&exitIsValid()&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';
+ if(exitIsValid()&&!switchesOpen(env.getMap().tiles[env.getMap().exit.r]?.[env.getMap().exit.c]?.tags)&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='出口绑定的开关尚未全部开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;
 }

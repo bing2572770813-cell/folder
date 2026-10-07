@@ -50,7 +50,7 @@ export function validateTreeDocument(candidate){
  // Only occupied cells contribute entity tags; avoid allocating a full grid projection.
  for(const [key,nodes] of byCell){
   const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){
-   if(name!=='requiredKeys'&&Object.hasOwn(tags,name)&&JSON.stringify(tags[name])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+name);tags[name]=value;
+   if(name!=='requiredKeys'&&name!=='requiredSwitches'&&Object.hasOwn(tags,name)&&JSON.stringify(tags[name])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+name);tags[name]=value;
   }
   if(tags.spawn)spawns.push(key);
   if(tags.entry){const region=candidate.cellTags[key]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}

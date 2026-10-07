@@ -126,9 +126,29 @@ function switchFixture(initialState=0){
  f.env.getFoldAxes=()=>[group];f.env.resolveFoldGroup=()=>group;
  return f;
 }
+test('each exit checks only its bound switches and unbound exits remain open',()=>{
+ const f=switchFixture(1);f.add('closed',0,5,{foldSwitch:{initialState:0},fold:{directions:['v']}});
+ f.map.tiles[2][2].tags={exitTo:'B',requiredSwitches:['switch']};f.map.tiles[6][6].regionTag='B';
+ f.map.tiles[2][3].tags={exitTo:'C',requiredSwitches:['closed']};f.map.tiles[6][5].regionTag='C';
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(2,2),true);
+ assert.equal(f.state.revealedRegions.has('B'),true,'unrelated closed switch must not block this exit');
+ f.controller.tick(performance.now()+1000);
+ assert.equal(f.controller.testTeleport(2,3),true);assert.equal(f.state.revealedRegions.has('C'),false);
+ f.controller.tick(performance.now()+1000);f.controller.undo();
+ f.map.tiles[2][3].tags.requiredSwitches=[];
+ assert.equal(f.controller.testTeleport(2,3),true);assert.equal(f.state.revealedRegions.has('C'),true);
+});
+test('all bound switches are required; deleted and non-switch references fail closed',()=>{
+ const f=switchFixture(1);f.add('closed',0,5,{foldSwitch:{initialState:0},fold:{directions:['v']}});
+ f.map.exit={r:2,c:2};f.map.tiles[2][2].tags.requiredSwitches=['switch','closed'];
+ f.move(2,2);assert.equal(f.state.levelWon,false);
+ f.map.tiles[2][2].tags.requiredSwitches=['switch'];assert.equal(f.controller.isAtExit(),true);
+ f.map.tiles[2][2].tags.requiredSwitches=['deleted'];assert.equal(f.controller.isAtExit(),false);assert.equal(f.controller.validateForPlay().valid,false);
+ f.map.tiles[2][2].tags.requiredSwitches=['2-2'];assert.equal(f.controller.isAtExit(),false);
+});
 
 test('a zero switch blocks exits; using its fold group toggles state once and undo restores it',()=>{
- const f=switchFixture();f.map.tiles[2][3].tags.exitTo='B';f.map.tiles[6][6].regionTag='B';f.map.tiles[6][6].tags.entry=true;
+ const f=switchFixture();f.map.tiles[2][3].tags.exitTo='B';f.map.tiles[2][3].tags.requiredSwitches=['switch'];f.map.tiles[6][6].regionTag='B';f.map.tiles[6][6].tags.entry=true;
  assert.equal(f.controller.canMoveTo(0,2),false);
  f.controller.setFreeTeleport(true);f.controller.testTeleport(2,3);
  assert.equal(f.state.player.r,2);assert.equal(f.state.player.c,3);assert.match(f.state.terrainState.message,/开关/);
@@ -139,9 +159,9 @@ test('a zero switch blocks exits; using its fold group toggles state once and un
  assert.deepEqual(f.world.runtime('switch','foldSwitch'),{});assert.equal(f.state.revealedRegions.has('B'),false);
 });
 
-test('only actual use of the switch fold group toggles; any zero switch also prevents final victory',()=>{
+test('only actual use of the switch fold group toggles; only the final exit bound switches prevent victory',()=>{
  const f=switchFixture(1);f.add('other',0,5,{foldSwitch:{initialState:0},fold:{directions:['v']}});
- f.map.exit={r:2,c:2};f.move(2,2);assert.equal(f.state.levelWon,false);
+ f.map.exit={r:2,c:2};f.map.tiles[2][2].tags.requiredSwitches=['other'];f.move(2,2);assert.equal(f.state.levelWon,false);
  assert.equal(f.world.runtime('switch','foldSwitch').state,undefined,'walking does not toggle');
  f.controller.restart();f.controller.teleport({r:2,c:2,type:'v'});
  assert.equal(f.world.runtime('switch','foldSwitch').state,0);assert.deepEqual(f.world.runtime('other','foldSwitch'),{});

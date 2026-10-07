@@ -63,6 +63,7 @@ export function normalizeTile(tile) {
   const keyName=terrain==='key'?(tile.keyName??'钥匙'):undefined;
   if(keyName!==undefined&&(typeof keyName!=='string'||!keyName.trim()||keyName.trim().length>80))throw new Error('钥匙名须为 1–80 字');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(k=>typeof k!=='string'||!k.trim()||k.length>80)))throw new Error('所需钥匙必须是名称列表');
+  if(tags.requiredSwitches!==undefined&&(!Array.isArray(tags.requiredSwitches)||tags.requiredSwitches.some(id=>typeof id!=='string'||!id.trim()||id.length>160)||new Set(tags.requiredSwitches).size!==tags.requiredSwitches.length))throw new Error('绑定开关须为不重复的实体 ID 列表');
   const propertyExtras={...(tile.visual!==undefined?{visual:normalizeVisual(tile.visual)}:{}),...(tile.properties!==undefined?{properties:copyJson(tile.properties)}:{}),...(tile.propertySchema!==undefined?{propertySchema:normalizePropertySchema(tile.propertySchema)}:{})};
   const unique=[...new Set(folds)];
   if(tile.followFold!==undefined&&typeof tile.followFold!=='boolean')throw new Error('可跟随折叠须为布尔值');

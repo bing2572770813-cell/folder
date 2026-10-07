@@ -17,7 +17,7 @@
   {"id":"emitter","prefabId":"ray_emitter_ai","transformId":"e","components":{"surface":{"height":0.09,"color":"red"},"collision":{"blocked":true},"rayEmitter":{"initialDirection":"east"}},"tags":{},"static":{"entityType":"terrain","walkable":false}},
   {"id":"switch","prefabId":"fold_switch_ai","transformId":"s","components":{"surface":{"height":0.09,"color":"green"},"collision":{"blocked":true},"fold":{"directions":["v"]},"foldSwitch":{"initialState":0}},"tags":{},"static":{"entityType":"terrain","walkable":false}},
   {"id":"lift","prefabId":"lift_paper_ai","transformId":"l","components":{"surface":{"height":0.09,"color":"white"},"lift":{"minHeight":0.09,"maxHeight":0.75,"initialHeight":0.09,"turnsPerLeg":3}},"tags":{},"static":{"entityType":"terrain"}},
-  {"id":"exit","prefabId":"paper_ai","transformId":"x","components":{"surface":{"height":0.09,"color":"white"}},"tags":{},"static":{"entityType":"terrain"}},
+  {"id":"exit","prefabId":"paper_ai","transformId":"x","components":{"surface":{"height":0.09,"color":"white"}},"tags":{"requiredSwitches":["switch"]},"static":{"entityType":"terrain"}},
   {"id":"crease","prefabId":"void_ai","transformId":"f","components":{"fold":{"directions":["v"]}},"tags":{},"static":{}}
  ]
 }

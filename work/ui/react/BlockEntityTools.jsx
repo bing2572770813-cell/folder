@@ -205,6 +205,11 @@ export const BlockEntityTools = React.memo(function BlockEntityTools() {
             <summary>{"所需 key"}</summary>
             <div id="requiredKeyList" />
           </UiDisclosure>
+          <UiDisclosure>
+            <summary>{"绑定开关（全部需开启）"}</summary>
+            <div id="requiredSwitchList" />
+            <small>{"留空：不受开关限制"}</small>
+          </UiDisclosure>
         </div>
       </UiSection>
     </UiSection>

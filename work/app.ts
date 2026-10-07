@@ -109,6 +109,7 @@ interface EditorElements {
   nodeComponents: HTMLTextAreaElement;
   nodeTags: HTMLTextAreaElement;
   requiredKeyList: HTMLDivElement;
+  requiredSwitchList: HTMLDivElement;
   playerKeyChoices: HTMLDivElement;
 }
 function $(id: keyof EditorElements): EditorElements[typeof id];
@@ -541,7 +542,7 @@ function editAt(r,c){
       const tag=tool==='player'?'spawn':tool==='entry'?'entry':'exitTo';
       if(tool!=='clear-tags')assertTagAttachment(tagCatalog,tool==='player'?'tag-spawn':tool==='entry'?'tag-entry':'tag-exit',map,r,c);
       if(tool==='player'&&taggedCells(map,'spawn').some(p=>cellHidden(p.r,p.c))||tool==='entry'&&taggedCells(map,'entry').some(p=>regionOf(p.tile)===regionOf(map.tiles[r][c])&&cellHidden(p.r,p.c)))throw new Error('不能修改隐藏区域标签');
-      const next=clone(map);if(tool==='clear-tags')next.tiles[r][c].tags={};else {tagCell(next,r,c,tag,tool==='region-exit'?$('exitRegion').value:true);if(tool==='region-exit')next.tiles[r][c].tags.requiredKeys=[...document.querySelectorAll('#requiredKeyList input:checked')].map(i=>i.value);}
+      const next=clone(map);if(tool==='clear-tags')next.tiles[r][c].tags={};else {tagCell(next,r,c,tag,tool==='region-exit'?$('exitRegion').value:true);if(tool==='region-exit'){next.tiles[r][c].tags.requiredKeys=[...document.querySelectorAll('#requiredKeyList input:checked')].map(i=>i.value);next.tiles[r][c].tags.requiredSwitches=[...document.querySelectorAll('#requiredSwitchList input:checked')].map(i=>i.value);}}
       applyPropertyMap(next);controller.resetPosition();buildPaper();persist();
     }catch(e){toast(e.message,true);}return;
   }
@@ -593,8 +594,8 @@ function inspectSelection(){
   const generalKeys=new Set(['color','edgeColor','height','thickness','gradualRate','blocked','followFold','canDropOnFold','regionTag','prefabId','instance','kind','terrain']);
   const specialValues=Object.fromEntries(Object.entries(values).filter(([key])=>!generalKeys.has(key)));
   const generalValues=Object.fromEntries(Object.entries(values).filter(([key])=>generalKeys.has(key)&&key!=='regionTag'));
-  const specialTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key==='exitTo'||key==='requiredKeys'));
-  const generalTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key!=='exitTo'&&key!=='requiredKeys'));
+  const specialTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key==='exitTo'||key==='requiredKeys'||key==='requiredSwitches'));
+  const generalTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key!=='exitTo'&&key!=='requiredKeys'&&key!=='requiredSwitches'));
   const cellSpecialValues=Object.keys(specialTags).length?{tags:specialTags}:{};
   const cellGeneralValues={...independent.values,...(values.regionTag!==undefined?{regionTag:values.regionTag}:{}),...(Object.keys(generalTags).length?{tags:generalTags}:{})};if(!Object.keys(generalTags).length)delete cellGeneralValues.tags;
   const cellGeneralSchema={...independent.schema,regionTag:schema.regionTag};
@@ -902,6 +903,9 @@ function buildFoldSelection(){
 function updateFoldAxes(){}
 
 function renderRegionControls(){
+ const switchList=$('requiredSwitchList'),chosenSwitches=new Set([...switchList.querySelectorAll('input:checked')].map(i=>i.value));
+ const switches=documentModel.world.serialize().filter(node=>node.components.foldSwitch),switchLabels=Object.fromEntries(switches.map(node=>{const p=documentModel.world.cells(node.id)[0];return [node.id,'折线开关 '+coord(p.r,p.c)+' · '+node.id.slice(-8)];}));
+ renderNameChecklist(switchList,[...new Set([...switches.map(node=>node.id),...chosenSwitches])],chosenSwitches,'绑定 ',null,'地图上没有折线开关',switchLabels);
  const keyList=$('requiredKeyList'),chosenKeys=new Set([...keyList.querySelectorAll('input:checked')].map(i=>i.value));renderNameChecklist(keyList,legalKeyNames(map,documentModel.world),chosenKeys,'所需钥匙 ',null,'地图上没有可收集的钥匙');
  const names=regionNames(map,documentModel.cellTags);
  const regionChoice=$('regionChoice'),previousRegion=regionChoice.value;regionChoice.replaceChildren(new Option('新建区域',''));for(const name of names)regionChoice.add(new Option(name,name));if(names.includes(previousRegion))regionChoice.value=previousRegion;$('newRegionPanel').hidden=!!regionChoice.value;

@@ -64,7 +64,7 @@ export function renderEntityChecklist(container, items, hidden, onChange) {
     <EntityChecklist items={items} hidden={hidden} onChange={onChange} />,
   );
 }
-export function NameChecklist({ names, selected, prefix, onChange, empty }) {
+export function NameChecklist({ names, selected, prefix, onChange, empty, labels={} }) {
   const [checked, setChecked] = React.useState(selected);
   React.useEffect(() => setChecked(selected), [selected]);
   return names.length ? (
@@ -73,8 +73,8 @@ export function NameChecklist({ names, selected, prefix, onChange, empty }) {
         <UiCheckbox
           key={name}
           value={name}
-          label={name}
-          aria-label={prefix + name}
+          label={labels[name]??name}
+          aria-label={prefix + (labels[name]??name)}
           checked={checked.has(name)}
           onChange={(e) => {
             const next = new Set(checked);
@@ -97,6 +97,7 @@ export function renderNameChecklist(
   prefix,
   onChange,
   empty = "",
+  labels = {},
 ) {
   renderIsland(
     container,
@@ -106,6 +107,7 @@ export function renderNameChecklist(
       prefix={prefix}
       onChange={onChange}
       empty={empty}
+      labels={labels}
     />,
   );
 }

@@ -18,6 +18,7 @@ export function validateEntityTags(value:unknown):JsonObject {
   for(const key of ['spawn','entry'])if(tags[key]!==undefined&&typeof tags[key]!=='boolean')throw new Error('方块标签无效');
   if(tags.exitTo!==undefined&&(typeof tags.exitTo!=='string'||!tags.exitTo.trim()||tags.exitTo.length>80))throw new Error('跳转区域名称无效');
   if(tags.requiredKeys!==undefined&&(!Array.isArray(tags.requiredKeys)||tags.requiredKeys.some(key=>typeof key!=='string'||!key.trim()||key.length>80)))throw new Error('所需钥匙必须是名称列表');
+  if(tags.requiredSwitches!==undefined&&(!Array.isArray(tags.requiredSwitches)||tags.requiredSwitches.some(id=>typeof id!=='string'||!id.trim()||id.length>160)||new Set(tags.requiredSwitches).size!==tags.requiredSwitches.length))throw new Error('绑定开关须为不重复的实体 ID 列表');
   return tags;
 }
 /** Catalog and world boundaries share the same static field contract. */

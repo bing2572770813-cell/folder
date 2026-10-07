@@ -11,7 +11,7 @@ const visible=node=>!!node.components.surface&&!node.static.transparent;
 function mergedTags(nodes){
   const tags={};
   for(const node of nodes)for(const [key,value] of Object.entries(node.tags)){
-    if(key==='requiredKeys'){tags[key]=[...new Set([...(tags[key]??[]),...value])].sort();continue;}
+    if(key==='requiredKeys'||key==='requiredSwitches'){tags[key]=[...new Set([...(tags[key]??[]),...value])].sort();continue;}
     if(Object.hasOwn(tags,key)&&!equal(tags[key],value))throw new Error('Conflicting entity tag: '+key);
     tags[key]=copy(value);
   }

@@ -285,6 +285,35 @@ async function main() {
       await capture('desktop-emitter-direction-play');
       results.push({name:'emitter-initial-direction-picker-preview-export-reload-play',status:'pass'});
       }
+      {
+        await page.locator('#editMode').click();
+        const switchMap=structuredClone(enemyMap);switchMap.metadata.name='独立出口开关验收';delete switchMap.entities[0].components.fragile;
+        switchMap.cellTags['6,6']={regionTag:'B'};switchMap.cellTags['6,5']={regionTag:'C'};
+        for(const [key,id,state] of [['2-4','open-switch',1],['2-5','closed-switch',0]]){
+          const node=switchMap.entities.find(node=>node.id===key);node.id=id;node.prefabId='fold_switch_ai';node.components.foldSwitch={initialState:state};node.components.fold={directions:['v']};node.components.collision={blocked:true};node.static.walkable=false;
+        }
+        await page.locator('#mapFile').setInputFiles({name:'exit-switches.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(switchMap))});
+        await page.waitForFunction(()=>window.foldField.getState().map.name==='独立出口开关验收');
+        if(!await page.locator('[data-tool="region-exit"]').isVisible())await page.locator('#tagSummary').click();
+        await page.locator('[data-tool="region-exit"]').click();
+        await page.locator('#requiredSwitchList').locator('..').locator('summary').click();
+        await page.locator('#exitRegion').selectOption('B');await page.locator('#requiredSwitchList input[value="open-switch"]').check();
+        const firstExit=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(firstExit.x,firstExit.y);
+        await page.locator('#requiredSwitchList input[value="open-switch"]').uncheck();await page.locator('#requiredSwitchList input[value="closed-switch"]').check();await page.locator('#exitRegion').selectOption('C');
+        const secondExit=await page.evaluate(()=>window.foldField.screenPoint(0,2));await page.mouse.click(secondExit.x,secondExit.y);
+        assert.deepEqual(await page.evaluate(()=>window.foldField.getState().map.tiles[0].slice(1,3).map(tile=>tile.tags.requiredSwitches)),[['open-switch'],['closed-switch']]);
+        const downloadPromise=page.waitForEvent('download');await page.locator('#exportMap').click();const saved=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),'utf8'));
+        assert.deepEqual(saved.entities.find(node=>node.id==='0-1').tags.requiredSwitches,['open-switch']);
+        await capture('desktop-exit-switch-bindings');
+        await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+        const start=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(start.x,start.y);
+        const toFirst=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(toFirst.x,toFirst.y);await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
+        assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.state).revealedRegions.includes('B')),true);
+        const toSecond=await page.evaluate(()=>window.foldField.screenPoint(0,2));await page.mouse.click(toSecond.x,toSecond.y);await page.waitForFunction(()=>window.foldField.getState().steps===2&&!window.foldField.getState().moving);
+        assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.state).revealedRegions.includes('C')),false);
+        await capture('desktop-exit-independent-switch-gates');
+        results.push({name:'exit-switch-checklist-save-and-independent-runtime-gates',status:'pass'});
+      }
       await closeContext('desktop');
       await open({width:1280,height:800},pathToFileURL(exportedEmitter).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());

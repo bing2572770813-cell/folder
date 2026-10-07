@@ -25,9 +25,9 @@ export class EntityWorld {
   }
   clone():EntityWorld {
     const result=new EntityWorld(this.transforms.clone());
-    result.entities=new Map([...this.entities].map(([id,node])=>[id,structuredClone(node)]));
+    result.entities=new Map(structuredClone([...this.entities]));
     result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
-    result.states=new Map([...this.states].map(([id,states])=>[id,new Map([...states].map(([component,state])=>[component,structuredClone(state)]))]));
+    result.states=new Map([...this.states].map(([id,states])=>[id,new Map(structuredClone([...states]))]));
     return result;
   }
   add(node:EntityNode):void {

@@ -19,8 +19,8 @@ export class TransformManager {
   get(id:string):TransformNode {const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return copy(node);}
   clone():TransformManager {
     const result=new TransformManager(this.width,this.height);
-    result.nodes=new Map([...this.nodes].map(([id,node])=>[id,copy(node)]));
-    result.index=new Map([...this.index].map(([key,ids])=>[key,[...ids]]));
+    result.nodes=new Map(structuredClone([...this.nodes]));
+    result.index=new Map(structuredClone([...this.index]));
     result.references=new Map([...this.references].map(([id,owners])=>[id,new Set(owners)]));
     return result;
   }

@@ -20,6 +20,7 @@ import {createSurfacePreview} from './render/placement-preview.mjs';
 import {mechanismMarker,shotMarker} from './render/directional-mechanisms.mjs';
 import {paperSurface,isPaper,hasConnectedLiftNearby,createPaperSurfaceCache} from './render/paper-surface.mjs';
 import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
+import {withEmitterDirection} from './entities/emitter-placement.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
 import {refreshFlatPaperPlacement} from './render/flat-placement.mjs';
@@ -811,6 +812,7 @@ function setupPrefabs(){
   let fingerprint='',loading=false;
   function applyPrefabBrush(){
     const prefab=prefabs.find(p=>p.id===selectedPrefabId),colored=hasColor(prefab?.tile);
+    $('emitterDirectionPanel').hidden=!prefab?.components?.rayEmitter;$('emitterInitialDirection').value=prefab?.components?.rayEmitter?.initialDirection??'north';
     $('keyNamePanel').hidden=prefab?.tile?.terrain!=='key';$('blockColorPanel').hidden=!colored||!$('prefabSummary').parentElement.open;
     const summary=$('prefabSummary'),name=document.createElement('span');name.textContent=prefab?.name||'无可用实体';summary.replaceChildren();
     if(prefab){const img=document.createElement('img');img.src=prefabPreview(prefab);img.alt='';summary.append(img);}
@@ -837,6 +839,7 @@ function setupPrefabs(){
     }catch(error){$('prefabStatus').textContent='使用内置实体目录 · '+error.message;}finally{loading=false;}
   }
   renderCatalog();$('prefabStatus').textContent='内置实体目录 · 本地服务支持实时更新';
+  $('emitterInitialDirection').onchange=()=>{if(tool!=='place')setTool('place');cancelPlacementPreview();if(latestPointerEvent)hoverTask.request(latestPointerEvent);syncState();};
   $('prefabType').oninput=$('prefabType').onchange=()=>{
     selectedPrefabId=$('prefabType').value||null;applyPrefabBrush();if(tool!=='place')setTool('place');else updateUI();
   };
@@ -927,7 +930,7 @@ function prefabPreview(prefab){
 function refreshPrefabPreviews(type){for(const prefab of prefabs.filter(p=>p.tile?.terrain===type||Object.hasOwn(p.components??{},type))){previewCache.delete(JSON.stringify(prefab));const img=document.querySelector('[data-prefab="'+prefab.id+'"] img');if(img)img.src=prefabPreview(prefab);}}
 
 function placementCandidate(r,c,{preview=false}={}){
- const prefab=prefabs.find(p=>p.id===selectedPrefabId),tile=brushTile();
+ const prefab=withEmitterDirection(prefabs.find(p=>p.id===selectedPrefabId),$('emitterInitialDirection').value),tile=brushTile();
  if(!prefab)throw new Error('没有可用实体');
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
@@ -943,7 +946,7 @@ let placementCheckCache=null;
 function drawPlacementPreview(hit){
  if(P.mode!=='edit'||tool!=='place'||!hit){cancelPlacementPreview();return;}
  const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab){cancelPlacementPreview();return;}
- const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
+ const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,$('emitterInitialDirection').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
  if(placementRenderCache?.document===documentModel&&placementRenderCache.prefab===prefab&&placementRenderCache.key===key&&placementLayer.children.length){$('hoverCoord').textContent=placementRenderCache.text;return;}
  disposableClear(placementLayer);placementLayer.userData.preview=null;placementRenderCache=null;
  let cells,reason='';try{cells=previewFootprint(prefab,hit.r,hit.c,id=>prefabs.find(p=>p.id===id));}catch(error){$('hoverCoord').textContent='无法放置 · '+error.message;return;}
@@ -971,7 +974,7 @@ function drawPlacementPreview(hit){
    const mechanism=mechanismMarker(THREE,node.components);mechanism.position.set(wx(p.c),tileHeight(view.tiles[p.r]?.[p.c])+.05,wz(p.r));placementLayer.add(mechanism);
   }
   for(const p of projection.terrainCells)if(affected.has(p.r+','+p.c))marker(terrainTextures[p.type],p.r,p.c,p.surfaceTop,p.total>1?.4:.72,p.index,p.total);
-  placementLayer.userData.preview={surfaces:surfaceCells.map(p=>({r:p.r,c:p.c,height:tileHeight(p.tile),thickness:tileThickness(p.tile),lift:!!p.tile.lift})),markers:projection.terrainCells.filter(p=>affected.has(p.r+','+p.c)).map(p=>p.type)};
+  placementLayer.userData.preview={emitterDirections:candidate.world.serialize().filter(node=>node.components.rayEmitter).map(node=>({nodeId:node.id,direction:node.components.rayEmitter.initialDirection})),surfaces:surfaceCells.map(p=>({r:p.r,c:p.c,height:tileHeight(p.tile),thickness:tileThickness(p.tile),lift:!!p.tile.lift})),markers:projection.terrainCells.filter(p=>affected.has(p.r+','+p.c)).map(p=>p.type)};
  }
  for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;const top=invalid?tileTop(p.r,p.c):tileHeight(previewMap.tiles[p.r]?.[p.c]);line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?top+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
  $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':'放置预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';

@@ -245,6 +245,33 @@ async function main() {
         await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');
         results.push({name:'fragile-entry-'+source+'-no-camera-shake',status:'pass',screenDrift:drift});
       }
+      await page.locator('#editMode').click();
+      {
+      const placementEmitterMap=structuredClone(enemyMap);placementEmitterMap.metadata.name='喷射初始方向验收';
+      await page.locator('#mapFile').setInputFiles({name:'emitter-direction.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(placementEmitterMap))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='喷射初始方向验收');
+      if(!await page.locator('#prefabGrid').isVisible())await page.locator('#prefabSummary').click();
+      await page.locator('#prefabGrid [data-prefab="ray_emitter_ai"]').click();
+      assert.equal(await page.locator('#emitterDirectionPanel').isVisible(),true);
+      assert.equal(await page.locator('#emitterInitialDirection').inputValue(),'north');
+      const emitterPoint=await page.evaluate(()=>window.foldField.screenPoint(1,1));
+      for(const direction of ['east','south','west','north','east']){
+        await page.locator('#emitterInitialDirection').selectOption(direction);
+        await page.mouse.move(emitterPoint.x,emitterPoint.y);
+        await page.waitForFunction(direction=>window.foldField.getState().placementPreview?.emitterDirections.some(node=>node.direction===direction),direction);
+      }
+      await capture('desktop-emitter-direction-preview');
+      await page.mouse.click(emitterPoint.x,emitterPoint.y);
+      await page.waitForFunction(()=>document.getElementById('saveState').textContent==='本地已保存');
+      const downloadPromise=page.waitForEvent('download');await page.locator('#exportMap').click();const exported=await downloadPromise;
+      const saved=JSON.parse(fs.readFileSync(await exported.path(),'utf8'));
+      assert.equal(saved.entities.find(node=>node.prefabId==='ray_emitter_ai').components.rayEmitter.initialDirection,'east');
+      await page.locator('#prefabGrid [data-prefab="paper_ai"]').click();assert.equal(await page.locator('#emitterDirectionPanel').isVisible(),false);
+      await page.reload({waitUntil:'networkidle'});assert.equal(await page.locator('#mapName').inputValue(),'喷射初始方向验收');
+      await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+      await capture('desktop-emitter-direction-play');
+      results.push({name:'emitter-initial-direction-picker-preview-export-reload-play',status:'pass'});
+      }
       await closeContext('desktop');
       await open({width:1280,height:800},pathToFileURL(exportedEmitter).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());

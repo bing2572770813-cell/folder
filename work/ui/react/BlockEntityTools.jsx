@@ -20,6 +20,17 @@ export const BlockEntityTools = React.memo(function BlockEntityTools() {
         footer={<span id="footprintInfo" />}
       >
         <UiSelect id="prefabType" aria-label="方块实体" hidden={true} />
+        <div id="emitterDirectionPanel" hidden={true}>
+          <label>
+            {"初始方向"}
+            <UiSelect id="emitterInitialDirection" aria-label="emitter 初始方向" defaultValue="north">
+              <option value="north">{"上（北）"}</option>
+              <option value="east">{"右（东）"}</option>
+              <option value="south">{"下（南）"}</option>
+              <option value="west">{"左（西）"}</option>
+            </UiSelect>
+          </label>
+        </div>
         <div id="blockColorPanel" className="block-color-panel" hidden={true}>
           <h3 className="section-label">
             {"方块颜色"}

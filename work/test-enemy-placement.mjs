@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
 import {normalizePrefab} from './entities/tile-model.mjs';
 import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
+import {withEmitterDirection} from './entities/emitter-placement.mjs';
 
 const bundle=await build({stdin:{contents:'export {TreeDocument} from "./entities/tree-document.mjs";export {placeCategorizedPrefab,deleteNode} from "./entities/tree-commands.mjs";export {previewPlacement} from "./entities/placement-preview.mjs";',resolveDir:fileURLToPath(new URL('./',import.meta.url))},bundle:true,platform:'node',format:'esm',write:false});
 const {TreeDocument,placeCategorizedPrefab,previewPlacement,deleteNode}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
@@ -17,6 +18,18 @@ for(let r=0;r<6;r++)for(let c=0;c<6;c++){
  input.entities.push({id,prefabId:'paper_ai',transformId:'t-'+id,components:{surface:{height:.09},collision:{blocked:false}},static:{entityType:'terrain'},tags:r===0&&c===0?{spawn:true}:{}});
 }
 const document=new TreeDocument(input),before=document.serialize();
+const emitterBefore=structuredClone(emitter);
+for(const direction of ['north','east','south','west']){
+ const brush=withEmitterDirection(emitter,direction);
+ for(const candidate of [placeCategorizedPrefab(document,brush,{},1,1),previewPlacement(document,brush,{},1,1).candidate]){
+  const node=candidate.world.serialize().find(node=>node.prefabId===emitter.id);
+  assert.equal(node.components.rayEmitter.initialDirection,direction);
+  const restored=new TreeDocument(candidate.serialize());
+  assert.equal(restored.world.get(node.id).components.rayEmitter.initialDirection,direction);
+ }
+}
+assert.deepEqual(emitter,emitterBefore,'placement direction must not mutate the backend prefab');
+assert.throws(()=>withEmitterDirection(emitter,'diagonal'),/direction/);
 for(const enemy of [bird,emitter]){
  assert.equal(entityCategory(enemy),'creature');assert.equal(isPlaceableEntity(enemy),true);
  assert.equal(enemy.components.physics.canDropOnFold,true);

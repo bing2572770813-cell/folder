@@ -4,7 +4,7 @@ import {runInNewContext} from 'node:vm';
 import * as THREE from 'three';
 const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8');
 const draw=source.slice(source.indexOf('function drawPlacementPreview('),source.indexOf('function placementPreviewMap('));
-const inputs=Object.fromEntries(['blockHeight','blockThickness','blockGradualRate','keyName','hoverCoord'].map(id=>[id,{value:'1',textContent:''}]));
+const inputs=Object.fromEntries(['blockHeight','blockThickness','blockGradualRate','keyName','emitterInitialDirection','hoverCoord'].map(id=>[id,{value:'1',textContent:''}]));
 const prefab={id:'paper_ai',name:'纸张',size:{width:1,height:1}},layer=new THREE.Group(),counts={checks:0,projections:0,clears:0};
 const context={P:{mode:'edit'},tool:'place',placementRenderCache:null,placementCheckCache:null,documentModel:{},prefabs:[prefab],selectedPrefabId:prefab.id,$:id=>inputs[id],color:'white',visibility:{folds:true,player:true},hiddenEntities:new Set(),hiddenRegions:new Set(),THREE,placementLayer:layer,wx:c=>c,wz:r=>r,inside:()=>true,nodeHidden:()=>false,cellHidden:()=>false,tileTop:()=>.09,tileHeight:tile=>tile?.height??.09,previewFootprint:(_prefab,r,c)=>[{r,c}],placementCandidate:()=>{counts.checks++;return {world:{serialize:()=>[]}};},placementPreviewMap:()=>({tiles:[[{},{}],[{},{}]]}),renderTreeCells:()=>{counts.projections++;return {surfaceCells:[],tokenCells:[],terrainCells:[]};},disposableClear:group=>{counts.clears++;for(const child of [...group.children]){child.geometry?.dispose();child.material?.dispose();group.remove(child);}},cancelPlacementPreview(){context.placementRenderCache=null;context.disposableClear(layer);layer.userData.preview=null;}};
 runInNewContext(draw,context);
@@ -17,3 +17,5 @@ context.prefabs=[{...prefab}];context.drawPlacementPreview({r:0,c:0});assert.equ
 context.drawPlacementPreview(null);assert.equal(layer.children.length,0);context.drawPlacementPreview({r:0,c:0});assert.equal(counts.projections,6,'cleared previews can be drawn again');
 context.tool='select';context.drawPlacementPreview({r:0,c:0});assert.equal(layer.children.length,0);
 console.log('PASS: preview meshes persist within a cell and invalidate for brush, map, visibility, catalog and clear events.');
+
+context.tool="place";context.drawPlacementPreview({r:0,c:0});const beforeDirection=counts.checks;inputs.emitterInitialDirection.value="east";context.drawPlacementPreview({r:0,c:0});assert.equal(counts.checks,beforeDirection+1,"changing emitter direction invalidates the placement candidate");

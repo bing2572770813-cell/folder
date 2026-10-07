@@ -28,7 +28,7 @@ export class TransformManager {
   childrenOf(id:string):string[]{this.get(id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
   world(id:string):GridTransform{return this.resolve(this.nodes,id,new Set());}
   at(r:number,c:number):string[]{return [...(this.index.get(r+','+c)??[])];}
-  worldCells(id:string):Array<{r:number;c:number}>{return this.cells(this.get(id),this.world(id));}
+  worldCells(id:string):Array<{r:number;c:number}>{const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return this.cells(node,this.resolve(this.nodes,id,new Set()));}
   onChange(listener:(event:TransformChange)=>void):()=>void{this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};}
   retain(id:string,owner:string):void{this.get(id);if(!owner)throw new Error('Empty reference owner');const refs=this.references.get(id)??new Set();refs.add(owner);this.references.set(id,refs);}
   release(id:string,owner:string):void{this.references.get(id)?.delete(owner);}

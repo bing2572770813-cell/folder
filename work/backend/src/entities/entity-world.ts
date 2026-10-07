@@ -23,6 +23,11 @@ export class EntityWorld {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;
   }
+  has(id:string):boolean{return this.entities.has(id);}
+  forTransform(id:string):EntityNode[]{
+    this.transforms.get(id);
+    return [...(this.entitiesByTransform.get(id)??[])].map(owner=>this.get(owner));
+  }
   clone():EntityWorld {
     const result=new EntityWorld(this.transforms.clone());
     result.entities=new Map(structuredClone([...this.entities]));

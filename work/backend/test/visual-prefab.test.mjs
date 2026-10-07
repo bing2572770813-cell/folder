@@ -18,7 +18,7 @@ test('visual configuration inherits and can be disabled without changing entity 
 
 test('placed prefab retains visual through native persistence, copy/paste and map reload',()=>{
  const entities=[],transforms=[];for(let r=0;r<3;r++)for(let c=0;c<3;c++){if(r===2&&c===2)continue;const id=`paper-${r}-${c}`,transformId=`${id}-transform`;entities.push({id,prefabId:'paper_ai',transformId,components:{surface:{height:.09},collision:{blocked:false}},tags:{},static:{walkable:true}});transforms.push({id:transformId,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});}
- const document=new TreeDocument({version:2,width:3,height:3,entities,transforms,cellTags:{},legacyMetadata:{spawn:{r:0,c:0,dir:0}}});
+ const document=new TreeDocument({version:2,width:3,height:3,entities,transforms,cellTags:{},metadata:{spawn:{r:0,c:0,dir:0}}});
  const prefab=normalizePrefab({version:1,id:'model_key_ai',name:'Key',tile:{terrain:'key'},static:{entityType:'item'},BaseEntity:['paper_ai'],visual:{model:'model/key_ai.fbx',offset:[0,.2,0]}});
  const placed=placeCategorizedPrefab(document,prefab,prefab.tile,1,1);
  const node=placed.world.at(1,1).find(node=>node.prefabId===prefab.id);

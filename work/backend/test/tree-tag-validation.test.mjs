@@ -6,7 +6,7 @@ const load=async file=>{const result=await build({entryPoints:[fileURLToPath(new
 const {TreeDocument}=await load('../../entities/tree-document.mjs');
 const {configureNode,placeTreePrefab}=await load('../../entities/tree-commands.mjs');
 const {copyTree,pasteTree}=await load('../../entities/tree-clipboard.mjs');
-const tree=tags=>({version:2,width:5,height:5,entities:[{id:'overlay',prefabId:'tag',transformId:'t',components:{tag:{}},static:{},tags}],transforms:[{id:'t',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}}],cellTags:{},legacyMetadata:{spawn:{r:0,c:0,dir:0}}});
+const tree=tags=>({version:2,width:5,height:5,entities:[{id:'overlay',prefabId:'tag',transformId:'t',components:{tag:{}},static:{},tags}],transforms:[{id:'t',parentId:null,local:{r:1,c:1,dir:0},footprint:{width:1,height:1,occupied:[true]}}],cellTags:{},metadata:{spawn:{r:0,c:0,dir:0}}});
 const invalid=[{requiredKeys:7},{requiredKeys:['']},{requiredKeys:[3]},{requiredKeys:['x'.repeat(81)]},{spawn:'true'},{entry:1},{exitTo:false},{exitTo:' '},{exitTo:'x'.repeat(81)},{regionTag:'A'}];
 for(const tags of invalid){
   const label=JSON.stringify(tags);

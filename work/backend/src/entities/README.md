@@ -24,7 +24,7 @@
 
 `snapshotRuntime` / `restoreRuntime` 为游玩历史提供独立组件状态快照，恢复先校验完整输入再替换状态。Transform 的 `referenceOwners` 返回副本，`assertRemovable` 提供不释放引用的删除预检，供编辑事务保留外部引用保护。
 
-地图保存和读取只接受 version:2 树格式；旧地图转换器已移除。地图名称、起点、出口等元数据保存在 `legacyMetadata`，但该字段名只表示元数据容器，不表示旧地图兼容。
+地图保存和读取只接受 version:2 树格式；旧地图转换器已移除。地图名称、起点、出口等元数据保存在 `metadata`，但该字段名只表示元数据容器，不表示旧地图兼容。
 
 `ComponentRegistry` 注册受控组件处理器，分发 enter/leave/interact。事件先检查全部组件和进入限制，再返回独立的 actor/runtime/messages 结果；不在处理器中计步、切换区域或提交玩家状态。static.events 限制效果订阅，不禁用碰撞预检；static.walkable=false 阻止进入。
 

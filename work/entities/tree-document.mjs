@@ -100,7 +100,7 @@ export class TreeDocument {
     const owners=options?.projectProperties?this.world.serialize():null;
     const snapshot=serializeTreeMap(this.world,this.metadata,this.cellTags,options),spawns=new Map();
     for(const node of owners??snapshot.entities)if(node.tags.spawn)for(const {r,c} of this.world.transforms.worldCells(node.transformId))spawns.set(r+','+c,{r,c});
-    if(spawns.size===1)snapshot.legacyMetadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
+    if(spawns.size===1)snapshot.metadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
     return snapshot;
   }
   applyProjection(input){
@@ -134,7 +134,7 @@ export class TreeDocument {
           configure(node,{...tile,tags:ownTags},equal(oldFolds,folds)?node.components.fold?.directions??[]:folds,old);updated.set(node.id,node);
         }
         else {
-          const seed={version:2,width:next.width,height:next.height,entities:[],transforms:[],cellTags:{},legacyMetadata:{}};
+          const seed={version:2,width:next.width,height:next.height,entities:[],transforms:[],cellTags:{},metadata:{}};
           const tree=new TreeDocument(seed);const node=tree.world.serialize()[0],transform=tree.world.transforms.serialize()[0];
           const id=globalThis.crypto.randomUUID();node.id='entity-'+id;node.transformId=transform.id='transform-'+id;added.push(node);transforms.push(transform);
         }
@@ -181,7 +181,7 @@ export class TreeDocument {
       else instanceRoots.set(instanceId,{id:transform.id,...transform.local});
     }
     for(const key of Object.keys(cellTags)){const [r,c]=key.split(',').map(Number);if(r>=next.height||c>=next.width)delete cellTags[key];}
-    snapshot.cellTags=cellTags;snapshot.legacyMetadata=this.cleanMetadata({...this.metadata,...next});
+    snapshot.cellTags=cellTags;snapshot.metadata=this.cleanMetadata({...this.metadata,...next});
     const committed=importTreeMap(snapshot);
     const oldTransformIds=new Set(this.world.transforms.serialize().map(node=>node.id));
     const entityOwners=new Set(this.world.serialize().map(node=>'entity:'+node.id));

@@ -12,6 +12,7 @@ import {TreeDocument} from './entities/tree-document.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
+import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {paperSurface,isPaper} from './render/paper-surface.mjs';
 import {isPlaceableEntity} from './entities/entity-category.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
@@ -207,6 +208,7 @@ const terrainTextures=Object.fromEntries(Object.entries(TERRAIN_MARKERS).map(([t
 }));
 const liftTexture=canvasTexture((ctx,s)=>{ctx.fillStyle='#fff4cf';ctx.beginPath();ctx.arc(s/2,s/2,s*.46,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#5f6e52';ctx.lineWidth=8;ctx.stroke();ctx.fillStyle='#5f6e52';ctx.font=`bold ${s*.62}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('↕',s/2,s*.52);});
 const exitTexture=canvasTexture((ctx,s)=>{ctx.translate(s/2,s/2);ctx.fillStyle='#fff4b1';ctx.beginPath();ctx.arc(0,0,s*.32,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#8b7635';ctx.lineWidth=8;ctx.stroke();ctx.fillStyle='#6a5a2c';ctx.beginPath();ctx.moveTo(-s*.16,s*.2);ctx.lineTo(-s*.16,-s*.13);ctx.lineTo(0,-s*.25);ctx.lineTo(s*.16,-s*.13);ctx.lineTo(s*.16,s*.2);ctx.closePath();ctx.fill();ctx.fillStyle='#fff4b1';ctx.beginPath();ctx.arc(s*.07,0,4,0,Math.PI*2);ctx.fill();});
+const tagTextures=Object.fromEntries(['entry','exit'].map(kind=>[kind,canvasTexture((ctx,size)=>{ctx.fillStyle=kind==='exit'?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(kind==='exit'?'→':'↓',size/2,size/2);})]));
 const playerTexture=canvasTexture((ctx,s)=>{ctx.translate(s/2,s/2);ctx.fillStyle='#ddea90';ctx.beginPath();ctx.arc(0,0,87,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#425c3b';ctx.lineWidth=7;ctx.stroke();ctx.beginPath();ctx.moveTo(0,-65);ctx.lineTo(41,45);ctx.lineTo(0,22);ctx.lineTo(-41,45);ctx.closePath();ctx.fillStyle='#3b5033';ctx.fill();ctx.strokeStyle='#eff5c9';ctx.lineWidth=3;ctx.stroke();});
 const playerDecal=new THREE.Mesh(new THREE.PlaneGeometry(.81,.81),new THREE.MeshBasicMaterial({map:playerTexture,transparent:true,depthWrite:false,depthTest:false}));
 playerDecal.rotation.x=-Math.PI/2;playerDecal.renderOrder=7;
@@ -277,7 +279,7 @@ function buildPaper() {
     mesh.userData.cells=cells;cells.forEach(({r,c,index,total,surfaceTop},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});
     mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();terrainLayer.add(mesh);
   }
-  for(const cell of treeCells.tagCells){if(!cell.tags.entry&&!cell.tags.exitTo)continue;const texture=canvasTexture((ctx,size)=>{ctx.fillStyle=cell.tags.exitTo?'#d1ac42':'#478d77';ctx.beginPath();ctx.arc(size/2,size/2,size*.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font=`bold ${size*.4}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cell.tags.exitTo?'→':'↓',size/2,size/2);});const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));marker.renderOrder=6;marker.rotation.x=-Math.PI/2;marker.position.set(wx(cell.c)-.27,Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)+.045,wz(cell.r));marker.scale.setScalar(.4);marker.userData.ownedTexture=texture;marker.userData.cell=cell;tagLayer.add(marker);}
+  for(const mesh of createTagMarkerBatches(THREE,treeCells.tagCells,{geometry:markerGeo,textures:tagTextures,wx,wz,top:cell=>Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)}))tagLayer.add(mesh);
   if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));marker.userData.exitCell={...map.exit};foldLayer.add(marker);
   }
@@ -308,7 +310,7 @@ function refreshLiftSurfaces(){
  for(const mesh of terrainLayer.children){
   if(mesh.isInstancedMesh){mesh.userData.cells.forEach(({r,c,index,total},i)=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),tileTop(r,c)+.025+index*.005,wz(r));matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));mesh.setMatrixAt(i,matrix);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();}
  }
- for(const mesh of tagLayer.children){const {r,c}=mesh.userData.cell;mesh.position.y=tileTop(r,c)+.045;}
+ for(const mesh of tagLayer.children)updateTagMarkerBatch(THREE,mesh,{wx,wz,top:cell=>tileTop(cell.r,cell.c)});
  for(const mesh of foldLayer.children)if(mesh.userData.exitCell){const {r,c}=mesh.userData.exitCell;mesh.position.y=tileTop(r,c)+.012;}
  axisViewKey=null;rebuildFoldAxes();buildCreaseGuides();buildFoldSelection();
  if(hovered&&hoverOutline.visible)hoverOutline.position.y=tileTop(hovered.r,hovered.c)+.035;

@@ -11,6 +11,18 @@ import {validateRegions,taggedCells} from '../../tags/regions.mjs';
 const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tree-document.mjs',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
+test('serialization derives moved spawn without allocating a display projection',()=>{
+ const input=legacy();input.tiles[1][1].tags={spawn:true};const doc=new TreeDocument(input);
+ const node=doc.world.at(1,1).find(node=>node.tags.spawn);
+ doc.world.transforms.setLocal(node.transformId,{r:3,c:2,dir:0});
+ const expected=doc.view().spawn;
+ doc.view=()=>{throw new Error('serialization must not build the display map');};
+ const snapshot=doc.serialize();
+ assert.deepEqual(snapshot.legacyMetadata.spawn,expected);
+ assert.deepEqual(new TreeDocument(snapshot).view().spawn,expected);
+ doc.world.remove(node.id);
+ assert.deepEqual(doc.serialize().legacyMetadata.spawn,doc.metadata.spawn,'no tag keeps the metadata fallback');
+});
 function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components={fold:{directions:['v']}};tree.entities.push(node);return new TreeDocument(tree);}
 test('production persistence keeps the committed world and saves metadata without reimporting',()=>{
  const documentModel=stacked(),map=documentModel.view(),world=documentModel.world;

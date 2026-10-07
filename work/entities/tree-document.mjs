@@ -92,7 +92,14 @@ export class TreeDocument {
     const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if((byCell.get(r+','+c)??[]).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
     return {...metadata,version:1,width,height,tiles,foldCells};
   }
-  serialize(options){return serializeTreeMap(this.world,{...this.metadata,spawn:this.view().spawn},this.cellTags,options);}
+  serialize(options){
+    // Persistence may filter tags; derive the spawn from canonical owners before filtering.
+    const owners=options?.projectProperties?this.world.serialize():null;
+    const snapshot=serializeTreeMap(this.world,this.metadata,this.cellTags,options),spawns=new Map();
+    for(const node of owners??snapshot.entities)if(node.tags.spawn)for(const {r,c} of this.world.transforms.worldCells(node.transformId))spawns.set(r+','+c,{r,c});
+    if(spawns.size===1)snapshot.legacyMetadata.spawn={...this.metadata.spawn,...spawns.values().next().value};
+    return snapshot;
+  }
   applyLegacy(input){
     const next={...copy(input),...validateMap(input,true)},before=this.view(),snapshot=this.serialize();
     snapshot.width=next.width;snapshot.height=next.height;

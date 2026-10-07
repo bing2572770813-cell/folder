@@ -125,7 +125,15 @@ function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
     // fail map validation because it has no walkable spawn; placement validation
     // belongs to the candidate document after the node is attached.
     const uuid=globalThis.crypto.randomUUID(),transformId='transform-'+uuid;
-    const node={id:'entity-'+uuid,prefabId:record.id,transformId,components:merge(record.tile?{}:{},record.components),tags:merge(record.tags,normalized.tags),static:copy(record.static??{}),configuration:record.tile?copy(normalized):{prefabId:record.id,...(normalized.visual!==undefined?{visual:copy(normalized.visual)}:{}),...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})}};
+    const tileComponents=record.tile?{
+      surface:{height:normalized.height,thickness:normalized.thickness,gradualRate:normalized.gradualRate,...(normalized.color?{color:normalized.color}:{}),...(normalized.surfaceConnected!==undefined?{connected:normalized.surfaceConnected}: {})},
+      collision:{blocked:normalized.blocked},
+      ...(normalized.followFold!==undefined||normalized.canDropOnFold!==undefined?{physics:{...(normalized.followFold!==undefined?{followFold:normalized.followFold}:{}),...(normalized.canDropOnFold!==undefined?{canDropOnFold:normalized.canDropOnFold}:{})}}:{}),
+      ...(normalized.folds?.length?{fold:{directions:copy(normalized.folds)}}:{}),
+      ...(normalized.lift?{lift:copy(normalized.lift)}:{}),
+      ...(normalized.terrain?{[normalized.terrain]:{...copy(normalized.terrainConfig??{}),...(normalized.terrain==='key'?{name:normalized.keyName}: {})}}:{})
+    }:{};
+    const node={id:'entity-'+uuid,prefabId:record.id,transformId,components:merge(tileComponents,record.components),tags:merge(record.tags,normalized.tags),static:copy(record.static??{}),configuration:record.tile?copy(normalized):{prefabId:record.id,...(normalized.visual!==undefined?{visual:copy(normalized.visual)}:{}),...(record.propertySchema?{propertySchema:copy(record.propertySchema)}:{})}};
     delete node.configuration.regionTag;registry.validate(node);
     if(record.tile?.lift&&normalized.lift)node.components.lift=copy(normalized.lift);
     const size=record.size??{width:1,height:1},occupied=record.occupied??Array(size.width*size.height).fill(true);

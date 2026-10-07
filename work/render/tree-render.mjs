@@ -53,9 +53,14 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
 }
 
 /** Keep neighboring primary geometry so paper seams and hidden-cell rules still work. */
-export function mapForSurface(document,nodeId,runtime=false){
- const map=document.view(),node=document.world.get(nodeId);
+	export function mapForSurface(document,nodeId,runtime=false,baseMap=null){
+	 const source=baseMap??document.view();
+	 const map=baseMap?{...source,tiles:source.tiles.slice()}:source,node=document.world.get(nodeId);
  if(!hasSurface(node))return map;
- for(const {r,c} of document.world.transforms.worldCells(node.transformId))map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+	 const rows=new Set();
+	 for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
+	   if(!rows.has(r)){map.tiles[r]=map.tiles[r].slice();rows.add(r);}
+	   map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+	 }
  return map;
 }

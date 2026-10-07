@@ -86,3 +86,11 @@ const visibleNamed=name=>{let result;mixedRoot.traverse(o=>{if(o.name===name&&o.
 assert.deepEqual(visibleNamed('fixed-key').getWorldPosition(new THREE.Vector3()).toArray(),[0,.2,0],'nonfoldable entity stays fixed even on a rotating paper cell');
 assert.notDeepEqual(visibleNamed('moving-paper').getWorldPosition(new THREE.Vector3()).toArray(),[0,.2,0]);mixedView.reset();assert.equal(movingPaper.visible,true);assert.equal(fixedEntity.visible,true);
 const notFoldable=fixture();notFoldable.map.tiles[2][3].followFold=false;assert.equal(notFoldable.controller.beginFoldDrag(2,3,300),false,'player standing on a nonfoldable entity cannot start a fold');
+
+const referenceRoot=new THREE.Group(),referenceLayer=new THREE.Group(),referencePlayer=new THREE.Group();referenceRoot.add(referenceLayer,referencePlayer);
+const referenceLine=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(1,0,0)]),new THREE.LineBasicMaterial());referenceLayer.add(referenceLine);
+const referenceBefore=referenceLine.geometry.attributes.position.array.slice(),referenceMatrix=referenceLine.matrixWorld.clone();
+const fixedView=createFoldMotionView({paper:referenceRoot,layers:[referenceLayer],fixedLayers:[referenceLayer],playerGroup:referencePlayer,wx:c=>c,wz:r=>r});
+fixedView.begin([{r:0,c:0}],{origin:[0,0,0],direction:[0,0,1],side:1});fixedView.setAngle(Math.PI/2);referenceRoot.updateMatrixWorld(true);
+assert.equal(referenceLine.visible,true);assert.equal(referenceLayer.children.length,1);assert.deepEqual(referenceLine.geometry.attributes.position.array,referenceBefore);assert.deepEqual(referenceLine.matrixWorld.elements,referenceMatrix.elements);fixedView.reset();
+console.log('PASS: fixed reference layers retain their geometry and world transforms throughout folding.');

@@ -12,7 +12,7 @@ export function tabletopHeight(map,hidden=()=>false){
 }
 
 // Temporary render transforms only. Static map cells are never mutated.
-export function createFoldMotionView({ paper, layers, playerGroup, wx, wz, canFold=()=>true }) {
+export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGroup, wx, wz, canFold=()=>true }) {
   let session = null;
   function reset() {
     if (!session) return;
@@ -58,6 +58,7 @@ export function createFoldMotionView({ paper, layers, playerGroup, wx, wz, canFo
       if (moving) object.position.sub(pivot.position);
     }
     for (const layer of layers) {
+      if(fixedLayers.includes(layer))continue;
       if (!layer.visible) continue;
       for (const object of [...layer.children]) {
         if (!object.visible) continue;

@@ -148,7 +148,7 @@ const tableScenery=createTableScene(); scene.add(tableScenery.group);
 function paperUnderside(){return tabletopHeight(map,cellHidden); }
 // The tabletop always rests under the lowest visible paper underside.
 let sceneryTop=0;
-function layoutScenery(){sceneryTop=paperUnderside();tableScenery.layout(map.width,map.height,sceneryTop);}
+function layoutScenery(){sceneryTop=paperUnderside();tableScenery.layout(map.width,map.height,sceneryTop);boardLayer.position.y=sceneryTop;}
 // Void-plane overlays sit on the tabletop while the table is visible.
 const voidY=offset=>sceneryTop+offset;
 const ambient=new THREE.HemisphereLight('#ffffff','#708875',2.1); scene.add(ambient);
@@ -199,7 +199,7 @@ const playerGroup=new THREE.Group(),activeTokenHost=new THREE.Group();let active
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
-const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,gridLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
+const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
 function renderPlayer() {const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.y=-P.player.dir*Math.PI/4;}
 
@@ -302,11 +302,11 @@ function addAxisLabels(maxHeight){
     for(let c=0;c<w;c++){ctx.fillText(columnLabel(c),(c+1.5)*sx,.5*sy);ctx.fillText(columnLabel(c),(c+1.5)*sx,(h+1.5)*sy);}
     for(let r=0;r<h;r++){ctx.fillText(String(r+1),.5*sx,(r+1.5)*sy);ctx.fillText(String(r+1),(w+1.5)*sx,(r+1.5)*sy);}
   },size);
-  const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:false}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.03;label.userData.ownedTexture=texture;boardLayer.add(label);
+  const label=new THREE.Mesh(new THREE.PlaneGeometry(w+2,h+2),new THREE.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,depthTest:true}));label.rotation.x=-Math.PI/2;label.position.y=maxHeight+.003;label.userData.ownedTexture=texture;boardLayer.add(label);
 }
 function applyVisibility(){
   const editing=P.mode==='edit';boardLayer.visible=!editing||visibility.coords;tileLayer.visible=true;entityEdgeLayer.visible=tileLayer.visible;gridLayer.visible=showGrid;foldLayer.visible=!editing||visibility.folds;foldAxisLayer.visible=foldLayer.visible;playerGroup.visible=!editing;spawnMarkerGroup.visible=(!editing||visibility.player)&&!cellHidden(map.spawn.r,map.spawn.c)&&!!map.tiles[map.spawn.r]?.[map.spawn.c]?.tags?.spawn;staticTokenLayer.visible=tileLayer.visible;tagLayer.visible=!editing||visibility.player;
-  terrainLayer.visible=true;tableScenery.group.visible=showTable;creaseGuideLayer.visible=showCreaseDashes&&foldLayer.visible;foldSelectionLayer.visible=foldLayer.visible&&P.mode==='play'&&!!P.chosenFold&&!P.foldMotion;
+  terrainLayer.visible=true;tableScenery.group.visible=showTable;creaseGuideLayer.visible=showCreaseDashes&&foldLayer.visible;foldSelectionLayer.visible=foldLayer.visible&&P.mode==='play'&&!!P.chosenFold;
 }
 for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['playerVisible','player']])$(id).onchange=()=>{visibility[key]=$(id).checked;if(key==='folds')buildPaper();else applyVisibility();syncState();};
 

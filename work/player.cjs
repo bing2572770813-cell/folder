@@ -213,7 +213,12 @@ function canMoveTo(r,c){const map=env.getMap();const delta=(map.tiles[r]?.[c]?.h
 function commitTreeEvent(type,position,nodes,trigger){const tree=world(),result=treeEvent(type,position,P.terrainState,tree.snapshotRuntime(),nodes,trigger);if(result.valid){P.terrainState={...result.actor,message:result.messages.join('；')};tree.restoreRuntime(result.runtime);}return result;}
 function leaveTree(position,trigger){if(world())commitTreeEvent('leave',position,undefined,trigger);}
 function enterTree(trigger){P.terrainState={...P.terrainState,message:'',gameOver:false,won:false};const result=commitTreeEvent('enter',P.player,undefined,trigger);if(!result.valid)throw new Error(result.reason||'目标不可进入');if(P.terrainState.frozen&&!P.terrainState.gameOver){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if((dr||dc)&&world().at(P.player.r+dr,P.player.c+dc).some(node=>Object.hasOwn(node.components,'campfire'))){P.terrainState.frozen=false;P.terrainState.message='篝火解除冰冻';return;}}}}
-function interact(){if(!world()||P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit)return;record();const result=commitTreeEvent('interact',P.player);if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);buildPaper();updateUI();checkRunEnd();return result;}
+function interact(){
+ if(!world()||P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit)return;
+ const before=snapshot(),result=commitTreeEvent('interact',P.player),after=snapshot();
+ if(JSON.stringify(before)!==JSON.stringify(after)){P.playHistory.push(before);if(P.playHistory.length>150)P.playHistory.shift();}
+ if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);buildPaper();updateUI();checkRunEnd();return result;
+}
 function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vertical,foldHorizontal=P.foldDrop.horizontal,canDropOnFold=P.canDropOnFold,overheat=P.terrainState.overheat,frozen=P.terrainState.frozen,actions=P.terrainState.actions,collectedKeys=P.terrainState.collectedKeys}) {
  if(P.mode!=='play'||P.moving||P.foldMotion)throw new Error('请在游玩模式且移动结束后修改玩家属性');
  if(!inside(r,c)||!Number.isInteger(dir)||dir<0||dir>7)throw new Error('玩家坐标或朝向无效');

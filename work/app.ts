@@ -69,11 +69,53 @@ import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
 import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2 } from 'lucide';
 
 const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Copy, ClipboardPaste, Redo2 };
-for (const node of document.querySelectorAll('[data-lucide]')) {
-  const name=node.dataset.lucide.replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
-  const svg=createElement(icons[name]);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
+for (const node of document.querySelectorAll<HTMLElement>('[data-lucide]')) {
+  const name=(node.dataset.lucide??'').replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
+  const icon=icons[name as keyof typeof icons];
+  if(!icon)continue;
+  const svg=createElement(icon);svg.setAttribute('aria-hidden','true');node.replaceWith(svg);
 }
-const $ = id => document.getElementById(id);
+type EditorInput = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+interface EditorElements {
+  viewport: HTMLDivElement;
+  blockHeight: HTMLInputElement;
+  blockThickness: HTMLInputElement;
+  blockGradualRate: HTMLInputElement;
+  keyName: HTMLInputElement;
+  playerRow: HTMLInputElement;
+  playerColumn: HTMLInputElement;
+  playerDirection: HTMLSelectElement;
+  playerMaxUp: HTMLInputElement;
+  playerMaxDown: HTMLInputElement;
+  playerFoldVertical: HTMLInputElement;
+  playerFoldHorizontal: HTMLInputElement;
+  playerCanDropOnFold: HTMLInputElement;
+  playerOverheat: HTMLInputElement;
+  playerFrozen: HTMLInputElement;
+  playerActions: HTMLInputElement;
+  playerCollectedKeys: HTMLTextAreaElement;
+  mapName: HTMLInputElement;
+  mapWidth: HTMLInputElement;
+  mapHeight: HTMLInputElement;
+  regionChoice: HTMLSelectElement;
+  regionName: HTMLInputElement;
+  nodeLocalR: HTMLInputElement;
+  nodeLocalC: HTMLInputElement;
+  nodeLocalDir: HTMLSelectElement;
+  nodeParent: HTMLSelectElement;
+  preserveWorld: HTMLInputElement;
+  nodeComponents: HTMLTextAreaElement;
+  nodeTags: HTMLTextAreaElement;
+  requiredKeyList: HTMLDivElement;
+  playerKeyChoices: HTMLDivElement;
+}
+function $(id: keyof EditorElements): EditorElements[typeof id];
+function $(id: string): HTMLElement;
+function $(id: string): HTMLElement {
+  const element=document.getElementById(id);
+  if(!element)throw new Error(`缺少编辑器元素：${id}`);
+  return element;
+}
 const onEditorTab=event=>{if(event.detail==='inspect'){setTool('select');scheduleInspection();}};
 document.addEventListener('fold:editor-tab',onEditorTab);
 const editorTabs={dispose:()=>document.removeEventListener('fold:editor-tab',onEditorTab)};

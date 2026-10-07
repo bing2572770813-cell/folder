@@ -1,0 +1,33 @@
+{
+  "id": "firebird_ai",
+  "blend": "assets\\raw_design\\artworks\\firebird_ai.blend",
+  "sourceConcept": "assets\\raw_design\\artworks\\firebird_reference.png",
+  "cellSize": 1.0,
+  "footprint": "3x3 cells",
+  "modelBounds": {
+    "min": [
+      -1.4688,
+      -0.384,
+      0.00028
+    ],
+    "max": [
+      1.4688,
+      0.40924,
+      3.089
+    ]
+  },
+  "skill": {
+    "name": "火球点燃单格",
+    "target": "one 1x1 grid cell",
+    "animationFrames": [
+      1,
+      48
+    ]
+  },
+  "collections": [
+    "FIREBIRD_MODEL | 3x3 grid",
+    "FX_FIREBALL_IGNITE | single-cell skill",
+    "GRID_REFERENCE | 3x3 cells"
+  ],
+  "visualOnly": true
+}\n

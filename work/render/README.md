@@ -8,3 +8,7 @@ crease-guides.mjs 生成贴合折痕凹槽的"点线交替"虚线提示：纸张
 table-scene.mjs 将 Blender 建模的桌游桌以内联几何载入场景（独立 HTML 不依赖外部文件）：桌面顶面对齐当前地图最低纸张底面，桌面始终参与折叠碰撞，关闭桌子只隐藏外观。
 
 目录整理不改变 Three.js 预览效果、折线渲染或游玩侧栏。修改纸张几何需运行 node work/test-paper-surface.mjs 并完成相关视觉回归；新算法先确认。
+
+空闲 pointermove 通过 `core/frame-task.mjs` 合并为每帧一次；拖拽编辑和玩家折纸手势保持即时处理。相机交互开始时取消待执行的悬停与预览，结束后重新计算最后位置。调度器不持有地图、实体或 Three.js 对象。
+
+渲染循环默认不写 `viewport.dataset.frames/render/points`。浏览器性能检查需要这些数据时先调用 `window.foldField.enableDiagnostics(true)`，关闭时调用 `enableDiagnostics(false)`；相机手势期间仍暂停这些周期性诊断。`getState()` 和 `screenPoint(r,c)` 始终可按需读取。

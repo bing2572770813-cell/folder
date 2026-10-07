@@ -1,6 +1,8 @@
 const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
 const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
+const firebirdRules=require('./mechanics/firebird.cjs');
+const flameField=require('./mechanics/flame-field.cjs');
 function rayCells(origin,direction,width,height){
  const delta=rayEmitterConfig.directions[direction];if(!delta)throw new Error('Invalid ray emitter direction');
  const cells=[];for(let step=1;step<=3;step++){const r=origin.r+delta.r*step,c=origin.c+delta.c*step;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;
@@ -172,6 +174,21 @@ function fireRayEmitters(){
  }
  env.refreshMechanismSurfaces?.();
 }
+function updateFirebirds(action){
+ const tree=world(),map=env.getMap();if(!tree||!action)return;
+ let flames=flameField.spreadFlame(P.terrainState.flames??[],[],map.width,map.height);
+ for(const node of tree.serialize())if(node.components.firebird&&!tree.runtime(node.id,'firebird').replaced){
+  const origin=tree.position(node.id);if(!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
+  const footprint=tree.transforms.get(node.transformId).footprint;
+  for(const effect of firebirdRules.resolveFirebird({id:node.id,origin,footprint,config:node.components.firebird},action,P.player,map.width,map.height)){
+   if(effect.type==='addFlame')flames=flameField.addFlame(flames,effect.cells,map.width,map.height);
+   else if(effect.type==='replaceFirebird')tree.setRuntime(node.id,'firebird',{replaced:true});
+  }
+ }
+ P.terrainState.flames=flames;
+ if(flameField.contains(flames,P.player)){P.terrainState.gameOver=true;P.terrainState.message='被火焰覆盖，游戏结束';}
+ env.refreshMechanismSurfaces?.();
+}
 function syncLiftHeights(){const tree=world(),map=env.getMap();if(!tree)return false;let changed=false;
  for(const node of tree.serialize())if(node.components.lift){const state=tree.runtime(node.id,'lift'),height=Number(state.height??node.components.lift.initialHeight);for(const cell of tree.transforms.worldCells(node.transformId)){const tile=map.tiles[cell.r]?.[cell.c];if(tile&&Math.abs((tile.height??0)-height)>1e-9){tile.height=height;changed=true;}}}
  return changed;
@@ -203,6 +220,7 @@ function treeEntryCheck(position,actor=P.terrainState,trigger){
  return env.componentRegistry.checkEntry({trigger,nodes:activeAt(position.r,position.c),actor,runtime:world().snapshotRuntime()});
 }
 function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)return canEnterTerrain(env.getMap(),{r,c},P.terrainState);
+ if(flameField.contains(P.terrainState.flames,{r,c}))return {valid:false,reason:'火焰覆盖的方格不可进入'};
  if(!inside(r,c)||(!ignoreHidden&&env.isHidden(r,c)))return {valid:false,reason:'目标为空格或未揭示区域'};
  const nodes=activeAt(r,c);if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false))return {valid:false,reason:'目标是阻挡方块'};
@@ -345,6 +363,7 @@ function settleAction(action){
  const transitioned=!P.terrainState.gameOver&&transitionRegion();
  if(transitioned)arrive(Trigger.Teleport);
  fireRayEmitters();
+ updateFirebirds(action);
  if(!switchesOpen()&&exitIsValid()&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;
@@ -399,7 +418,7 @@ const turnManager=createTurnManager({
  enter:context=>arrive(context.action.trigger),
  settle:context=>{
   if(context.action.dropFrom){context.droppedEntities=applyEntityDrops(context.action.entityDrops);if(context.droppedEntities)collectKey();}
-  context.transitioned=settleAction(context.action);
+  context.transitioned=settleAction({...context.action,from:context.from});
  },
  outcome:()=>{checkRunEnd();return P.levelWon?'win':P.stepLimitHit?(P.terrainState.gameOver?'terrain':'limit'):null;},
  present:context=>{

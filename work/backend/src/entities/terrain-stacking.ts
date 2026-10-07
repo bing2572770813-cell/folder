@@ -3,6 +3,7 @@ import type {EntityNode} from './entity-model.js';
 
 export const terrainComponents = ['campfire', 'ice', 'fire', 'eruption', 'rayEmitter', 'foldSwitch', 'firebird', 'flame'] as const;
 export function isTerrainEntity(node:EntityNode):boolean {
+  if(node.static.entityType==='creature')return false;
   return terrainComponents.some(id => Object.hasOwn(node.components, id));
 }
 
@@ -28,6 +29,11 @@ export function validateTerrainStacking(world:EntityWorld,nodes:EntityNode[]=wor
     }
   }
   for (const [key,nodes] of byCell) {
+      const enemies=nodes.filter(node=>node.static.entityType==='creature'&&(node.components.firebird||node.components.rayEmitter));
+      if(enemies.length){
+        if(!nodes.some(node=>node.components.surface&&node.static.entityType!=='creature'&&!node.components.collision?.blocked&&node.static.walkable!==false))throw new Error('敌人机关的每个占用格都需要可行走纸面：'+key);
+        if(enemies.length>1||nodes.some(node=>node.tags.spawn||node.tags.entry))throw new Error('敌人机关不能覆盖生物、玩家起点或区域入口：'+key);
+      }
       if(nodes.some(item=>item.static.entityType==='terrain')){
         const terrainCount=nodes.filter(item=>item.static.entityType==='terrain'||(item.static.entityType===undefined&&(Object.hasOwn(item.components,'surface')||isTerrainEntity(item)))).length;
         if(terrainCount>1)throw new Error('所有地形（包括纸张）互斥：'+key);

@@ -19,7 +19,7 @@ export function mechanismMarker(THREE,components,runtime={}){
  }
  if(components.fragile){badge('#c99a48',.12);line([[-.4,-.2],[-.08,-.1],[-.08,-.1],[.02,.07],[.02,.07],[.32,.32],[.02,.07],[-.13,.33],[.02,.07],[.32,-.12]],'#554437');line([[-.28,.3],[-.08,.12],[-.08,.12],[.1,.24]],'#8b5c35',.8);}
  if(components.firebird){const replaced=runtime.firebird?.replaced===true;badge(replaced?'#3e4548':'#e05a2a',.26);line([[-.28,-.28],[.28,.28],[-.28,.28],[.28,-.28]],replaced?'#252b2d':'#d13a24');group.userData.firebird=!replaced;group.userData.replaced=replaced;}
- if(components.flame){badge('#ed7d24',.32);line([[-.08,-.3],[.12,-.08],[-.08,.02],[.14,.3]],'#f3b52b');}
+ if(components.flame){group.userData.flame=true;badge('#ed7d24',.32);line([[-.08,-.3],[.12,-.08],[-.08,.02],[.14,.3]],'#f3b52b');}
  group.traverse(object=>{object.raycast=()=>{};});return group;
 }
 

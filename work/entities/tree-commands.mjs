@@ -10,7 +10,7 @@ import {legalKeyNames} from '../tags/keys.mjs';
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
 const terrainComponentIds=['campfire','ice','fire','eruption','rayEmitter','foldSwitch','firebird','flame'];
-const isTerrainNode=node=>node.static.entityType==='terrain'||Object.hasOwn(node.components,'surface')||terrainComponentIds.some(id=>Object.hasOwn(node.components,id));
+const isTerrainNode=node=>node.static.entityType!==undefined?node.static.entityType==='terrain':Object.hasOwn(node.components,'surface')||terrainComponentIds.some(id=>Object.hasOwn(node.components,id));
 const matchesBase=(node,bases)=>bases?.some(base=>base==='paper_ai'?Object.hasOwn(node.components,'surface'):base===node.prefabId);
 export function forkTreeDocument(document){
   return document.clone();
@@ -141,7 +141,8 @@ function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
     // Legacy terrain/item prefabs include a paper surface; stacking reuses the destination paper.
     if(options.item===true||(!options.replaceTerrain&&record.tile?.terrain&&candidate.world.transforms.worldCells(transformId).some(cell=>candidate.world.at(cell.r,cell.c).some(other=>Object.hasOwn(other.components,'surface')))))delete node.components.surface;
     check(candidate.world,[transformId],options.isHidden,options.nodeHidden);
-    const bases=normalizeBaseEntity(record.BaseEntity);createEntityBehavior(record.behavior);
+    const bases=normalizeBaseEntity(record.BaseEntity);
+    createEntityBehavior(record.behavior).validatePlacement?.({prefab:record,cells:candidate.world.transforms.worldCells(transformId),world:candidate.world});
     for(const cell of candidate.world.transforms.worldCells(transformId)){
       const existing=candidate.world.at(cell.r,cell.c);
       if(existing.some(other=>options.nodeHidden?.(other)))throw new Error('不能覆盖隐藏实体');
@@ -160,7 +161,7 @@ function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
 
 /** Unified placement: terrain replaces its cell; items retain their required support. */
 export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
- if(!isPlaceableEntity(prefab))throw new Error('生物由游玩模式自动生成，不能主动放置');
+ if(!isPlaceableEntity(prefab))throw new Error('实体不可主动放置');
  const category=entityCategory(prefab),cells=footprint(prefab,r,c),world=document.world;
  if(cells.some(p=>p.r<0||p.c<0||p.r>=world.transforms.height||p.c>=world.transforms.width))throw new Error('实体实际占用格超出地图');
  if(cells.some(p=>options.isHidden?.(p.r,p.c)))throw new Error('不能修改隐藏区域');
@@ -201,6 +202,6 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
   };
   for(const id of ids)deleteTransform(id);
  }
- candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
+ candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item'||category==='creature',replaceTerrain:category==='terrain',validate:false});
  return validateTreeDocument(candidate);
 }

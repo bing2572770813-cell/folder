@@ -68,6 +68,32 @@ test('invalid emitter direction is rejected by the shared registry',()=>{
  assert.throws(()=>registry.validate(node),/direction/i);
 });
 
+function birdFixture(){
+ const f=fixture();f.world.remove('emitter');
+ f.world.transforms.create({id:'t-bird',parentId:null,local:{r:4,c:4,dir:0},footprint:{width:3,height:3,occupied:Array(9).fill(true)}});
+ f.world.add({id:'bird',prefabId:'firebird_ai',transformId:'t-bird',components:{firebird:{direction:'east'},collision:{blocked:true}},tags:{},static:{entityType:'creature',walkable:false}});
+ return f;
+}
+test('placed firebird activates once after arrival, with undo/restart restoring its runtime',()=>{
+ const f=birdFixture(),before=f.controller.snapshot();
+ assert.equal(f.controller.canMoveTo(4,4),false);
+ assert.equal(f.controller.movePlayer(99,99),false);assert.deepEqual(f.state.terrainState.flames,[]);
+ assert.equal(f.move(2,2),true);assert.equal(f.world.runtime('bird','firebird').replaced,true);
+ assert.equal(f.state.terrainState.flames.length,3);
+ assert.deepEqual(f.state.terrainState.flames,[{r:4,c:6},{r:5,c:6},{r:6,c:6}]);
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
+ f.move(2,2);f.controller.restart();assert.deepEqual(f.world.runtime('bird','firebird'),{});assert.deepEqual(f.state.terrainState.flames,[]);
+});
+test('outside watch range firebird ignites action origin and old flames spread only on successful turns',()=>{
+ const f=birdFixture();f.controller.setFreeTeleport(true);
+ assert.equal(f.controller.testTeleport(0,0),true);f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.state.terrainState.flames,[{r:2,c:1}]);assert.deepEqual(f.world.runtime('bird','firebird'),{});
+ assert.equal(f.controller.canMoveTo(2,1),false);
+ const before=f.controller.snapshot();f.controller.movePlayer(99,99);f.controller.tick(performance.now()+2000);assert.deepEqual(f.controller.snapshot(),before);
+ assert.equal(f.move(0,1),true);assert.equal(f.state.terrainState.flames.some(cell=>cell.r===1&&cell.c===1),true);
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
+});
+
 function switchFixture(initialState=0){
  const f=fixture();f.world.remove('emitter');
  f.add('switch',0,2,{foldSwitch:{initialState},fold:{directions:['v']}});

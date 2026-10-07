@@ -2,10 +2,58 @@
   "version": 1,
   "id": "firebird_ai",
   "name": "火焰鸟",
-  "size": {"width":3,"height":3},
-  "occupied": [true,true,true,true,true,true,true,true,true],
-  "components": {"firebird":{"direction":"east"}},
-  "propertySchema": {"components":{"children":{"firebird":{"children":{"direction":{"label":"预设方向","tempEditable":true}}}}}},
-  "static": {"entityType":"terrain","walkable":false},
-  "BaseEntity": ["paper_ai"]
+  "size": {
+    "width": 3,
+    "height": 3
+  },
+  "occupied": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "components": {
+    "firebird": {
+      "direction": "east"
+    },
+    "physics": {
+      "followFold": true,
+      "canDropOnFold": true
+    },
+    "collision": {
+      "blocked": true
+    }
+  },
+  "propertySchema": {
+    "components": {
+      "children": {
+        "firebird": {
+          "children": {
+            "direction": {
+              "label": "预设方向",
+              "tempEditable": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "static": {
+    "entityType": "creature",
+    "walkable": false,
+    "placeable": true
+  },
+  "BaseEntity": [
+    "paper_ai"
+  ],
+  "behavior": {
+    "scriptId": "firebird-placement",
+    "parameters": {},
+    "state": {}
+  }
 }

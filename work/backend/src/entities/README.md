@@ -38,9 +38,9 @@
 
 events 数组元素必须是事件名字符串；嵌套数组、对象或数字不能通过字符串转换被接受。
 
-旧 tile 的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和 serializable 权限过滤已接入生产保存，legacy/canonical 重复字段双向桥接并同时过滤。
+网格投影中的完整配置（包括自定义 properties 和 propertySchema）在转换后保存在实体 configuration 快照中，避免首次迁移丢失字段。组件配置是新交互接口，configuration 的编辑映射和 serializable 权限过滤已接入生产保存，投影/canonical 重复字段双向桥接并同时过滤。
 
-`importTreeMap` / `serializeTreeMap` 提供 version:1 转换和 version:2 配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。
+`importTreeMap` / `serializeTreeMap` 提供 version:2 配置往返，恢复时由 TransformManager / EntityWorld 校验引用和循环。只保存实体配置、局部 Transform 和地图元数据，不保存运行时状态、监听器或临时索引。
 
 持久化调用可传入 `projectProperties` 和 `schemaFor(node)`，复用核心模块的嵌套 serializable 权限，并同时过滤 configuration 及旧字段在组件、标签中的副本。默认无投影的序列化用于完整编辑历史；组件运行时状态始终独立。
 
@@ -53,6 +53,6 @@ events 数组元素必须是事件名字符串；嵌套数组、对象或数字�
 `player.cjs` 通过 getEntityWorld 查询同格节点并协调 enter/leave/interact，保留原计步、动画、折纸、邻近篝火与区域规则。游玩历史独立保存组件运行时，撤销恢复，重启清空；钥匙门槛检查同格所有节点。实体选择、层级编辑、重挂载、受保护删除和同格渲染/拾取均已接入编辑器。
 
 
-磁盘 prefab 目录支持带 tile 的旧定义和仅有 components 的原生定义，继承合并组件、静态属性与 children；API、浏览器 palette 和树放置使用同一归一化结果。原生节点没有显式 surface/collision 时不生成这两个组件。起点兼容坐标从真实 spawn 标签派生；编辑器 requiredKeys 和玩家验证使用全节点可收集钥匙集合。树命令与粘贴均校验无表面节点的标量标签冲突，旧高度/区域编辑保留混合组件。
+磁盘 prefab 目录支持带 tile 的旧定义和仅有 components 的原生定义，继承合并组件、静态属性与 children；API、浏览器 palette 和树放置使用同一归一化结果。原生节点没有显式 surface/collision 时不生成这两个组件。起点兼容坐标从真实 spawn 标签派生；编辑器 requiredKeys 和玩家验证使用全节点可收集钥匙集合。树命令与粘贴均校验无表面节点的标量标签冲突，网格高度/区域编辑保留混合组件。
 
 FR-01–14 的产品实现和验收证据见 docs/superpowers/plans/2026-10-06-transform-product-progress.md。方向沿父链叠加，不旋转子节点偏移或 footprint；regionTag 固定属于 tile。

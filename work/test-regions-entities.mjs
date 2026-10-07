@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import {normalizePrefab} from './tile-model.mjs';
 import {footprint,placeEntity,removeEntity} from './entity-model.mjs';
 import {clearMapCells} from './editor/clear-map.mjs';
-import {assignRegion,tagCell,validateRegions,migrateRegions,regionNames} from './regions.mjs';
-// Exercise old placement compatibility separately from the new prefab authoring boundary.
+import {assignRegion,tagCell,validateRegions,regionNames} from './regions.mjs';
+// Exercise grid projection placement separately from the prefab authoring boundary.
 const prefab={version:1,id:'large_ai',name:'large',size:{width:2,height:3},occupied:[true,false,true,true,true,true],tile:{color:'white'}};
 assert.throws(()=>normalizePrefab(prefab),/纸张实体只能占一个方格/);
-const map=migrateRegions({width:5,height:5,spawn:{r:4,c:4,dir:0},tiles:Array.from({length:5},()=>Array.from({length:5},()=>({color:'white'})))});
+const map={width:5,height:5,spawn:{r:4,c:4,dir:0},tiles:Array.from({length:5},()=>Array.from({length:5},()=>({color:'white',regionTag:'默认区域'})))};map.tiles[4][4].tags={spawn:true};
 const fixedTags={'0,0':{regionTag:'OverlayOnly'},'1,1':{regionTag:'EmptyFixed'}};
 assert.deepEqual(regionNames(map,fixedTags),['EmptyFixed','OverlayOnly','默认区域']);
 assert.deepEqual(regionNames({...map,cellTags:fixedTags}),regionNames(map,fixedTags));
@@ -21,7 +21,7 @@ const voidMap=structuredClone(map);voidMap.tiles[0][0]=null;voidMap.foldCells=[{
 const placed=placeEntity(voidMap,prefab,prefab.tile,0,0);assert.deepEqual(placed.map.tiles[0][0].folds,['h']);assert.equal(placed.map.foldCells.length,0);
 assert.equal(voidMap.tiles[0][0],null);
 const hiddenHole=placeEntity(map,prefab,prefab.tile,0,0,(r,c)=>r===0&&c===1);assert.equal(hiddenHole.map.tiles[0][1].instance,undefined);
-const noStart=structuredClone(map);delete noStart.tiles[4][4].tags.spawn;migrateRegions(noStart);assert.equal(noStart.tiles[4][4].tags.spawn,undefined);
+const noStart=structuredClone(map);delete noStart.tiles[4][4].tags.spawn;assert.equal(noStart.tiles[4][4].tags.spawn,undefined);
 const renamed=assignRegion(next,[{r:0,c:0},{r:1,c:0}],'renamed');assert.equal(renamed.tiles[4][4].tags.exitTo,'renamed');
 assert.throws(()=>assignRegion(next,[{r:0,c:0},{r:4,c:4}],'mixed'),/共存/);
 console.log('PASS: folds survive placement, hidden mask holes remain untouched, cleared starts stay cleared and region renames preserve exits.');

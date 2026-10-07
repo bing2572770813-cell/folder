@@ -36,7 +36,7 @@ export function importTreeMap(input:unknown):ImportedTree {
 export interface TreeSerializationOptions {
   /** Persistence boundaries supply core/property-model.mjs; omitted for complete editor snapshots. */
   projectProperties?:(values:JsonObject,schema:JsonObject,flag:'serializable')=>JsonObject;
-  /** Resolve inherited/catalog permissions; defaults to the legacy configuration's propertySchema. */
+  /** Resolve inherited/catalog permissions; defaults to the configuration propertySchema. */
   schemaFor?:(node:ReturnType<EntityWorld['serialize']>[number])=>JsonObject;
   /** Resolve cell permissions independently of movable entity configuration. */
   schemaForCell?:(r:number,c:number,tags:JsonObject)=>JsonObject;
@@ -51,7 +51,7 @@ export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTa
     const project=(values:JsonObject)=>jsonObject(options.projectProperties!(values,schema,'serializable'));
     if(configuration){
       node.configuration=project(configuration);
-      // These fields identify the legacy instance and its permission contract on import.
+      // These fields identify the instance and its permission contract on import.
       for(const key of ['prefabId','instance','kind','terrain','propertySchema'])if(Object.hasOwn(configuration,key))node.configuration[key]=configuration[key];
       if(configuration.folds!==undefined){
         if(node.configuration.folds===undefined)delete node.configuration.fold;

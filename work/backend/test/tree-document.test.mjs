@@ -11,6 +11,20 @@ import {validateRegions,taggedCells} from '../../tags/regions.mjs';
 const output=await build({entryPoints:[fileURLToPath(new URL('../../entities/tree-document.mjs',import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});
 const {TreeDocument}=await import('data:text/javascript;base64,'+Buffer.from(output.outputFiles[0].text).toString('base64'));
 const legacy=()=>({version:1,width:5,height:5,tiles:Array.from({length:5},(_,r)=>Array.from({length:5},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null)),spawn:{r:1,c:1,dir:0}});
+test('serialization derives moved spawn without allocating a display projection',()=>{
+ const input=legacy();input.tiles[1][1].tags={spawn:true};const doc=new TreeDocument(input);
+ const node=doc.world.at(1,1).find(node=>node.tags.spawn);
+ doc.world.transforms.setLocal(node.transformId,{r:3,c:2,dir:0});
+ const expected=doc.view().spawn;
+ doc.view=()=>{throw new Error('serialization must not build the display map');};
+ const serialize=doc.world.serialize.bind(doc.world);let snapshots=0;doc.world.serialize=()=>{snapshots++;return serialize();};
+ const snapshot=doc.serialize();
+ assert.equal(snapshots,1,'serialization reuses the validated entity snapshot');
+ assert.deepEqual(snapshot.legacyMetadata.spawn,expected);
+ assert.deepEqual(new TreeDocument(snapshot).view().spawn,expected);
+ doc.world.remove(node.id);
+ assert.deepEqual(doc.serialize().legacyMetadata.spawn,doc.metadata.spawn,'no tag keeps the metadata fallback');
+});
 function stacked(){const doc=new TreeDocument(legacy()),tree=doc.serialize(),node=structuredClone(tree.entities[0]);node.id='secondary';node.components={fold:{directions:['v']}};tree.entities.push(node);return new TreeDocument(tree);}
 test('production persistence keeps the committed world and saves metadata without reimporting',()=>{
  const documentModel=stacked(),map=documentModel.view(),world=documentModel.world;
@@ -19,8 +33,8 @@ test('production persistence keeps the committed world and saves metadata withou
  map.name='新地图';map.spawn.dir=3;map.bestSteps=6;
  let notifications=0;
  const source=readFileSync(new URL('../../app.js',import.meta.url),'utf8');
- const persistSource=source.slice(source.indexOf('function persist()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
- const context={documentModel,map,console,applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
+ const persistSource=source.slice(source.indexOf('function notifyMapChanged()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
+ const context={documentModel,map,console,gestureBefore:null,editRefresh:{request:()=>context.notifyMapChanged()},applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
  runInNewContext(persistSource,context);for(let i=0;i<20;i++)context.persist();
  assert.equal(notifications,20);assert.equal(documentModel.world,world);
  const saved=documentModel.serialize();assert.deepEqual(saved.entities,before.entities);assert.deepEqual(saved.transforms,before.transforms);assert.deepEqual(world.snapshotRuntime(),runtime);

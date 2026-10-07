@@ -10,10 +10,7 @@ import {legalKeyNames} from '../tags/keys.mjs';
 const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
 export function forkTreeDocument(document){
-  const candidate=document.clone();candidate.world.restoreRuntime(document.world.snapshotRuntime());
-  const owners=new Set(document.world.serialize().map(node=>'entity:'+node.id));
-  for(const transform of document.world.transforms.serialize())for(const owner of document.world.transforms.referenceOwners(transform.id))if(!owners.has(owner))candidate.world.transforms.retain(transform.id,owner);
-  return candidate;
+  return document.clone();
 }
 
 /** Rename every selected key owner, then update references only when its old name disappears. */
@@ -35,12 +32,29 @@ export function renameTreeKeys(document,cells,name,{isHidden=()=>false,nodeHidde
  return candidate;
 }
 function subtree(world,id){return [id,...world.transforms.childrenOf(id).flatMap(child=>subtree(world,child))];}
+function nodesForTransforms(world,ids){
+ return [...new Set(ids)].flatMap(id=>world.forTransform(id));
+}
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
-  const selected=new Set(ids);
-  for(const node of world.serialize())if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
+  for(const node of nodesForTransforms(world,ids))if(nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
-export function validateTreeDocument(candidate){validateTerrainStacking(candidate.world);const registry=defaultComponents();for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}const map=candidate.view(),spawns=[],entries=new Map(),byCell=candidate.cellNodes();for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const tags={};for(const node of byCell.get(r+','+c)??[])for(const [key,value] of Object.entries(node.tags)){if(key!=='requiredKeys'&&Object.hasOwn(tags,key)&&JSON.stringify(tags[key])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+key);tags[key]=value;}if(tags.spawn)spawns.push(r+','+c);if(tags.entry){const region=candidate.cellTags[r+','+c]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}}if(spawns.length>1)throw new Error('只能有一个玩家起点');for(const key of spawns)if(entries.has(candidate.cellTags[key]?.regionTag??'默认区域'))throw new Error('同一区域不能同时包含玩家起点与区域入口');return candidate;}
+export function validateTreeDocument(candidate){
+ const {nodes,byCell}=validateTerrainStacking(candidate.world),registry=defaultComponents();
+ for(const node of nodes){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
+ const spawns=[],entries=new Map();
+ // Only occupied cells contribute entity tags; avoid allocating a full legacy map.
+ for(const [key,nodes] of byCell){
+  const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){
+   if(name!=='requiredKeys'&&Object.hasOwn(tags,name)&&JSON.stringify(tags[name])!==JSON.stringify(value))throw new Error('Conflicting entity tag: '+name);tags[name]=value;
+  }
+  if(tags.spawn)spawns.push(key);
+  if(tags.entry){const region=candidate.cellTags[key]?.regionTag??'默认区域';if(entries.has(region))throw new Error('区域只能有一个入口：'+region);entries.set(region,true);}
+ }
+ if(spawns.length>1)throw new Error('只能有一个玩家起点');
+ for(const key of spawns)if(entries.has(candidate.cellTags[key]?.regionTag??'默认区域'))throw new Error('同一区域不能同时包含玩家起点与区域入口');
+ return candidate;
+}
 export function configureNode(document,id,components,tags,isHidden=()=>false,nodeHidden=()=>false,schema){
  const original=document.world.get(id);check(document.world,[original.transformId],isHidden,nodeHidden);
  const footprint=document.world.transforms.get(original.transformId).footprint;
@@ -89,8 +103,11 @@ export function replaceTreePrefab(document,prefab,tile,r,c,options={}){
  return validateTreeDocument(candidate);
 }
 export function placeTreePrefab(document,prefab,tile,r,c,options={}){
+  return instantiateTreePrefab(forkTreeDocument(document),prefab,tile,r,c,options);
+}
+function instantiateTreePrefab(candidate,prefab,tile,r,c,options={}){
   if(options.stack!==true)throw new Error('树实体放置需要显式启用叠层');
-  const candidate=forkTreeDocument(document),registry=defaultComponents(),resolve=options.resolve;
+  const registry=defaultComponents(),resolve=options.resolve;
   const resolveRecord=(record,seen=new Set())=>{
     if(seen.has(record.id))throw new Error('Prefab inheritance cycle');seen.add(record.id);
     if(!record.extends)return copy(record);if(!resolve)throw new Error('Prefab inheritance requires catalog resolver');
@@ -146,7 +163,7 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){
   const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
-  const removed=world.serialize().filter(node=>ids.has(node.transformId));
+  const removed=nodesForTransforms(world,ids);
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
   if(ids.size){
@@ -154,12 +171,12 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
    if([...ids].some(id=>world.transforms.worldCells(id).some(p=>!area.has(p.r+','+p.c))))throw new Error('不能间接覆盖放置区域外的实体');
   }
   // Cell-level region identity stays fixed; tags and crease markers survive replacement.
-  if(cells.length===1){const old=document.view().tiles[r][c];configuration.tags=copy(old?.tags??{});configuration.folds=[...new Set([...targets.values()].flatMap(node=>node.components.fold?.directions??[]))];}
+  if(cells.length===1){const old=document.viewCells(cells).get(r+','+c);configuration.tags=copy(old?.tags??{});configuration.folds=[...new Set([...targets.values()].flatMap(node=>node.components.fold?.directions??[]))];}
   if((configuration.tags?.spawn||configuration.tags?.entry)&&(configuration.blocked||configuration.terrain==='campfire'))throw new Error('不能用不可通行实体覆盖玩家起点或区域入口');
   for(const node of removed)candidate.world.remove(node.id);
   const deleteTransform=id=>{for(const child of candidate.world.transforms.childrenOf(id))if(ids.has(child))deleteTransform(child);candidate.world.transforms.remove(id);};
   for(const id of ids)if(!ids.has(world.transforms.get(id).parentId))deleteTransform(id);
  }
- candidate=placeTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
- return candidate;
+ candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item',replaceTerrain:category==='terrain',validate:false});
+ return validateTreeDocument(candidate);
 }

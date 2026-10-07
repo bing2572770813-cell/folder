@@ -37,3 +37,13 @@ Use `npm --prefix work run frontend:fast -- 4` for optional faster frontend feed
 Three measured warm samples on this checkout gave frontend medians of 3566ms (existing serial), 3561ms (isolated serial), 1934ms (two workers), and 1379ms (four workers). Four workers reduced the test stage by about 61%; this excludes HTML build time and is not a reduction in total development time. Normal compilation was 236ms versus 148ms incremental, saving only 88ms. Incremental compilation is therefore experimental and does not replace the default compiler.
 
 Compiler experiments emit to independent directories and compare emitted JavaScript hashes. They measure unchanged-source rebuilds, not correctness after source edits or missing outputs. Machine load, source changes and dependency versions affect all timings; remeasure before relying on these numbers.
+
+## Browser Smoke Checks
+
+Run `npm --prefix work run browser:check` to build fresh HTML and launch a headless installed browser on a temporary loopback server. It uses Playwright Core and does not download browsers. Windows defaults to Edge, other platforms to Chrome. Set `FOLD_BROWSER_CHANNEL` to `chrome` or `msedge`, or `FOLD_BROWSER_EXECUTABLE` to an installed executable, if needed. Missing browsers fail with a retained log.
+
+Each run uses fresh browser contexts, so it does not change your browser's maps or sessions. Scenarios cover desktop boot, renaming/undo, play/edit mode switching, restart at zero steps, reload restoration, mobile editor boot and mobile game boot. Runtime exceptions, console errors, failed requests and HTTP errors fail verification. Only the unrelated favicon request is fulfilled locally. Screenshot color sampling rejects nearly uniform canvas captures.
+
+Reports, desktop/mobile screenshots, canvas screenshots and Playwright traces are saved in `.dev-checks/browser-*`; failures retain a screenshot/trace when possible and return nonzero. Close operations release the temporary browser and server. Open traces with separately available Playwright tooling. This command is separate from full unit checks because it requires an installed browser and graphics support.
+
+The first measured run completed six scenarios in 6.59s, or 8.61s including build preparation. This is automated verification time, not a measured saving against manual work. Screenshot inspection showed the mobile game's map extending beyond the viewport and top controls overlapping the HUD. The smoke check proves boot and selected behavior; these existing visual issues remain to be addressed in product development. Pixel variation alone cannot verify framing, readability, terrain editing, movement, teleport or lift mechanics.

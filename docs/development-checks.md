@@ -14,6 +14,8 @@ Every run writes full stdout/stderr logs and `report.json` under the ignored `wo
 
 Existing `test`, `backend:test` and `build` command names remain available. Frontend tests now discover matching files rather than use a manual list. The unified entry runs both test suites; a green `npm test` alone does not assert that backend tests passed. Use `npm --prefix work run check:tools` to test the auxiliary tools.
 
+Integration with newer main preserves its five entity regression files in the default `npm test` entry before frontend discovery. Full checks consequently run those files both in the backend stage and in the compatibility entry. Optional `frontend:fast` runs root frontend files only; use the full check for backend and entity regressions.
+
 For faster feedback during implementation, use `npm --prefix work run check -- backend`, `-- frontend`, or `-- tools`. Backend scope compiles and runs every backend test. Frontend scope compiles the shared backend, builds HTML and runs the frontend suite. Tools scope runs all auxiliary tool tests. These are explicitly partial checks, not substitutes for the default full check before committing. Unknown scopes fail. No test-result caching is used.
 
 Browser performance sampling and screenshots are separate checks; a successful report does not prove a frame-time target or visual correctness. Review generated HTML changes before committing. Logs may contain local paths and application error details; inspect them before sharing.

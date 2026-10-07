@@ -4,9 +4,14 @@ import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 const bundle=async file=>{const result=await build({entryPoints:[fileURLToPath(new URL(file,import.meta.url))],bundle:true,platform:'node',format:'esm',write:false});return import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));};
 const {TreeDocument}=await bundle('../../entities/tree-document.mjs');
-const {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode}=await bundle('../../entities/tree-commands.mjs');
+const {moveNode,reparentNode,deleteNode,placeTreePrefab,configureNode,validateTreeDocument}=await bundle('../../entities/tree-commands.mjs');
 const document=()=>new TreeDocument({version:1,width:6,height:6,spawn:{r:1,c:1,dir:0},tiles:Array.from({length:6},(_,r)=>Array.from({length:6},(_,c)=>r===1&&c===1?{color:'white',regionTag:'A'}:null))});
 const prefab={id:'hot',tile:{color:'red'},components:{fire:{damage:2}},static:{walkable:true}};
+test('candidate validation reuses a single detached world snapshot',()=>{
+ const doc=document(),serialize=doc.world.serialize.bind(doc.world);let reads=0;
+ doc.world.serialize=()=>{reads++;return serialize();};
+ validateTreeDocument(doc);assert.equal(reads,1,'stacking, component and tag validation share one snapshot');
+});
 test('placement preserves existing surface and snapshots inherited terrain and collection configuration',()=>{
   const doc=document(),original=doc.serialize();doc.world.setRuntime(original.entities[0].id,'surface',{visited:true});doc.world.transforms.retain(original.transforms[0].id,'player');
   const placed=placeTreePrefab(doc,{id:'mixed',extends:'base',components:{fire:{damage:3},key:{name:'铜'}}},{color:'blue'},2,2,{stack:true,resolve:()=>prefab});

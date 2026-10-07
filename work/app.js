@@ -9,12 +9,13 @@ import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,place
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
 import {describeViewportCell} from './render/viewport-cell.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
+import {previewPlacement,previewFootprint} from './entities/placement-preview.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
-import {paperSurface,isPaper} from './render/paper-surface.mjs';
+import {paperSurface,isPaper,createPaperSurfaceCache} from './render/paper-surface.mjs';
 import {isPlaceableEntity} from './entities/entity-category.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
@@ -36,6 +37,7 @@ import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } 
 import {inspectionCells,batchProperties,selectionDetails} from './editor/batch-inspection.mjs';
 import {projectedCellSchema,assertNodePropertyChanges} from './editor/node-edit-permissions.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
+import {createEditRefresh} from './editor/edit-refresh.mjs';
 import {clearMapCells} from './editor/clear-map.mjs';
 import {inspectCell} from './entities/cell-entity.mjs';
 import {EventBus} from './core/event-bus.mjs';
@@ -100,6 +102,7 @@ const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer)
 window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();}});
 
 const foldableCells=new Set();
+let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
 const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
@@ -121,12 +124,13 @@ function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(
 function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
-function persist() {documentModel.metadata=documentModel.cleanMetadata(map);for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
+function notifyMapChanged(){for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
+function persist() {documentModel.metadata=documentModel.cleanMetadata(map);editRefresh.request({save:true},!!gestureBefore);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
-function editSnapshot(){return {...createEditSnapshot(documentModel.serialize(),editRect,selectedCells),directSelectedCells:clone(directSelectedCells)};}
-function record() {if(P.mode==='play'){controller.recordPlay();updateUI();return;}if(gestureBefore)return;editHistory.push(editSnapshot());redoHistory=[];trimHistory(editHistory);updateUI();}
-function finishGesture(){if(!gestureBefore)return;const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(documentModel.serialize())){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
+function editSnapshot(snapshot=documentModel.serialize()){return {...createEditSnapshot(snapshot,editRect,selectedCells),directSelectedCells:clone(directSelectedCells)};}
+function record({snapshot,refresh=true}={}) {if(P.mode==='play'){controller.recordPlay();if(refresh)updateUI();return;}if(gestureBefore)return;editHistory.push(editSnapshot(snapshot));redoHistory=[];trimHistory(editHistory);if(refresh)updateUI();}
+function finishGesture(){if(!gestureBefore)return;editRefresh.flush();const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(documentModel.serialize())){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
 
 const viewport=$('viewport');
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#cbd8d0');
@@ -228,21 +232,30 @@ function makeToken(color){
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
 let liftLineRanges=[];
-function buildPaper() {
+const paperSurfaceCache=createPaperSurfaceCache();
+const editRefresh=createEditRefresh({rebuild:rebuildPaper,notify:notifyMapChanged,requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle)});
+function buildPaper(){editRefresh.request({scene:true},!!gestureBefore);}
+function rebuildPaper() {
   hoverDescriptionKey=null;
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();
   foldableCells.clear();
-  for(const node of documentModel.world.serialize())if(nodeFollowsFold(node))for(const cell of documentModel.world.transforms.worldCells(node.transformId))foldableCells.add(cell.r+','+cell.c);
+  placementTagCells=[];
+  for(const node of documentModel.world.serialize()){
+   const cells=documentModel.world.transforms.worldCells(node.transformId);
+   if(node.tags.spawn||node.tags.entry)placementTagCells.push(...cells);
+   if(nodeFollowsFold(node))for(const cell of cells)foldableCells.add(cell.r+','+cell.c);
+  }
   updateLighting();
   disposableClear(placementLayer);placementLayer.userData.preview=null;
   liftLineRanges=[];
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
+  paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
-	    const cell={r,c,nodeId,tile},surface=paperSurface(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId,P.mode==='play',baseProjection)),surfaceMaps.get(nodeId))),r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth);if(surface){surfaces.add(cell,surface);}else if(tile.lift){
+	    const cell={r,c,nodeId,tile},surface=paperSurfaceCache.get(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId,P.mode==='play',baseProjection)),surfaceMaps.get(nodeId))),r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth);if(surface){surfaces.add(cell,surface);}else if(tile.lift){
       const body=createLiftBlock(THREE,tile,materials[tile.color??'white']);body.position.x=wx(c);body.position.z=wz(r);body.userData.cell=cell;body.userData.surfaceCells=[cell];
       const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));
       marker.rotation.x=-Math.PI/2;marker.position.y=tileThickness(tile)/2+.035;marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.liftMarker=true;body.add(marker);tileLayer.add(body);
@@ -265,6 +278,7 @@ function buildPaper() {
       const style=entityEdgeColor(tile);if(style)liftLineRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
     }
   }
+  paperSurfaceCache.end();
   for(const cell of treeCells.tokenCells){const token=makeToken(cell.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(cell.c),Math.max(cell.surfaceTop,cell.tile.height??0),wz(cell.r));token.userData.cell=cell;staticTokenLayer.add(token);}
   for(const marker of treeCells.terrainCells){if(!terrains.has(marker.type))terrains.set(marker.type,[]);terrains.get(marker.type).push(marker);}
   for(const mesh of surfaces.meshes(THREE,color=>materials[color]))tileLayer.add(mesh);
@@ -774,9 +788,10 @@ function placementCandidate(r,c,{preview=false}={}){
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
- const candidate=placeCategorizedPrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)});
+ const options={isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)},result=preview?previewPlacement(documentModel,prefab,tile,r,c,{...options,tagCells:placementTagCells}):null;
+ const candidate=preview?result.candidate:placeCategorizedPrefab(documentModel,prefab,tile,r,c,options);
  if(!preview)assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
- assertTreeVisibility(candidate);
+ assertTreeVisibility(candidate,preview?result.source:documentModel);
  return candidate;
 }
 
@@ -784,7 +799,7 @@ let placementCheckCache=null;
 function drawPlacementPreview(hit){
  disposableClear(placementLayer);placementLayer.userData.preview=null;if(P.mode!=='edit'||tool!=='place'||!hit)return;
  const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)return;
- const cells=footprint(prefab,hit.r,hit.c);let reason='';
+ let cells,reason='';try{cells=previewFootprint(prefab,hit.r,hit.c,id=>prefabs.find(p=>p.id===id));}catch(error){$('hoverCoord').textContent='无法放置 · '+error.message;return;}
  const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
  if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
  else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
@@ -812,9 +827,9 @@ function drawPlacementPreview(hit){
 }
 
 function placementPreviewMap(candidate,cells){
- const preview={...map,tiles:map.tiles.map(row=>row.slice())};
+ const preview={...map,tiles:map.tiles.slice()},rows=new Set();
  const changes=candidate.viewCells(cells);
- for(const {r,c} of cells)preview.tiles[r][c]=changes.get(r+','+c)??null;
+ for(const {r,c} of cells){if(!rows.has(r)){preview.tiles[r]=preview.tiles[r].slice();rows.add(r);}preview.tiles[r][c]=changes.get(r+','+c)??null;}
  return preview;
 }
 
@@ -828,11 +843,11 @@ function refreshEntityVisibility(){setSelectedCells(directSelectedCells);buildPa
 $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility();};
 $('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
-function assertTreeVisibility(next){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(documentModel,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(documentModel,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
-function commitTree(next){assertTreeVisibility(next);if(JSON.stringify(next.serialize())===JSON.stringify(documentModel.serialize())){refreshTreePanel();return;}record();documentModel=next;map=next.view();if(selectedNodeId&&!next.world.serialize().some(node=>node.id===selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();updateUI();}
+function assertTreeVisibility(next,before=documentModel){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(before,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(before,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
+function commitTree(next){assertTreeVisibility(next);const before=documentModel.serialize();if(JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});documentModel=next;map=next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();}
 function refreshTreePanel(){
- const panel=$('treeNodes');if(!panel)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
- renderTreeNodes(panel,entityTreeContext(documentModel.world,selectedNodeId,point).map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
+ const panel=$('treeNodes');if(!panel)return;const point=lastClickTile??selectedCells[0],nodes=entityTreeContext(documentModel.world,selectedNodeId,point);
+ renderTreeNodes(panel,nodes.map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
  const node=nodes.find(item=>item.id===selectedNodeId);$('treeFields').hidden=!node;if(!node){clearPropertyInspector($('nodeConfiguration'));return;}const transform=documentModel.world.transforms.get(node.transformId),world=documentModel.world.transforms.world(node.transformId);$('nodeLocalR').value=transform.local.r;$('nodeLocalC').value=transform.local.c;$('nodeLocalDir').value=transform.local.dir;renderTreeParents($('nodeParent'),entityParentChoices(documentModel.world,node.id).map(other=>({...other,disabled:nodeHidden(other)||documentModel.world.transforms.worldCells(other.transformId).some(p=>cellHidden(p.r,p.c))})));$('nodeParent').value=nodes.find(item=>item.transformId===transform.parentId)?.id??'';const schema=nodeSchema(node),readable=inspectNodeValues(node,schema);$('nodeComponents').value=JSON.stringify(readable.components??{},null,2);$('nodeTags').value=JSON.stringify(readable.tags??{},null,2);$('nodeIdentity').textContent=node.id;$('nodeWorldPosition').textContent='地图位置 '+coord(world.r,world.c)+' · 朝'+FACE_NAMES[world.dir];
  renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,choices:{'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
  const locked=nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c));$('treeFields').disabled=locked;for(const id of ['moveNode','reparentNode','applyNodeConfig'])$(id).disabled=locked;const protectedNode=documentModel.world.transforms.childrenOf(node.transformId).length||documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>owner!=='entity:'+node.id);$('deleteNode').disabled=locked||!!protectedNode;$('deleteNode').title=protectedNode?'实体有子节点或外部引用，暂不能删除':'删除当前实体';

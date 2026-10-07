@@ -7,9 +7,10 @@ export function isTerrainEntity(node:EntityNode):boolean {
 }
 
 /** Physical tile rules are independent of parenting, visibility and collection items. */
-export function validateTerrainStacking(world:EntityWorld):void {
+export function validateTerrainStacking(world:EntityWorld):{nodes:EntityNode[];byCell:Map<string,EntityNode[]>} {
   const byCell=new Map<string,EntityNode[]>();
-  for (const node of world.serialize()) {
+  const snapshot=world.serialize();
+  for (const node of snapshot) {
     if(Object.hasOwn(node.components,'lift')&&!Object.hasOwn(node.components,'surface'))throw new Error('升降组件必须属于纸张实体：'+node.id);
     const footprint=world.transforms.get(node.transformId).footprint;
     if(Object.hasOwn(node.components,'surface')&&(footprint.width!==1||footprint.height!==1))throw new Error('纸张实体只能占一个方格：'+node.id);
@@ -32,4 +33,5 @@ export function validateTerrainStacking(world:EntityWorld):void {
       if (terrains > 1)
         throw new Error('纸张方格上最多只能叠加一个 terrain 实体：' + key);
   }
+  return {nodes:snapshot,byCell};
 }

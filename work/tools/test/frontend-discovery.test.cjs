@@ -30,3 +30,19 @@ test('default runner discovers a newly added failing test without editing a list
     assert.match(result.stderr, /new regression discovered/);
   } finally {fs.rmSync(directory, {recursive: true, force: true});}
 });
+
+test('default runner retains main entity regression tests and propagates their failures', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'entity-regressions-'));
+  try {
+    fs.mkdirSync(path.join(directory, 'backend/test'), {recursive: true});
+    for(const name of ['local-placement-preview','categorized-placement','transform','tree-commands','tree-document']) {
+      fs.writeFileSync(path.join(directory, 'backend/test/' + name + '.test.mjs'), name === 'categorized-placement' ? "throw new Error('entity regression retained');\n" : '');
+    }
+    const code = `process.exitCode = require(${JSON.stringify(path.resolve(__dirname, '../../test-runner.cjs'))}).runEntityRegressions(${JSON.stringify(directory)})`;
+    // The fixture launches its own test runner, independent of this test worker.
+    const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, ['-e', code], {encoding: 'utf8', windowsHide: true, env});
+    assert.equal(result.status, 1);
+    assert.match(result.stdout + result.stderr, /entity regression retained/);
+  } finally {fs.rmSync(directory, {recursive: true, force: true});}
+});

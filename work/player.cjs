@@ -79,8 +79,8 @@ function createTurnManager(hooks){
   executing=true;
   try{
    state.turn={number:previous.number+1,phase:TurnPhase.Validate,trigger:input.trigger,source:input.source??null,outcome:null};
-   phase(TurnPhase.Validate);
    if(!hooks.validate(context.action)){state.turn=previous;return false;}
+   phase(TurnPhase.Validate);
    // Capture the completed prior turn, never an in-progress lifecycle phase.
    state.turn=previous;captured=hooks.snapshot();hooks.record();
    state.turn={number:previous.number+1,phase:TurnPhase.Snapshot,trigger:input.trigger,source:input.source??null,outcome:null};

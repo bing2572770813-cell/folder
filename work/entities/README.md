@@ -29,3 +29,5 @@ node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，�
 升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。旧地图的 `durationMs` 导入为默认 3 回合，保存时移除旧字段。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。方块本体是厚度不变的独立网格，升降图案附着其上，两者一起移动，不与相邻纸面形成渐变坡面。回合变化更新方块、边线和地形标记的位置，不重建地图或清除玩家选择。移动动画端点也读取平台当前高度。
 
 placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType 与 BaseEntity 原子检查，地形清空占格后替换，道具保留支持实体并去除兼容 tile 的 surface。拒绝隐藏占格、多格覆盖和间接越界删除；区域固定格数据及标签/折线保留。旧 replaceTreePrefab/placeTreePrefab 仅供旧数据与受控树工具兼容。
+
+`physics.canDropOnFold` 是道具与生物的可序列化布尔属性，未设置时默认 true；地形不参与实体掉落。`player.cjs` 在物理折叠成功时检查源侧占格、对称目标、显示状态和 BaseEntity 支撑，并统一结算实体掉落。EntityWorld 的 runtime position 索引负责游玩期查询，静态 TransformManager 保持不变；撤销、重启与退出游玩清除或恢复运行时位置。`render/tree-render.mjs` 使用 runtime cells 投影道具和 token。

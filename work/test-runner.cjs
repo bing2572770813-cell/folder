@@ -2,7 +2,7 @@ const {spawnSync}=require('node:child_process');
 const path=require('node:path');
 const {frontendFiles}=require('./tools/frontend-test-files.cjs');
 function runEntityRegressions(cwd=__dirname){
-  const files=['visual-prefab','visual-assets','local-placement-preview','categorized-placement','transform','tree-commands','tree-document'].map(name=>path.join(cwd,'backend/test/'+name+'.test.mjs'));
+  const files=['visual-prefab','visual-assets','local-placement-preview','categorized-placement','transform','tree-commands','tree-document','trigger-list'].map(name=>path.join(cwd,'backend/test/'+name+'.test.mjs'));
   const result=spawnSync(process.execPath,['--test',...files],{cwd,stdio:'inherit',windowsHide:true});
   if(result.error)console.error(result.error.message);
   return result.status===0?0:result.status||1;

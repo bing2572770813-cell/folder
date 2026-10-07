@@ -19,6 +19,15 @@ test('entry rejection prevents all effects and cyclic eruption uses pre-action c
   assert.equal(denied.valid,false);assert.deepEqual(denied.actor,state);assert.deepEqual(denied.runtime,{});
   state.actions=2;assert.equal(registry.dispatch({type:'enter',nodes,actor:state,runtime:{}}).valid,true);
 });
+
+test('fragile components consume one count from global action events',()=>{
+ const registry=defaultComponents();
+ const node=(id,config)=>({id,prefabId:'fragile',transformId:id,components:{fragile:config},tags:{},static:{}});
+ const first=registry.dispatch({type:'action',trigger:'walk',nodes:[node('a',{count:2}),node('b',{count:1})],actor:{},runtime:{}});
+ assert.deepEqual(first.runtime,{a:{fragile:{remaining:1}},b:{fragile:{remaining:0,breaking:true}}});
+ const second=registry.dispatch({type:'action',trigger:'teleport',nodes:[node('a',{count:2})],actor:{},runtime:first.runtime});
+ assert.deepEqual(second.runtime.a.fragile,{remaining:0,breaking:true});
+});
 test('ice and fire preserve existing failure thresholds',()=>{
   const registry=defaultComponents();let state=actor();state.frozen=true;
   const ice=registry.dispatch({type:'enter',nodes:[node('a',{ice:{}})],actor:state,runtime:{}});

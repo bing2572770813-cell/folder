@@ -2,7 +2,7 @@ import {jsonObject,type JsonObject,type EntityNode,type ComponentRuntime} from '
 import rayEmitter from '../../../entities/ray-emitter-config.cjs';
 import {normalizeComponentTriggers} from '../../../mechanics/trigger-list.cjs';
 
-export type EntityEvent='enter'|'leave'|'interact';
+export type EntityEvent='enter'|'leave'|'interact'|'action';
 /** Exclusive cause of an arrival/departure; omitted for initialization or interaction. */
 export type ArrivalTrigger='walk'|'teleport';
 export interface EventContext {type:EntityEvent;trigger?:ArrivalTrigger;nodes:EntityNode[];actor:JsonObject;runtime:ComponentRuntime}
@@ -35,7 +35,7 @@ export class ComponentRegistry {
     return this.evaluate({...input,type:'enter'},false);
   }
   private evaluate(input:EventContext,applyEffects:boolean):EventResult {
-    if(!['enter','leave','interact'].includes(input.type))throw new Error('Unknown entity event');
+    if(!['enter','leave','interact','action'].includes(input.type))throw new Error('Unknown entity event');
     if(input.trigger!==undefined&&!['walk','teleport'].includes(input.trigger))throw new Error('Unknown arrival trigger');
     const nodes=structuredClone(input.nodes).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
     for(const node of nodes)this.validate(node);
@@ -93,7 +93,7 @@ export function defaultComponents():ComponentRegistry {
   registry.register('foldSwitch',{validate:config=>{validateTriggers(config);if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
   registry.register('firebird',{validate:config=>{validateTriggers(config);if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
   registry.register('flame',{validate:config=>{if(config.source!==undefined&&typeof config.source!=='boolean')throw new Error('火焰来源标记无效');},canEnter:()=> '火焰覆盖的方格不可进入'});
-  registry.register('fragile',{canEnter:(_context,_config,state)=>state.broken?'易碎方块已破碎':undefined,events:{leave:context=>context.trigger==='walk'||context.trigger==='teleport'?{state:{broken:true}}:{}}});
+  registry.register('fragile',{validate:config=>{const count=Number(config.count??1);if(!Number.isSafeInteger(count)||count<1||count>100)throw new Error('Invalid fragile count');},canEnter:(_context,_config,state)=>state.broken||state.breaking?'易碎方块已破碎':undefined,events:{action:(_context,config,state):ComponentEffect=>{const remaining=Number(state.remaining??config.count??1)-1;return remaining<=0?{state:{remaining:0,breaking:true}}:{state:{remaining}};}}});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{
     effectOrder:10,

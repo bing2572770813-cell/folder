@@ -159,6 +159,7 @@ export const PlayPanel = React.memo(function PlayPanel() {
                     </fieldset>
                     <fieldset className="player-height-limits">
                       <legend>折纸落点检测</legend>
+                      <label>可在折叠时掉落<UiCheckbox id="playerCanDropOnFold" aria-label="玩家可在折叠时掉落" defaultChecked /></label>
                       <label>竖直距离阈值（世界 Y）<UiInput id="playerFoldVertical" aria-label="折纸竖直距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={1}/></label>
                       <label>水平距离阈值（世界 XZ）<UiInput id="playerFoldHorizontal" aria-label="折纸水平距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={0.35}/></label>
                     </fieldset>

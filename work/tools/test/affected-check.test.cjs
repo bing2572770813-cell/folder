@@ -23,4 +23,5 @@ test('ignores generated and documentation changes', () => {
 test('root workflow files are treated as frontend changes', () => {
   assert.equal(classifyFiles(['work/test-runner.cjs']).scope, 'frontend');
   assert.equal(classifyFiles(['work/player.cjs']).scope, 'frontend');
+  assert.equal(classifyFiles(['work/app.ts', 'work/react-entry.tsx']).scope, 'frontend');
 });

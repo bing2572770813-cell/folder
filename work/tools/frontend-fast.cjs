@@ -1,7 +1,7 @@
 const path = require('node:path');
 const {runChecks} = require('./check-runner.cjs');
 const {createCheckPlan} = require('./check-plan.cjs');
-const {frontendFiles} = require('./cost-experiments.cjs');
+const {frontendFiles} = require('./frontend-test-files.cjs');
 const concurrency = Number(process.argv[2] ?? 4);
 if (process.argv.length > 3 || ![1, 2, 4].includes(concurrency)) {
   console.error('Usage: npm run frontend:fast -- [1|2|4]'); process.exitCode = 2;

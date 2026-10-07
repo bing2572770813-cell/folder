@@ -24,8 +24,9 @@ function tileOf(node){
   delete tile.terrain;delete tile.terrainConfig;delete tile.keyName;
   for(const id of terrainIds)if(node.components[id]){tile.terrain=id;tile.terrainConfig=copy(node.components[id]);if(id==='key')tile.keyName=node.components[id].name??'钥匙';break;}
   if(node.components.physics?.followFold!==undefined)tile.followFold=node.components.physics.followFold;
+  if(node.components.physics?.canDropOnFold!==undefined)tile.canDropOnFold=node.components.physics.canDropOnFold;
   tile.folds=copy(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
-  tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
+  tile.surfaceConnected=node.components.surface?.connected??(!tile.lift&&!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
   return normalizeTile(tile);
 }
 function configure(node,tile,folds,previous){
@@ -34,6 +35,7 @@ function configure(node,tile,folds,previous){
   // Preserve absent native defaults when only unrelated legacy fields changed.
   for(const field of ['height','thickness','gradualRate','color','edgeColor'])if(!equal(previous[field],tile[field])){delete node.components.surface[field];if(tile[field]!==undefined)node.components.surface[field]=tile[field];}
   if(!equal(previous.followFold,tile.followFold))node.components.physics={...node.components.physics,followFold:tile.followFold};
+  if(!equal(previous.canDropOnFold,tile.canDropOnFold))node.components.physics={...node.components.physics,canDropOnFold:tile.canDropOnFold};
   if(!equal(previous.surfaceConnected,tile.surfaceConnected))node.components.surface.connected=tile.surfaceConnected;
   if(!equal(previous.lift,tile.lift)){if(tile.lift)node.components.lift=copy(tile.lift);else delete node.components.lift;}
   if(!equal(previous.blocked,tile.blocked))node.components.collision={...node.components.collision,blocked:tile.blocked};
@@ -58,9 +60,9 @@ export class TreeDocument {
     return candidate;
   }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
-  cellNodes(){
+  cellNodes(nodes=this.world.serialize()){
     const byCell=new Map();
-    for(const node of this.world.serialize())for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
+    for(const node of nodes)for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
       const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
     }
     for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));

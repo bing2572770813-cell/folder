@@ -1,4 +1,4 @@
-import {nodeFollowsFold} from './entities/fold-properties.mjs';
+import {nodeFollowsFold,nodeCanDropOnFold} from './entities/fold-properties.mjs';
 import {renderTreeNodes,renderTreeParents} from './ui/react/TreeInspector.jsx';
 import {renderTestModifiers} from './ui/react/PlayPanel.jsx';
 import {entityTreeContext,entityParentChoices} from './ui/entity-tree-context.mjs';
@@ -13,12 +13,11 @@ import {previewPlacement,previewFootprint} from './entities/placement-preview.mj
 import {defaultComponents} from './entities/tree-runtime.mjs';
 import {createLiftBlock,setLiftBlockHeight} from './render/lift-block.mjs';
 import {createSurfacePreview} from './render/placement-preview.mjs';
-import {mechanismMarker,shotMarker} from './render/directional-mechanisms.mjs';
-import rayEmitterConfig from './entities/ray-emitter-config.cjs';
+import {paperSurface,isPaper,hasConnectedLiftNearby} from './render/paper-surface.mjs';
+import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
-import {paperSurface,isPaper,createPaperSurfaceCache} from './render/paper-surface.mjs';
-import {isPlaceableEntity} from './entities/entity-category.mjs';
+import {refreshFlatPaperPlacement} from './render/flat-placement.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
@@ -40,7 +39,7 @@ import { uniqueFoldAxes, foldGroupAt, inFoldRange, axisKey } from './tags/fold-g
 import {migrateRegions,regionOf,regionNames,taggedCells,validateRegions,assignRegion,tagCell} from './tags/regions.mjs';
 import {footprint,removeEntity} from './entities/placement-model.mjs';
 import demoMap from '../outputs/fold-field-demo.json';
-import { rectangle, region,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
+import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } from './editor/selection-model.mjs';
 import {inspectionCells,batchProperties,selectionDetails} from './editor/batch-inspection.mjs';
 import {projectedCellSchema,assertNodePropertyChanges} from './editor/node-edit-permissions.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
@@ -86,7 +85,7 @@ const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const EMBEDDED_ASSETS = window.__FOLD_FIELD_EXPORT_ASSETS__;
 const clone = data => JSON.parse(JSON.stringify(data));
-const previewCache=new Map();let previewRenderer;
+const previewCache=new Map();let previewRenderer,placementRenderCache=null;
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
 let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
 let tagCatalog=(window.__FOLD_FIELD_TAGS__||[]).map(normalizeTagPrefab);
@@ -107,12 +106,12 @@ let inspectionFrame=0;
 const debugOverrides=new DebugState(),nodeDebug=new DebugState();
 const editorBus=new EventBus();
 const stopMapPersistence=editorBus.on('map:changed',()=>{clearTimeout(saveTimer);$('saveState').textContent='保存中';saveTimer=setTimeout(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(savedMap()));$('saveState').textContent='本地已保存';}catch{$('saveState').textContent='仅当前会话';}},120);});
-window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();modelView.dispose();playerModelView.dispose();modelLibrary.dispose();}});
+window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersistence();editorTabs.dispose();modelView.dispose();modelLibrary.dispose();}});
 
 const foldableCells=new Set();
 let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,refreshMechanismSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,refreshLiftSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -234,33 +233,19 @@ const playerTexture=canvasTexture((ctx,s)=>{ctx.translate(s/2,s/2);ctx.fillStyle
 const playerDecal=new THREE.Mesh(new THREE.PlaneGeometry(.81,.81),new THREE.MeshBasicMaterial({map:playerTexture,transparent:true,depthWrite:false,depthTest:false}));
 playerDecal.rotation.x=-Math.PI/2;playerDecal.renderOrder=7;
 const playerGroup=new THREE.Group(),activeTokenHost=new THREE.Group();let activeTokenColor=null;playerGroup.add(activeTokenHost);paper.add(playerGroup);const spawnMarkerGroup=new THREE.Group();spawnMarkerGroup.add(playerDecal);paper.add(spawnMarkerGroup);
-const playerModelHost=new THREE.Group();playerGroup.add(playerModelHost);
-const playerModelView=createModelView({layer:playerModelHost,library:modelLibrary,onChange:()=>{updatePlayerVisual();renderer.shadowMap.needsUpdate=true;},onError:(_descriptor,error)=>console.warn('主角模型加载失败，使用备用形象',error)});
 const ringTexture=canvasTexture((ctx,s)=>{ctx.strokeStyle='#415e37';ctx.lineWidth=7;ctx.setLineDash([16,12]);ctx.beginPath();ctx.arc(s/2,s/2,s*.43,0,Math.PI*2);ctx.stroke();});
 const selectionRing=new THREE.Mesh(new THREE.PlaneGeometry(.8,.8),new THREE.MeshBasicMaterial({map:ringTexture,transparent:true,depthWrite:false}));selectionRing.rotation.x=-Math.PI/2;selectionRing.position.y=.006;selectionRing.visible=false;playerGroup.add(selectionRing);
 const hoverOutline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(.94,.94)),new THREE.LineBasicMaterial({color:'#537340',depthTest:false,transparent:true,opacity:.75}));hoverOutline.rotation.x=-Math.PI/2;hoverOutline.visible=false;paper.add(hoverOutline);
 const foldMotionView=createFoldMotionView({paper,layers:[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,mechanismLayer,rayLayer,modelLayer],fixedLayers:[gridLayer,foldAxisLayer,creaseGuideLayer,foldSelectionLayer,boardLayer,tagLayer,spawnMarkerGroup],playerGroup,wx,wz,canFold:cell=>nodeFollowsFold(cell?.nodeId?documentModel.world.get(cell.nodeId):null)});
 function tileTop(r,c) { return map.tiles[r]?.[c]?tileHeight(map.tiles[r][c]):0; }
-function updatePlayerVisual() {
- const prefab=getPlayerPrefab(),visual=prefab?.visual;
- const modelReady=playerModelView.update(visual?[{id:'player',visual,position:[0,0,0],dir:0}]:[]).has('player');
- activeTokenHost.visible=!modelReady;
- if(!modelReady){const tokenColor=prefab?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}}
-}
-function renderPlayer() {
- renderer.shadowMap.needsUpdate=true;updatePlayerVisual();
- playerGroup.userData.prefabId='player_ai';
- spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;
- playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);
-}
+function renderPlayer() {renderer.shadowMap.needsUpdate=true;const tokenColor=getPlayerPrefab()?.tile.color??'white';if(activeTokenColor!==tokenColor){disposableClear(activeTokenHost);activeTokenHost.add(makeToken(tokenColor));activeTokenColor=tokenColor;}playerGroup.userData.prefabId='player_ai';spawnMarkerGroup.position.set(wx(map.spawn.c),tileTop(map.spawn.r,map.spawn.c)+.018,wz(map.spawn.r));spawnMarkerGroup.rotation.y=-map.spawn.dir*Math.PI/4;playerGroup.position.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+.018,wz(P.player.r));playerGroup.rotation.set(0,-P.player.dir*Math.PI/4,0);}
 
 function entityEdgeColor(tile){return tile.edgeColor??(!tile.prefabId&&!blocked(tile)?prefabs.find(p=>p.id==='paper_ai')?.tile?.edgeColor:undefined);}
 function makeToken(color){
  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.DodecahedronGeometry(.36,0),new THREE.MeshStandardMaterial({color:COLORS[color]??COLORS.white,roughness:.8}));body.position.y=.42;g.add(body);
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
-let liftLineRanges=[];
-const paperSurfaceCache=createPaperSurfaceCache();
+let liftLineRanges=[],dynamicSurfaceEntries=[];
 const editRefresh=createEditRefresh({rebuild:rebuildPaper,notify:notifyMapChanged,requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle)});
 function buildPaper(){editRefresh.request({scene:true},!!gestureBefore);}
 function rebuildPaper() {
@@ -271,21 +256,34 @@ function rebuildPaper() {
   foldableCells.clear();
   placementTagCells=[];
   for(const node of documentModel.world.serialize()){
-   const cells=documentModel.world.transforms.worldCells(node.transformId);
+   const cells=documentModel.world.cells(node.id);
    if(node.tags.spawn||node.tags.entry)placementTagCells.push(...cells);
    if(nodeFollowsFold(node))for(const cell of cells)foldableCells.add(cell.r+','+cell.c);
   }
   updateLighting();
-  disposableClear(placementLayer);placementLayer.userData.preview=null;
-  liftLineRanges=[];
+  cancelPlacementPreview();
+  liftLineRanges=[];dynamicSurfaceEntries=[];
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
-  modelView.update(collectModelDescriptors(documentModel,{nodeHidden,cellHidden,wx,wz,tileTop}));
+  modelView.update(collectModelDescriptors(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play',wx,wz,tileTop}));
   paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
-	    const cell={r,c,nodeId,tile},surface=paperSurfaceCache.get(projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId,P.mode==='play',baseProjection)),surfaceMaps.get(nodeId))),r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth);if(surface){surfaces.add(cell,surface);}else if(tile.lift){
+    const cell={r,c,nodeId,tile},surfaceMap=projection.primary?map:(surfaceMaps.get(nodeId)??(surfaceMaps.set(nodeId,mapForSurface(documentModel,nodeId,P.mode==='play',baseProjection)),surfaceMaps.get(nodeId)));
+    const dynamic=hasConnectedLiftNearby(surfaceMap,r,c,cellHidden);
+    const surface=paperSurface(surfaceMap,r,c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth,dynamic);
+    let dynamicEntry=null;
+    if(surface){
+      if(dynamic){
+        const geometry=new THREE.BufferGeometry(),positions=[];
+        for(let i=0;i<surface.positions.length;i+=3)positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));
+        geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
+        const mesh=new THREE.Mesh(geometry,materials[tile.color??'white']);mesh.userData.triangleCells=Array.from({length:positions.length/9},()=>cell);mesh.userData.surfaceCells=[cell];tileLayer.add(mesh);
+        dynamicEntry={r,c,nodeId,primary:projection.primary,cell,mesh};dynamicSurfaceEntries.push(dynamicEntry);
+        if(tile.lift){const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(c),tileHeight(tile)+.035,wz(r));marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.cell=cell;marker.userData.dynamicLiftMarker=true;tileLayer.add(marker);dynamicEntry.marker=marker;}
+      }else surfaces.add(cell,surface);
+    }else if(tile.lift){
       const body=createLiftBlock(THREE,tile,materials[tile.color??'white']);body.position.x=wx(c);body.position.z=wz(r);body.userData.cell=cell;body.userData.surfaceCells=[cell];
       const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));
       marker.rotation.x=-Math.PI/2;marker.position.y=tileThickness(tile)/2+.035;marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.liftMarker=true;body.add(marker);tileLayer.add(body);
@@ -303,7 +301,8 @@ function rebuildPaper() {
 
     if(edgeColor){if(!styleCells.has(edgeColor))styleCells.set(edgeColor,[]);const count=((styleEdges.get(edgeColor)?.length??0)-styleStart)/6;for(let i=0;i<count;i++)styleCells.get(edgeColor).push(cell);}
     if(surface){for(const segment of surface.boundarySegments)for(const p of segment)edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
-    if(documentModel.world.get(nodeId).components.lift){
+    if(dynamicEntry){dynamicEntry.gridStart=edgeStart;dynamicEntry.gridEnd=edges.length;dynamicEntry.style=entityEdgeColor(tile);dynamicEntry.styleStart=styleStart;dynamicEntry.styleEnd=dynamicEntry.style?styleEdges.get(dynamicEntry.style).length:styleStart;}
+    if(documentModel.world.get(nodeId).components.lift&&!dynamicEntry){
       liftLineRanges.push({r,c,height:y,start:edgeStart,end:edges.length,style:null});
       const style=entityEdgeColor(tile);if(style)liftLineRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
     }
@@ -330,6 +329,7 @@ function rebuildPaper() {
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z+.5,x+.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
   for(const range of liftLineRanges){range.attribute=range.style===null?grid.geometry.attributes.position:entityEdgeLayer.children.find(line=>line.userData.edgeColor===range.style)?.geometry.attributes.position;}
+  for(const entry of dynamicSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?entityEdgeLayer.children.find(line=>line.userData.edgeColor===entry.style)?.geometry.attributes.position:null;}
   rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
   for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
   renderRegionControls();renderEntityVisibility();refreshTreePanel();
@@ -349,6 +349,19 @@ function refreshLiftSurfaces(){
   for(let i=range.start+1;i<range.end;i+=3)range.attribute.array[i]+=delta;
   range.height+=delta;range.attribute.needsUpdate=true;
  }
+ const surfaceMaps=new Map();
+ for(const entry of dynamicSurfaceEntries){
+  const surfaceMap=entry.primary?map:(surfaceMaps.get(entry.nodeId)??(surfaceMaps.set(entry.nodeId,mapForSurface(documentModel,entry.nodeId,true,map)),surfaceMaps.get(entry.nodeId)));
+  const surface=paperSurface(surfaceMap,entry.r,entry.c,cellHidden,P.mode!=='edit'||visibility.folds,lighting.creaseDepth,true);
+  if(!surface)continue;
+  const points=entry.mesh.geometry.attributes.position;
+  for(let i=0;i<surface.positions.length;i+=3){points.array[i]=surface.positions[i]+wx(entry.c);points.array[i+1]=surface.positions[i+1];points.array[i+2]=surface.positions[i+2]+wz(entry.r);}
+  points.needsUpdate=true;entry.mesh.geometry.computeVertexNormals();entry.mesh.geometry.computeBoundingSphere();
+  const writeEdges=(attribute,start,segments,raise=0)=>{if(!attribute)return;let i=start;for(const segment of segments)for(const point of segment){attribute.array[i++]=wx(entry.c)+point[0];attribute.array[i++]=point[1]+raise;attribute.array[i++]=wz(entry.r)+point[2];}attribute.needsUpdate=true;};
+  writeEdges(entry.gridAttribute,entry.gridStart,surface.boundarySegments,.002);
+  if(entry.styleAttribute)writeEdges(entry.styleAttribute,entry.styleStart,entityEdgeSegments(entry.cell.tile,surface));
+  if(entry.marker)entry.marker.position.y=surface.height+.035;
+ }
  for(const layer of [gridLayer,entityEdgeLayer])for(const mesh of layer.children){mesh.geometry?.computeBoundingSphere();}
  const tilt=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),-Math.PI/2);
  for(const mesh of terrainLayer.children){
@@ -357,6 +370,7 @@ function refreshLiftSurfaces(){
  for(const mesh of tagLayer.children)updateTagMarkerBatch(THREE,mesh,{wx,wz,top:cell=>tileTop(cell.r,cell.c)});
  for(const mesh of foldLayer.children)if(mesh.userData.exitCell){const {r,c}=mesh.userData.exitCell;mesh.position.y=tileTop(r,c)+.012;}
  axisViewKey=null;rebuildFoldAxes();buildCreaseGuides();buildFoldSelection();
+ if(dynamicSurfaceEntries.length){foldMotionView.invalidatePrepared();scheduleFoldPreparation();}
  if(hovered&&hoverOutline.visible)hoverOutline.position.y=tileTop(hovered.r,hovered.c)+.035;
  refreshMechanismMarkers();
 }
@@ -369,8 +383,8 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
  brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
  for(const cell of cells.surfaceCells){
   const node=documentModel.world.get(cell.nodeId),components=node.components;
-  if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile&&!components.firebird&&!components.flame)continue;
-  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
+  if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile)continue;
+  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch')}:{};
   const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
   if(components.rayEmitter){
    const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
@@ -379,7 +393,6 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
    }
   }
  }
- if(P.mode==='play')for(const cell of (P.terrainState?.flames??[])){if(cellHidden(cell.r,cell.c))continue;const marker=mechanismMarker(THREE,{flame:{}},{});marker.position.set(wx(cell.c),tileTop(cell.r,cell.c)+.055,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);}
 }
 function addAxisLabels(maxHeight){
   const w=map.width,h=map.height,size=Math.min(4096,Math.max(w,h)*32+64);
@@ -449,7 +462,7 @@ $('blockHeight').onchange=()=>{const n=Number($('blockHeight').value);if(!Number
 
 function setTool(next){if(next==='paint')next='place';pendingRegion=null;tool=next;$('foldDirectionPanel').hidden=tool!=='fold';const tagNames={player:"玩家起点",entry:"设置区域入口","region-exit":"设置区域出口","clear-tags":"清除方块标签"};if(tagNames[tool])selectedTagTool=tool;
 const tagSummary=$('tagSummary'),tagName=document.createElement('span');tagName.textContent=tagNames[selectedTagTool]||'选择方块标签';
-const tagIcon=selectedTagTool?document.querySelector('[data-tool="'+selectedTagTool+'"] svg').cloneNode(true):createElement(Box);tagIcon.setAttribute('aria-hidden','true');tagSummary.replaceChildren(tagIcon,tagName);$("exitRegionPanel").hidden=tool!=="region-exit";disposableClear(placementLayer);drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
+const tagIcon=selectedTagTool?document.querySelector('[data-tool="'+selectedTagTool+'"] svg').cloneNode(true):createElement(Box);tagIcon.setAttribute('aria-hidden','true');tagSummary.replaceChildren(tagIcon,tagName);$("exitRegionPanel").hidden=tool!=="region-exit";cancelPlacementPreview();drawEditSelection();document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});updateUI();}
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(b.dataset.tool==='select'){selectionMode=tool==='select'&&selectionMode==='single'?'multi':'single';if(selectionMode==='single'&&selectedCells.length>1){setSelectedCells(directSelectedCells.slice(0,1));}b.setAttribute('aria-label','选区 · '+(selectionMode==='single'?'单选':'多选'));b.dataset.tip='选区 · '+(selectionMode==='single'?'单选':'多选');b.querySelector('.selection-mode-label').textContent=b.dataset.tip;}setTool(b.dataset.tool);scheduleInspection();});
 document.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>{if(!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile))return;color=b.dataset.color;document.querySelectorAll('[data-color]').forEach(s=>{const active=s===b;s.classList.toggle('active',active);s.setAttribute('aria-pressed',String(active));});$('colorName').textContent=COLOR_NAMES[color];$('colorType').textContent=prefabs.find(p=>p.id===selectedPrefabId)?.tile?.blocked?'阻挡实体':'可通行实体';if(tool!=='place')setTool('place');});
 document.querySelectorAll('[data-fold]').forEach(b=>b.onclick=()=>{foldType=b.dataset.fold==='none'?null:b.dataset.fold;document.querySelectorAll('[data-fold]').forEach(s=>{s.classList.toggle('active',s===b);s.setAttribute('aria-pressed',String(s===b));});setTool('fold');});
@@ -481,13 +494,13 @@ function editAt(r,c){
   
 
   
-  if(tool==='place'){try{commitTree(placementCandidate(r,c));}catch(e){toast(e.message,true);}return;}
+  if(tool==='place'){try{commitTree(placementCandidate(r,c),{placement:true,cell:{r,c}});}catch(e){toast(e.message,true);}return;}
   if(tool==='fold'){try{if(!visibility.folds)throw new Error('隐藏折线禁止编辑');if(foldType)assertTagAttachment(tagCatalog,'tag-fold',map,r,c);const next=clone(map);if(!applyFoldLine(next,r,c,foldType))return;validateMap(next,true);applyPropertyMap(next);buildPaper();persist();}catch(error){toast(error.message,true);}return;}
   if(tool==='erase'){try{const cells=removeEntity(map,r,c,cellHidden);if(!visibility.player&&cells.some(p=>Object.keys(map.tiles[p.r][p.c]?.tags??{}).length))throw new Error('删除实体会改变隐藏标签');if(cells.some(p=>map.tiles[p.r][p.c]?.tags?.spawn))throw new Error('先移动玩家起点标签');const next=clone(map);for(const p of cells){const tile=next.tiles[p.r][p.c];next.foldCells.push(...foldsOf(tile).map(type=>({...p,type})));next.tiles[p.r][p.c]=null;}applyMap(next,true);buildPaper();persist();}catch(e){toast(e.message,true);}return;}
   buildPaper();persist();updateUI();
 }
 
-function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;clearPropertyInspector($('propertyInspector'));clearPropertyInspector($('cellPropertyInspector'));$('inspectedCellProperties').textContent='尚未选择方格';$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';renderMechanismText($('mechanismDescriptions'),['选择实体以查看机制说明']);}
+function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;for(const id of ['propertyInspector','generalPropertyInspector','cellSpecialInspector','cellPropertyInspector'])clearPropertyInspector($(id));$('inspectedCellProperties').textContent='尚未选择方格';$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';renderMechanismText($('mechanismDescriptions'),['选择实体以查看机制说明']);}
 function scheduleInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
 function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
 function inspectAtCell(r,c){setSelectedCells([{r,c}]);drawEditSelection();inspectSelection();}
@@ -508,8 +521,8 @@ function inspectSelection(){
     const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
-  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。'};
-  renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>map.tiles[p.r][p.c]?.terrain??'none'))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
+  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
+  renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>{const tile=map.tiles[p.r][p.c];return tile?.lift?'lift':tile?.terrain??'none';}))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
   inspectedCell=cells[0];
   const cellKeys=new Set(['tags','folds','fold']);
   const wholeEntries=entries.map(entry=>({...entry,values:Object.fromEntries(Object.entries(entry.values).filter(([key])=>!cellKeys.has(key)))}));
@@ -517,11 +530,22 @@ function inspectSelection(){
   const directKeys=new Set(directSelectedCells.map(p=>p.r+','+p.c));
   const cellEntries=entries.filter((entry,i)=>directKeys.has(cells[i].r+','+cells[i].c)).map(entry=>({...entry,values:Object.fromEntries(Object.entries(entry.values).filter(([key])=>cellKeys.has(key)))}));
   const independent=batchProperties(cellEntries);
+  const generalKeys=new Set(['color','edgeColor','height','thickness','gradualRate','blocked','followFold','canDropOnFold','regionTag','prefabId','instance','kind','terrain']);
+  const specialValues=Object.fromEntries(Object.entries(values).filter(([key])=>!generalKeys.has(key)));
+  const generalValues=Object.fromEntries(Object.entries(values).filter(([key])=>generalKeys.has(key)&&key!=='regionTag'));
+  const specialTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key==='exitTo'||key==='requiredKeys'));
+  const generalTags=Object.fromEntries(Object.entries(independent.values.tags??{}).filter(([key])=>key!=='exitTo'&&key!=='requiredKeys'));
+  const cellSpecialValues=Object.keys(specialTags).length?{tags:specialTags}:{};
+  const cellGeneralValues={...independent.values,...(values.regionTag!==undefined?{regionTag:values.regionTag}:{}),...(Object.keys(generalTags).length?{tags:generalTags}:{})};if(!Object.keys(generalTags).length)delete cellGeneralValues.tags;
+  const cellGeneralSchema={...independent.schema,regionTag:schema.regionTag};
+  const cellGeneralMixed=new Set([...independent.mixed,...mixed]);
   $('inspectedCellProperties').textContent=directSelectedCells.map(p=>coord(p.r,p.c)).join('、')+' · 纸张按单格编辑，多选可批量修改；标签、折线及区域属于选中格';
   $('inspectedEntity').textContent=cells.length===1?coord(cells[0].r,cells[0].c)+' · '+(map.tiles[cells[0].r][cells[0].c]?(prefabs.find(p=>p.id===entityType(map.tiles[cells[0].r][cells[0].c]))?.name||'实体方块'):'虚空'):'批量检视 · '+selectedCells.length+' 个选中格 / '+cells.length+' 个实体占用格';
   $('inspectedProperties').textContent=JSON.stringify({entity:projectProperties(values,schema,'readable'),cells:projectProperties(independent.values,independent.schema,'readable')},null,2);
-  renderPropertyInspector($('propertyInspector'),values,schema,applyInspectedProperty,error=>toast(error.message,true),mixed);
-  renderPropertyInspector($('cellPropertyInspector'),independent.values,independent.schema,(path,value)=>applyInspectedProperty(path,value,'cell'),error=>toast(error.message,true),independent.mixed);
+  renderPropertyInspector($('propertyInspector'),specialValues,schema,applyInspectedProperty,error=>toast(error.message,true),mixed,{hideReadOnly:true,expanded:true});
+  renderPropertyInspector($('generalPropertyInspector'),generalValues,schema,applyInspectedProperty,error=>toast(error.message,true),mixed,{hideReadOnly:true});
+  renderPropertyInspector($('cellSpecialInspector'),cellSpecialValues,independent.schema,(path,value)=>applyInspectedProperty(path,value,'cell'),error=>toast(error.message,true),independent.mixed,{hideReadOnly:true,expanded:true});
+  renderPropertyInspector($('cellPropertyInspector'),cellGeneralValues,cellGeneralSchema,(path,value)=>applyInspectedProperty(path,value,'cell'),error=>toast(error.message,true),cellGeneralMixed,{hideReadOnly:true});
 }
 function applyInspectedProperty(path,value,scope='entity'){
   if(P.mode!=='edit'||!selectedCells.length)throw new Error('请先选择方格');
@@ -555,7 +579,7 @@ function applyInspectedProperty(path,value,scope='entity'){
 }
 
 document.querySelectorAll('.rotate-left').forEach(b=>b.onclick=()=>turn(-1));document.querySelectorAll('.rotate-right').forEach(b=>b.onclick=()=>turn(1));
-$('applyPlayerProperties').onclick=()=>{try{controller.setPlayerProperties({r:Number($('playerRow').value)-1,c:Number($('playerColumn').value)-1,dir:Number($('playerDirection').value),maxUp:Number($('playerMaxUp').value),maxDown:Number($('playerMaxDown').value),foldVertical:Number($('playerFoldVertical').value),foldHorizontal:Number($('playerFoldHorizontal').value),overheat:Number($('playerOverheat').value),frozen:$('playerFrozen').checked,actions:Number($('playerActions').value),collectedKeys:JSON.parse($('playerCollectedKeys').value)});$('playerPropertyStatus').textContent='玩家属性已应用 · 可撤销，重启后重置';}catch(error){$('playerPropertyStatus').textContent=error.message;toast(error.message,true);}};
+$('applyPlayerProperties').onclick=()=>{try{controller.setPlayerProperties({r:Number($('playerRow').value)-1,c:Number($('playerColumn').value)-1,dir:Number($('playerDirection').value),maxUp:Number($('playerMaxUp').value),maxDown:Number($('playerMaxDown').value),foldVertical:Number($('playerFoldVertical').value),foldHorizontal:Number($('playerFoldHorizontal').value),canDropOnFold:$('playerCanDropOnFold').checked,overheat:Number($('playerOverheat').value),frozen:$('playerFrozen').checked,actions:Number($('playerActions').value),collectedKeys:JSON.parse($('playerCollectedKeys').value)});$('playerPropertyStatus').textContent='玩家属性已应用 · 可撤销，重启后重置';}catch(error){$('playerPropertyStatus').textContent=error.message;toast(error.message,true);}};
 
 
 $('editMode').onclick=()=>setMode('edit');$('playMode').onclick=()=>setMode('play');$('startBtn').onclick=()=>setMode(P.mode==='edit'?'play':'edit');
@@ -583,8 +607,8 @@ function drawEditSelection(){
   $('copyRegion').disabled=!selectedCells.length;$('pasteRegion').disabled=!clipboard;scheduleInspection();
 }
 $('copyRegion').onclick=()=>{if(!editRect)return;try{clipboard=copyTree(documentModel,selectedCells,{isHidden:cellHidden,nodeHidden});}catch(error){toast(error.message,true);return;}drawEditSelection();toast('选区已复制');};
-$('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.height,w:clipboard.width};drawEditSelection();};
-function pasteAt(r,c){try{commitTree(pasteTree(documentModel,clipboard,r,c,{isHidden:cellHidden,nodeHidden}));pendingRegion=null;setTool('select');}catch(err){toast(err.message,true);}}
+$('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();};
+function pasteAt(r,c){try{if(clipboard.kind==='tree'){commitTree(pasteTree(documentModel,clipboard,r,c,{isHidden:cellHidden,nodeHidden}));pendingRegion=null;setTool('select');return;}if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);assertHiddenContentUnchanged(map,result.map,visibility);applyMap(result.map,true);editRect=result.rect;setSelectedCells(unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x)));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
 function updateUI(){
   updateCameraMode();
@@ -595,10 +619,11 @@ function updateUI(){
   $('startBtn').setAttribute('aria-label',playing?'返回编辑':'开始游玩');$('editMode').setAttribute('aria-pressed',String(!playing));$('playMode').setAttribute('aria-pressed',String(playing));
   $('startBtn').querySelector('svg').replaceWith(createElement(playing?Pencil:Play));
   const names={inspect:'点击实体或虚空检视 · 不修改地图',select:selectionMode==='single'?'单选 · 点击选择方格':'多选 · 点击累加 / 拖拽替换 / Shift 拖拽累加',paste:'点击粘贴落点',paint:'方块工具 · '+(COLOR_NAMES[color]||'无颜色属性')+' / 高度 '+brushHeight,place:'放置方块 · '+(prefabs.find(p=>p.id===selectedPrefabId)?.name||'无可用实体'),erase:'删除方块',fold:foldType?FOLD_NAMES[foldType]:'移除折纸线',player:'设置玩家起点',entry:'设置区域入口','region-exit':'设置区域出口','clear-tags':'清除方块标签'};if(!P.chosenFold)$('toolStatus').textContent=playing?'玩家 '+coord(P.player.r,P.player.c):names[tool];
-  $('steps').textContent=$('canvasSteps').textContent=String(P.steps).padStart(2,'0');$('teleports').textContent=String(P.teleports).padStart(2,'0');$('playerCoord').textContent=coord(P.player.r,P.player.c)+' · 朝'+FACE_NAMES[P.player.dir]+(playing?' · '+(P.terrainState.frozen?'冰冻 · ':'')+'过热 '+P.terrainState.overheat+(P.terrainState.hasKey?' · 持有钥匙':''):'');$('facingLabel').textContent=$('playFacingLabel').textContent='朝向：'+FACE_NAMES[P.player.dir];
+  $('steps').textContent=$('canvasSteps').textContent=String(P.steps).padStart(2,'0');$('teleports').textContent=String(P.teleports).padStart(2,'0');$('playerCoord').textContent=coord(P.player.r,P.player.c)+' · 朝'+FACE_NAMES[P.player.dir]+(playing?' · '+(P.terrainState.frozen?'冰冻 · ':'')+'过热 '+P.terrainState.overheat+(P.terrainState.hasKey?' · 持有钥匙':''):'');$('playFacingLabel').textContent='朝向：'+FACE_NAMES[P.player.dir];
   for(const [id,value] of Object.entries({playerRow:P.player.r+1,playerColumn:P.player.c+1,playerDirection:P.player.dir,playerMaxUp:P.moveHeight.maxUp,playerMaxDown:P.moveHeight.maxDown,playerFoldVertical:P.foldDrop.vertical,playerFoldHorizontal:P.foldDrop.horizontal}))if(document.activeElement!==$(id))$(id).value=value;
   for(const [id,value] of Object.entries({playerOverheat:P.terrainState.overheat,playerActions:P.terrainState.actions,playerCollectedKeys:JSON.stringify(P.terrainState.collectedKeys)}))if(document.activeElement!==$(id))$(id).value=value;
   if(document.activeElement!==$('playerFrozen'))$('playerFrozen').checked=P.terrainState.frozen;
+  if(document.activeElement!==$('playerCanDropOnFold'))$('playerCanDropOnFold').checked=P.canDropOnFold;
   renderNameChecklist($('playerKeyChoices'),legalKeyNames(map,documentModel.world),new Set(P.terrainState.collectedKeys),'持有钥匙 ',(name,checked)=>{const keys=new Set(JSON.parse($('playerCollectedKeys').value));if(checked)keys.add(name);else keys.delete(name);$('playerCollectedKeys').value=JSON.stringify([...keys]);},'无可收集钥匙');
   $('playerRow').max=map.height;$('playerColumn').max=map.width;$('applyPlayerProperties').disabled=!playing||P.moving||!!P.foldMotion;if(P.foldMotion)$('teleportBtn').disabled=true;
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
@@ -644,11 +669,12 @@ const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();let pointerDown=
 let placementPreviewFrame=0,pendingPlacementHit=null;
 function schedulePlacementPreview(hit){
  if(cameraInteraction.active)return;
+ if(P.mode==='edit'&&pointerDown?.button===0&&dragEdited){cancelPlacementPreview();return;}
  pendingPlacementHit=hit;
  if(placementPreviewFrame)return;
  placementPreviewFrame=requestAnimationFrame(()=>{placementPreviewFrame=0;const next=pendingPlacementHit;pendingPlacementHit=null;if(!cameraInteraction.active)drawPlacementPreview(next);});
 }
-function cancelPlacementPreview(){pendingPlacementHit=null;if(placementPreviewFrame){cancelAnimationFrame(placementPreviewFrame);placementPreviewFrame=0;}disposableClear(placementLayer);placementLayer.userData.preview=null;}
+function cancelPlacementPreview(){placementRenderCache=null;pendingPlacementHit=null;if(placementPreviewFrame){cancelAnimationFrame(placementPreviewFrame);placementPreviewFrame=0;}disposableClear(placementLayer);placementLayer.userData.preview=null;}
 function hitAt(clientX,clientY){
   const b=renderer.domElement.getBoundingClientRect();mouse.set((clientX-b.left)/b.width*2-1,-(clientY-b.top)/b.height*2+1);raycaster.setFromCamera(mouse,camera);
   const surface=raycaster.intersectObjects([modelLayer,tagLayer,terrainLayer,tileLayer].filter(layer=>layer.visible).flatMap(layer=>layer.children.filter(object=>object.visible)),true)[0];
@@ -673,7 +699,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.poin
   if(manualPan){hoverOutline.visible=false;disposableClear(placementLayer);return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
   if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));const groups=P.mode==='edit'&&visibility.folds?foldAxes.filter(g=>g.cells.some(p=>p.r===hit.r&&p.c===hit.c)):[];$('foldRadiusHint').hidden=!groups.length;$('foldRadiusHint').textContent=groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / ');const descriptionKey=[hit.r,hit.c,P.mode,visibility.folds,[...hiddenEntities].sort().join(',')].join('|');if(descriptionKey!==hoverDescriptionKey){hoverDescriptionKey=descriptionKey;$('hoverCoord').textContent=cellHidden(hit.r,hit.c)?coord(hit.r,hit.c)+' · 隐藏区域':describeViewportCell(documentModel,hit.r,hit.c,{nodeHidden,runtime:P.mode==='play',nameFor:id=>prefabs.find(prefab=>prefab.id===id)?.name??id});}}else{hoverDescriptionKey=null;hoverOutline.visible=false;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';}
   schedulePlacementPreview(hit);
-  if(P.mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.height,w:clipboard.width};drawEditSelection();}
+  if(P.mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();}
   if(P.mode==='edit'&&tool==='select'&&selectionMode==='multi'&&pointerDown?.button===0&&!multiTouch&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start){const rect=rectangle(start,hit);setSelectedCells(unionCells(selectionBase,rect,(r,c)=>!cellHidden(r,c)));dragEdited=true;drawEditSelection();}return;}
   const dragTools=new Set(['place','erase']);
   if(P.mode==='edit'&&pointerDown?.button===0&&!multiTouch&&!dragEdited&&dragTools.has(tool)&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){
@@ -849,19 +875,21 @@ function placementCandidate(r,c,{preview=false}={}){
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
  const options={isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)},result=preview?previewPlacement(documentModel,prefab,tile,r,c,{...options,tagCells:placementTagCells}):null;
  const candidate=preview?result.candidate:placeCategorizedPrefab(documentModel,prefab,tile,r,c,options);
- if(!preview)assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
+ if(!preview&&(!visibility.folds||!visibility.player))assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
  assertTreeVisibility(candidate,preview?result.source:documentModel);
  return candidate;
 }
 
 let placementCheckCache=null;
 function drawPlacementPreview(hit){
- disposableClear(placementLayer);placementLayer.userData.preview=null;if(P.mode!=='edit'||tool!=='place'||!hit)return;
- const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)return;
- let cells,reason='';try{cells=previewFootprint(prefab,hit.r,hit.c,id=>prefabs.find(p=>p.id===id));}catch(error){$('hoverCoord').textContent='无法放置 · '+error.message;return;}
+ if(P.mode!=='edit'||tool!=='place'||!hit){cancelPlacementPreview();return;}
+ const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab){cancelPlacementPreview();return;}
  const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
- if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
- else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
+ if(placementRenderCache?.document===documentModel&&placementRenderCache.prefab===prefab&&placementRenderCache.key===key&&placementLayer.children.length){$('hoverCoord').textContent=placementRenderCache.text;return;}
+ disposableClear(placementLayer);placementLayer.userData.preview=null;placementRenderCache=null;
+ let cells,reason='';try{cells=previewFootprint(prefab,hit.r,hit.c,id=>prefabs.find(p=>p.id===id));}catch(error){$('hoverCoord').textContent='无法放置 · '+error.message;return;}
+ if(placementCheckCache?.document===documentModel&&placementCheckCache.prefab===prefab&&placementCheckCache.key===key)reason=placementCheckCache.reason;
+ else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,prefab,key,reason,candidate};}
  const invalid=!!reason;
  const previewMap=invalid?null:placementPreviewMap(placementCheckCache.candidate,cells);
  if(!invalid){
@@ -884,6 +912,7 @@ function drawPlacementPreview(hit){
  }
  for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;const top=invalid?tileTop(p.r,p.c):tileHeight(previewMap.tiles[p.r]?.[p.c]);line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?top+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
  $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':'放置预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
+ placementRenderCache={document:documentModel,prefab,key,text:$('hoverCoord').textContent};
 }
 
 function placementPreviewMap(candidate,cells){
@@ -904,19 +933,22 @@ $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility
 $('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
 function assertTreeVisibility(next,before=documentModel){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(before,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(before,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
-function commitTree(next){assertTreeVisibility(next);const before=documentModel.serialize();if(JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});documentModel=next;map=next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();buildPaper();persist();}
+function commitTree(next,{placement=false,cell}={}){assertTreeVisibility(next);const before=placement&&gestureBefore?null:documentModel.serialize();if(!placement&&JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});const previousDocument=documentModel,previousMap=map;documentModel=next;map=next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();
+ if(placement&&cell&&refreshFlatPaperPlacement(THREE,{before:previousDocument.world,after:next.world,beforeMap:previousMap,afterMap:map,...cell,layer:tileLayer,materialFor:color=>materials[color],wx,wz,hidden:cellHidden})){cancelPlacementPreview();clearSelection();foldMotionView.invalidatePrepared();renderer.shadowMap.needsUpdate=true;refreshTreePanel();applyVisibility();updateUI();scheduleFoldPreparation();}
+ else buildPaper();persist();}
 function refreshTreePanel(){
- const panel=$('treeNodes');if(!panel)return;const point=lastClickTile??selectedCells[0],nodes=entityTreeContext(documentModel.world,selectedNodeId,point);
- renderTreeNodes(panel,nodes.map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
+ const panel=$('treeNodes');if(!panel||!panel.closest('details')?.open)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
+ renderTreeNodes(panel,entityTreeContext(documentModel.world,selectedNodeId,point).map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
  const node=nodes.find(item=>item.id===selectedNodeId);$('treeFields').hidden=!node;if(!node){clearPropertyInspector($('nodeConfiguration'));return;}const transform=documentModel.world.transforms.get(node.transformId),world=documentModel.world.transforms.world(node.transformId);$('nodeLocalR').value=transform.local.r;$('nodeLocalC').value=transform.local.c;$('nodeLocalDir').value=transform.local.dir;renderTreeParents($('nodeParent'),entityParentChoices(documentModel.world,node.id).map(other=>({...other,disabled:nodeHidden(other)||documentModel.world.transforms.worldCells(other.transformId).some(p=>cellHidden(p.r,p.c))})));$('nodeParent').value=nodes.find(item=>item.transformId===transform.parentId)?.id??'';const schema=nodeSchema(node),readable=inspectNodeValues(node,schema);$('nodeComponents').value=JSON.stringify(readable.components??{},null,2);$('nodeTags').value=JSON.stringify(readable.tags??{},null,2);$('nodeIdentity').textContent=node.id;$('nodeWorldPosition').textContent='地图位置 '+coord(world.r,world.c)+' · 朝'+FACE_NAMES[world.dir];
-  renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,choices:{'components.rayEmitter.initialDirection':Object.entries(rayEmitterConfig.directions).map(([value,entry])=>({value,label:entry.label})),'components.firebird.direction':Object.entries(rayEmitterConfig.directions).map(([value,entry])=>({value,label:entry.label})),'components.foldSwitch.initialState':[{value:0,label:'0 · 关闭出口'},{value:1,label:'1 · 开启出口'}],'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
+ renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,hideReadOnly:true,choices:{'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
  const locked=nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c));$('treeFields').disabled=locked;for(const id of ['moveNode','reparentNode','applyNodeConfig'])$(id).disabled=locked;const protectedNode=documentModel.world.transforms.childrenOf(node.transformId).length||documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>owner!=='entity:'+node.id);$('deleteNode').disabled=locked||!!protectedNode;$('deleteNode').title=protectedNode?'实体有子节点或外部引用，暂不能删除':'删除当前实体';
 }
+$('treeNodes').closest('details').addEventListener('toggle',event=>{if(event.currentTarget.open)refreshTreePanel();});
 function treeAction(action){try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');commitTree(action());$('nodeEditStatus').textContent='已应用';}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}}
 $('moveNode').onclick=()=>treeAction(()=>moveNode(documentModel,selectedNodeId,{r:Number($('nodeLocalR').value),c:Number($('nodeLocalC').value),dir:Number($('nodeLocalDir').value)},cellHidden,nodeHidden));
 $('reparentNode').onclick=()=>treeAction(()=>reparentNode(documentModel,selectedNodeId,$('nodeParent').value||null,$('preserveWorld').checked,cellHidden,nodeHidden));
 $('deleteNode').onclick=()=>treeAction(()=>deleteNode(documentModel,selectedNodeId,cellHidden,nodeHidden));
-function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema);return projectProperties({...value,components:{...value.components,physics:{followFold:nodeFollowsFold(node),...value.components?.physics}}},schema,'readable');}
+function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema),physics={followFold:nodeFollowsFold(node),...(['item','creature'].includes(entityCategory(node))?{canDropOnFold:nodeCanDropOnFold(node)}:{}),...value.components?.physics};return projectProperties({...value,components:{...value.components,physics}},schema,'readable');}
 function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
 function applyTreeConfiguration(node,shown,after,schema){if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,node.id,after.components,after.tags,cellHidden,nodeHidden,schema);commitTree(next);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);refreshTreePanel();$('nodeEditStatus').textContent='已应用';}
 $('applyNodeConfig').onclick=()=>{try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable');applyTreeConfiguration(node,shown,{...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)},schema);}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}};

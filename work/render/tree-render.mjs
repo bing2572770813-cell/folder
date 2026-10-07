@@ -1,5 +1,5 @@
-// Detached render views; all coordinates come from the canonical Transform tree.
 import fragilePresence from '../entities/fragile-presence.cjs';
+// Detached render views; gameplay-only positions are resolved by EntityWorld.
 const terrainTypes=['campfire','ice','fire','eruption','key','flame','firebird'];
 const hasSurface=node=>Object.hasOwn(node.components,'surface');
 const rendered=node=>node.static.render!==false;
@@ -14,8 +14,9 @@ function surfaceTile(document,node,r,c,runtime=false){
  const terrain=terrainTypes.find(type=>Object.hasOwn(node.components,type));
  if(terrain){tile.terrain=terrain;tile.terrainConfig=structuredClone(node.components[terrain]);if(terrain==='key')tile.keyName=node.components.key.name??'钥匙';}
  if(node.components.physics?.followFold!==undefined)tile.followFold=node.components.physics.followFold;
+ if(node.components.physics?.canDropOnFold!==undefined)tile.canDropOnFold=node.components.physics.canDropOnFold;
  tile.folds=structuredClone(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
- tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
+ tile.surfaceConnected=node.components.surface?.connected??(!tile.lift&&!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
  return tile;
 }
 
@@ -23,7 +24,7 @@ function projection(document,cells){
  const byCell=new Map(),nodes=cells
   ?[...new Map(cells.flatMap(({r,c})=>document.world.at(r,c)).map(node=>[node.id,node])).values()]
   :document.world.serialize();
- for(const node of nodes)for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
+ for(const node of nodes)for(const {r,c} of document.world.cells(node.id)){
   const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
  }
  for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
@@ -35,7 +36,7 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
  const allowed=cells&&new Set(cells.map(({r,c})=>r+','+c)),{byCell,nodes}=projection(document,cells);nodes.sort((a,b)=>a.id.localeCompare(b.id));
  for(const node of nodes){
   if(!rendered(node)||nodeHidden(node))continue;
-  for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
+  for(const {r,c} of document.world.cells(node.id)){
    if((allowed&&!allowed.has(r+','+c))||cellHidden(r,c))continue;
    if(runtime&&fragilePresence.isBrokenCell(document.world,byCell.get(r+','+c)??[]))continue;
    if(isToken(node))tokenCells.push({nodeId:node.id,r,c,tile:surfaceTile(document,node,r,c,runtime)});
@@ -55,14 +56,14 @@ export function renderTreeCells(document,{nodeHidden=()=>false,cellHidden=()=>fa
 }
 
 /** Keep neighboring primary geometry so paper seams and hidden-cell rules still work. */
-	export function mapForSurface(document,nodeId,runtime=false,baseMap=null){
-	 const source=baseMap??document.view();
-	 const map=baseMap?{...source,tiles:source.tiles.slice()}:source,node=document.world.get(nodeId);
+export function mapForSurface(document,nodeId,runtime=false,baseMap=null){
+ const source=baseMap??document.view();
+ const map=baseMap?{...source,tiles:source.tiles.slice()}:source,node=document.world.get(nodeId);
  if(!hasSurface(node))return map;
-	 const rows=new Set();
-	 for(const {r,c} of document.world.transforms.worldCells(node.transformId)){
-	   if(!rows.has(r)){map.tiles[r]=map.tiles[r].slice();rows.add(r);}
-	   map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
-	 }
+ const rows=new Set();
+ for(const {r,c} of document.world.cells(node.id)){
+   if(!rows.has(r)){map.tiles[r]=map.tiles[r].slice();rows.add(r);}
+   map.tiles[r][c]=surfaceTile(document,node,r,c,runtime);
+ }
  return map;
 }

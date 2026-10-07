@@ -72,6 +72,11 @@ export async function readCatalog(folder: string): Promise<CatalogResult> {
       const value = normalizeTagPrefab(await readDefinition(entry.file));
       if (tagIds.has(value.id)) throw new Error(`标签 ID 或行为重复：${value.id}`);
       tagIds.add(value.id);
+      // Regions belong to map cells; all loaded entity types support them by default.
+      if (value.behavior && !Array.isArray(value.behavior) && typeof value.behavior === 'object'
+        && value.behavior.scriptId === 'tag-region') {
+        value.BaseEntity = [...new Set([...(value.BaseEntity as string[]), ...prefabs.map(prefab => prefab.id)])];
+      }
       tags.push(value);
     } catch (error) {
       errors.push({file: entry.name, message: errorMessage(error)});

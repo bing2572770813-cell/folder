@@ -18,6 +18,12 @@
   "occupied": [
     true
   ],
+  "components": {
+    "physics": {
+      "followFold": true,
+      "canDropOnFold": true
+    }
+  },
   "static": {
     "entityType": "item"
   },

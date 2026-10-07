@@ -87,3 +87,24 @@ test('catalog preserves valid inherited static fields accepted by entity worlds'
   const catalog=await readCatalog(root);assert.deepEqual(catalog.prefabs.find(value=>value.id==='child_static_ai').static,statics);
  }finally{await fs.rm(root,{recursive:true,force:true});}
 });
+
+test('region tags accept lift paper and newly loaded entities without editing the whitelist', async () => {
+  const root = await fixture();
+  try {
+    const regionFile = path.join(root, 'tag', 'region_ai.json');
+    const original = await fs.readFile(regionFile, 'utf8');
+    await fs.writeFile(path.join(root, 'entity', 'lift_paper_ai.json'), await fs.readFile(new URL('../../../assets/prefab/entity/lift_paper_ai.json', import.meta.url), 'utf8'));
+    await fs.writeFile(path.join(root, 'tag', 'fold_ai.json'), JSON.stringify({version:1,id:'fold_ai',name:'折线',BaseEntity:['paper_ai'],behavior:{scriptId:'tag-fold',parameters:{},state:{}}}));
+    const {assertTagAttachment} = await import('../../tags/tag-model.mjs');
+    let catalog = await readCatalog(root);
+    assert.doesNotThrow(() => assertTagAttachment(catalog.tags, 'tag-region', {tiles:[[{prefabId:'lift_paper_ai'}]]}, 0, 0));
+    assert.throws(() => assertTagAttachment(catalog.tags, 'tag-fold', {tiles:[[{prefabId:'lift_paper_ai'}]]}, 0, 0), /不能附着/);
+    await savePrefab(root, {version:1,id:'future_ai',name:'以后新增的实体',tile:{color:'white',height:0.09}});
+    catalog = await readCatalog(root);
+    assert.doesNotThrow(() => assertTagAttachment(catalog.tags, 'tag-region', {tiles:[[{prefabId:'future_ai'}]]}, 0, 0));
+    assert.equal(catalog.tags.find(tag => tag.id==='region_ai').BaseEntity.filter(id => id==='paper_ai').length, 1);
+    assert.equal(await fs.readFile(regionFile, 'utf8'), original, 'derived permissions do not write back to prefab files');
+  } finally {
+    await fs.rm(root, {recursive:true,force:true});
+  }
+});

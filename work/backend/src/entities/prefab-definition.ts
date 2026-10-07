@@ -1,5 +1,5 @@
 import {jsonObject,freezeJson,type JsonObject,type EntityNode} from './entity-model.js';
-import {normalizeVisual} from '../../../resources/visual-definition.mjs';
+import {normalizeVisual} from '../resources/visual-definition.js';
 
 export interface TreePrefab {
   id:string;

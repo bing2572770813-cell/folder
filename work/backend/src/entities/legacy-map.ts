@@ -6,8 +6,8 @@ import {jsonObject,type EntityNode,type JsonObject} from './entity-model.js';
 export interface TreeMap {version:2;width:number;height:number;entities:EntityNode[];transforms:TransformNode[];cellTags:Record<string,JsonObject>;legacyMetadata:JsonObject}
 interface LegacyTile {
   prefabId?:string;instance?:{id:string};height?:number;thickness?:number;gradualRate?:number;color?:string;edgeColor?:string;surfaceConnected?:boolean;
-  followFold?:boolean;blocked?:boolean;terrain?:string;terrainConfig?:JsonObject;keyName?:string;regionTag?:string;tags?:JsonObject;folds?:string[];fold?:string|null;lift?:JsonObject;
-  components?:Record<string,JsonObject>;
+  followFold?:boolean;canDropOnFold?:boolean;blocked?:boolean;terrain?:string;terrainConfig?:JsonObject;keyName?:string;regionTag?:string;tags?:JsonObject;folds?:string[];fold?:string|null;lift?:JsonObject;
+  components?:Record<string,JsonObject>;static?:JsonObject;
 }
 interface LegacyMap {width:number;height:number;tiles:(LegacyTile|null)[][];foldCells?:{r:number;c:number;type:string}[];[key:string]:unknown}
 
@@ -26,17 +26,25 @@ export function legacyMapToTree(map:LegacyMap):TreeMap {
     if(tile.surfaceConnected!==undefined)surface.connected=tile.surfaceConnected;
     const components:Record<string,JsonObject>={surface,collision:{blocked:tile.blocked??tile.color==='black'}};
     if(tile.followFold!==undefined)components.physics={followFold:tile.followFold};
+    if(tile.canDropOnFold!==undefined)components.physics={...components.physics,canDropOnFold:tile.canDropOnFold};
     if(tile.lift)components.lift=jsonObject(tile.lift);
-    if(tile.terrain==='fire')components.fire={...tile.terrainConfig,damage:tile.terrainConfig?.damage??1};
+    if(tile.components)for(const [name,config] of Object.entries(tile.components))components[name]=jsonObject(config);
+    const inferred:Record<string,JsonObject>={
+      fragile_paper_ai:{fragile:{}},
+      ray_emitter_ai:{rayEmitter:{initialDirection:'north'}},
+      fold_switch_ai:{foldSwitch:{initialState:0}},
+    };
+    const defaults=inferred[tile.prefabId??''];
+    if(defaults)for(const [name,config] of Object.entries(defaults))if(!components[name])components[name]=jsonObject(config);
+    if(tile.terrain==='fire')components.fire={...components.fire,...tile.terrainConfig,damage:tile.terrainConfig?.damage??components.fire?.damage??1};
     else if(tile.terrain==='key')components.key={...tile.terrainConfig,name:tile.keyName??'钥匙'};
     else if(tile.terrain)components[tile.terrain]={...tile.terrainConfig};
     const directions=tile.folds??(tile.fold?[tile.fold]:[]);if(directions.length)components.fold={directions:[...directions]};
-    for(const [id,config] of Object.entries(tile.components??{}))components[id]=jsonObject(config);
     cellTags[r+','+c]={regionTag:tile.regionTag??'默认区域'};
     const {regionTag:ignoredRegion,instance:ignoredInstance,...configuration}=tile;
     const prefabId=tile.prefabId==='large_paper_ai'?'paper_ai':tile.prefabId??'paper_ai';
     if(configuration.prefabId==='large_paper_ai')configuration.prefabId='paper_ai';
-    entities.push({id,prefabId,transformId,components,tags:{...tile.tags},static:{},configuration:jsonObject(configuration)});
+    entities.push({id,prefabId,transformId,components,tags:{...tile.tags},static:jsonObject(tile.static??{}),configuration:jsonObject(configuration)});
   }
   const virtual=new Map<string,EntityNode>();
   for(const fold of map.foldCells??[]){

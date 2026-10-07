@@ -43,23 +43,6 @@ export const PlayPanel = React.memo(function PlayPanel() {
                   <div id="testModifierControls" className="test-modifiers">
                     <TestModifiers />
                   </div>
-                  <div className="orientation-row">
-                    <span id="playFacingLabel">朝向：北</span>
-                    <div className="mini-controls">
-                      <UiButton
-                        className="icon-btn rotate-left"
-                        aria-label="逆时针转向"
-                      >
-                        <i data-lucide="rotate-ccw" />
-                      </UiButton>
-                      <UiButton
-                        className="icon-btn rotate-right"
-                        aria-label="顺时针转向"
-                      >
-                        <i data-lucide="rotate-cw" />
-                      </UiButton>
-                    </div>
-                  </div>
                 </UiDisclosure>
               </>
             ),
@@ -86,6 +69,17 @@ export const PlayPanel = React.memo(function PlayPanel() {
                   <div>
                     <strong id="teleports">{"00"}</strong>
                     <span>{"掉落次数"}</span>
+                  </div>
+                </div>
+                <div className="orientation-row">
+                  <span id="playFacingLabel">朝向：北</span>
+                  <div className="mini-controls">
+                    <UiButton className="icon-btn rotate-left" aria-label="逆时针转向">
+                      <i data-lucide="rotate-ccw" />
+                    </UiButton>
+                    <UiButton className="icon-btn rotate-right" aria-label="顺时针转向">
+                      <i data-lucide="rotate-cw" />
+                    </UiButton>
                   </div>
                 </div>
                 <UiDisclosure className="studio-section player-properties" open>
@@ -159,6 +153,7 @@ export const PlayPanel = React.memo(function PlayPanel() {
                     </fieldset>
                     <fieldset className="player-height-limits">
                       <legend>折纸落点检测</legend>
+                      <label>可在折叠时掉落<UiCheckbox id="playerCanDropOnFold" aria-label="玩家可在折叠时掉落" defaultChecked /></label>
                       <label>竖直距离阈值（世界 Y）<UiInput id="playerFoldVertical" aria-label="折纸竖直距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={1}/></label>
                       <label>水平距离阈值（世界 XZ）<UiInput id="playerFoldHorizontal" aria-label="折纸水平距离阈值" type="number" min={0.01} max={16} step={0.05} defaultValue={0.35}/></label>
                     </fieldset>

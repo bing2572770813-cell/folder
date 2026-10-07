@@ -733,14 +733,14 @@ function prefabPreview(prefab){
 
 function refreshPrefabPreviews(type){for(const prefab of prefabs.filter(p=>p.tile?.terrain===type||Object.hasOwn(p.components??{},type))){previewCache.delete(JSON.stringify(prefab));const img=document.querySelector('[data-prefab="'+prefab.id+'"] img');if(img)img.src=prefabPreview(prefab);}}
 
-function placementCandidate(r,c){
+function placementCandidate(r,c,{preview=false}={}){
  const prefab=prefabs.find(p=>p.id===selectedPrefabId),tile=brushTile();
  if(!prefab)throw new Error('没有可用实体');
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
  const candidate=placeCategorizedPrefab(documentModel,prefab,tile,r,c,{isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)});
- assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
+ if(!preview)assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);
  assertTreeVisibility(candidate);
  return candidate;
 }
@@ -752,7 +752,7 @@ function drawPlacementPreview(hit){
  const cells=footprint(prefab,hit.r,hit.c);let reason='';
  const key=JSON.stringify([hit.r,hit.c,selectedPrefabId,$('blockHeight').value,$('blockThickness').value,$('blockGradualRate').value,$('keyName').value,color,visibility,[...hiddenEntities],[...hiddenRegions]]);
  if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
- else{let candidate;try{candidate=placementCandidate(hit.r,hit.c);}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
+ else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
  const invalid=!!reason;
  const previewMap=invalid?null:placementCheckCache.candidate.view();
  if(!invalid){

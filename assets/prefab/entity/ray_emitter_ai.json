@@ -29,6 +29,10 @@
             "initialDirection": {
               "label": "初始朝向",
               "tempEditable": true
+            },
+            "triggers": {
+              "label": "触发方式",
+              "tempEditable": true
             }
           }
         }

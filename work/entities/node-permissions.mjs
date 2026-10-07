@@ -3,6 +3,7 @@ function intersect(a={},b={}){const result={...copy(a),...copy(b)};for(const fla
 export function nodePermissions(node,legacy={}){
  const schema=copy(legacy);schema.id={readable:true,tempEditable:false};schema.transformId={readable:true,tempEditable:false};schema.static={readable:true,tempEditable:false};
  const components=schema.components??={},children=components.children??={};schema.components=components;
+ for(const key of ['lift','foldSwitch','rayEmitter','firebird'])if(children[key]){children[key].children??={};children[key].children.triggers={label:'触发方式',tempEditable:true};}
  const field=(component,key,definition)=>{const branch=children[component]??={},fields=branch.children??={};children[component]=branch;fields[key]=intersect(fields[key],definition);};
  for(const key of ['height','thickness','gradualRate','color','edgeColor'])if(schema[key])field('surface',key,schema[key]);
  if(schema.followFold)field('physics','followFold',schema.followFold);

@@ -2,7 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
-const {ACTION_TRIGGERS,dispatchTriggerList}=require('../../mechanics/trigger-list.cjs');
+const {ACTION_TRIGGERS,dispatchTriggerList,normalizeComponentTriggers,componentTriggerMatches}=require('../../mechanics/trigger-list.cjs');
+
+test('mechanism trigger settings default to both action causes and accept fixed selections',()=>{
+ assert.deepEqual(normalizeComponentTriggers(undefined),['walk','teleport']);
+ assert.deepEqual(normalizeComponentTriggers(['teleport']),['teleport']);
+ assert.equal(componentTriggerMatches(undefined,'walk'),true);
+ assert.equal(componentTriggerMatches(['teleport'],'walk'),false);
+ assert.throws(()=>normalizeComponentTriggers(['hover']),/trigger/i);
+ assert.throws(()=>normalizeComponentTriggers([]),/trigger/i);
+});
 
 test('trigger list filters by lifecycle event and action trigger',()=>{
  const calls=[];const list=[

@@ -45,6 +45,11 @@ const esbuild = require("esbuild");
   for (const id of ['playerOverheat','playerFrozen','playerActions','playerCollectedKeys'])
     assert.equal(document.getElementById(id).closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.ok(document.querySelector('#cellPropertyInspector'));
+  assert.ok(document.querySelector('#cellSpecialInspector'));
+  assert.ok(document.querySelector('#generalPropertyInspector').closest('details'));
+  assert.ok(![...document.querySelectorAll('#panelInspect h2')].some(heading=>heading.textContent==='当前选区'));
+  assert.ok(!document.querySelector('#nodeConfiguration').closest('details').hasAttribute('open'));
+  assert.equal(document.querySelector('#playFacingLabel').closest('[role="tabpanel"]').id,'panelPlayerState');
   assert.equal(document.querySelector('#clearMap').closest('.tool-grid').className,'tool-grid');
   assert.equal(document.querySelector('#freeTeleportToggle').closest('[role="tabpanel"]').id,'panelDeveloper');
   assert.equal(document.querySelector('#applyPlayerProperties').closest('[role="tabpanel"]').id,'panelPlayerState');
@@ -103,6 +108,14 @@ const esbuild = require("esbuild");
     inspector.querySelector('[aria-label="secret (properties.secret)"]'),
     null,
   );
+  const compact=parseHTML(module.exports.renderInspectorMarkup({
+    values:{surfaceConnected:true,prefabId:'paper_ai',properties:{secret:1}},
+    schema:{properties:{children:{secret:{tempEditable:false}}}},
+    mixed:new Set(),onChange:()=>{},onError:()=>{},options:{hideReadOnly:true},
+  })).document;
+  assert.equal(compact.querySelector('[aria-label="连接相邻纸面 (surfaceConnected)"]').getAttribute('type'),'checkbox');
+  assert.equal(compact.querySelector('[aria-label="实体 ID (prefabId)"]'),null);
+  assert.equal(compact.querySelector('details'),null,'empty read-only property groups stay hidden');
 
   const entityPicker = document
     .querySelector("#prefabSummary")

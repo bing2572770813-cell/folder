@@ -43,23 +43,6 @@ export const PlayPanel = React.memo(function PlayPanel() {
                   <div id="testModifierControls" className="test-modifiers">
                     <TestModifiers />
                   </div>
-                  <div className="orientation-row">
-                    <span id="playFacingLabel">朝向：北</span>
-                    <div className="mini-controls">
-                      <UiButton
-                        className="icon-btn rotate-left"
-                        aria-label="逆时针转向"
-                      >
-                        <i data-lucide="rotate-ccw" />
-                      </UiButton>
-                      <UiButton
-                        className="icon-btn rotate-right"
-                        aria-label="顺时针转向"
-                      >
-                        <i data-lucide="rotate-cw" />
-                      </UiButton>
-                    </div>
-                  </div>
                 </UiDisclosure>
               </>
             ),
@@ -86,6 +69,17 @@ export const PlayPanel = React.memo(function PlayPanel() {
                   <div>
                     <strong id="teleports">{"00"}</strong>
                     <span>{"掉落次数"}</span>
+                  </div>
+                </div>
+                <div className="orientation-row">
+                  <span id="playFacingLabel">朝向：北</span>
+                  <div className="mini-controls">
+                    <UiButton className="icon-btn rotate-left" aria-label="逆时针转向">
+                      <i data-lucide="rotate-ccw" />
+                    </UiButton>
+                    <UiButton className="icon-btn rotate-right" aria-label="顺时针转向">
+                      <i data-lucide="rotate-cw" />
+                    </UiButton>
                   </div>
                 </div>
                 <UiDisclosure className="studio-section player-properties" open>

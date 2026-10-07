@@ -29,12 +29,13 @@ export function renderTreeParents(container, nodes) {
 // Fields stay mounted and uncontrolled so the scene adapter retains event targets.
 export const TreeInspector = React.memo(function TreeInspector() {
   return <UiSection className="section">
-    <h2 className="section-label">当前实体与关联节点</h2>
+    <UiDisclosure className="node-section">
+    <summary>结构与节点</summary>
     <div id="treeNodes" className="studio-fields" role="group" aria-label="实体节点" />
     <fieldset id="treeFields" className="studio-fields" aria-label="当前实体" hidden>
       <p id="nodeIdentity" className="studio-readout" />
       <p id="nodeWorldPosition" className="studio-readout" />
-      <UiDisclosure className="node-section" open>
+      <UiDisclosure className="node-section">
         <summary>位置与父子关系</summary>
         <div className="studio-fields">
           <div className="node-coordinate-grid">
@@ -50,7 +51,10 @@ export const TreeInspector = React.memo(function TreeInspector() {
           <UiButton id="reparentNode" className="node-command"><UiIcon icon={GitBranch} />应用父子关系</UiButton>
         </div>
       </UiDisclosure>
-      <div id="nodeConfiguration" className="property-inspector" />
+      <UiDisclosure className="node-section">
+        <summary>节点组件与属性</summary>
+        <div id="nodeConfiguration" className="property-inspector" />
+      </UiDisclosure>
       <UiDisclosure className="node-section">
         <summary>高级配置</summary>
         <label>组件 JSON<UiTextarea id="nodeComponents" rows={8} aria-label="节点组件 JSON" /></label>
@@ -60,5 +64,6 @@ export const TreeInspector = React.memo(function TreeInspector() {
       <p id="nodeEditStatus" className="studio-readout" role="status" />
       <UiButton id="deleteNode" className="node-command node-danger"><UiIcon icon={Trash2} />删除实体</UiButton>
     </fieldset>
+    </UiDisclosure>
   </UiSection>;
 });

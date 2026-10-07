@@ -6,7 +6,7 @@ export function tabletopHeight(map,hidden=()=>false){
   const heights=[];
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){
     const tile=map.tiles[r]?.[c];
-    if(isPaper(tile)&&!hidden(r,c))heights.push(tileHeight(tile)-tileThickness(tile));
+    if(!tile?.lift&&isPaper(tile)&&!hidden(r,c))heights.push(tileHeight(tile)-tileThickness(tile));
   }
   return heights.length?Math.min(...heights):0;
 }

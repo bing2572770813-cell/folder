@@ -25,7 +25,7 @@ function tileOf(node){
   if(node.components.physics?.followFold!==undefined)tile.followFold=node.components.physics.followFold;
   if(node.components.physics?.canDropOnFold!==undefined)tile.canDropOnFold=node.components.physics.canDropOnFold;
   tile.folds=copy(node.components.fold?.directions??[]);tile.fold=tile.folds[0]??null;
-  tile.surfaceConnected=node.components.surface?.connected??(!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
+  tile.surfaceConnected=node.components.surface?.connected??(!tile.lift&&!tile.blocked&&!tile.terrain&&tile.kind!=='player-token');
   return normalizeTile(tile);
 }
 function configure(node,tile,folds,previous){

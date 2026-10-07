@@ -15,5 +15,10 @@ function runFrontend(cwd=__dirname){
   }
   return 0;
 }
-if(require.main===module)process.exitCode=runEntityRegressions()||runFrontend();
+if(require.main===module){
+ const args=process.argv.slice(2);
+ if(args.length===0)process.exitCode=runEntityRegressions()||runFrontend();
+ else if(args.length===1&&args[0]==='--frontend-only')process.exitCode=runFrontend();
+ else {console.error('Usage: node test-runner.cjs [--frontend-only]');process.exitCode=2;}
+}
 module.exports={runFrontend,runEntityRegressions};

@@ -12,6 +12,15 @@ const key=prefab('key_ai','item',{color:'green',height:.09,terrain:'key',keyName
 const token=prefab('player_token_ai','item',{kind:'player-token',color:'white',height:.09,blocked:true},['paper_ai','fire_ai','ice_ai','key_ai']);
 function fixture(){return new TreeDocument({version:1,width:4,height:4,tiles:Array.from({length:4},()=>Array(4).fill(null)),spawn:{r:0,c:0,dir:0},exit:null,foldCells:[]});}
 const put=(doc,p,r=1,c=1,options={})=>placeCategorizedPrefab(doc,p,{...p.tile,prefabId:p.id},r,c,options);
+test('placement queries target ownership without serializing the original world',()=>{
+ const doc=put(put(fixture(),paper),key);
+ const before=doc.serialize();
+ doc.world.serialize=()=>{throw new Error('full source snapshot');};
+ assert.doesNotThrow(()=>put(doc,fire));
+ assert.throws(()=>put(doc,fire,1,1,{nodeHidden:node=>node.prefabId==='key_ai'}),/隐藏/);
+ const moved=put(doc,paper);assert.equal(moved.world.at(1,1).length,1);
+ delete doc.world.serialize;assert.deepEqual(doc.serialize(),before);
+});
 test('terrain consumes paper, clears items, rejects other terrains as bases and preserves cell metadata',()=>{
  let doc=put(fixture(),paper);doc.cellTags['1,1']={regionTag:'A'};
  doc=put(doc,key);assert.equal(doc.world.at(1,1).length,2);assert.equal(doc.world.at(1,1).find(n=>n.prefabId==='key_ai').components.surface,undefined);

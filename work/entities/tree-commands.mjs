@@ -32,9 +32,17 @@ export function renameTreeKeys(document,cells,name,{isHidden=()=>false,nodeHidde
  return candidate;
 }
 function subtree(world,id){return [id,...world.transforms.childrenOf(id).flatMap(child=>subtree(world,child))];}
+function nodesForTransforms(world,ids){
+ const nodes=[];
+ // Every valid footprint has an occupied cell; all owners share that footprint.
+ for(const id of new Set(ids)){
+  const cell=world.transforms.worldCells(id)[0];
+  nodes.push(...world.at(cell.r,cell.c).filter(node=>node.transformId===id));
+ }
+ return nodes;
+}
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
-  const selected=new Set(ids);
-  for(const node of world.serialize())if(selected.has(node.transformId)&&nodeHidden(node))throw new Error('不能修改隐藏实体');
+  for(const node of nodesForTransforms(world,ids))if(nodeHidden(node))throw new Error('不能修改隐藏实体');
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
 export function validateTreeDocument(candidate){
@@ -161,7 +169,7 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){
   const ids=new Set([...targets.values()].flatMap(node=>subtree(world,node.transformId)));
-  const removed=world.serialize().filter(node=>ids.has(node.transformId));
+  const removed=nodesForTransforms(world,ids);
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}
   if(ids.size){

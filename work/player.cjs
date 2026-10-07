@@ -367,7 +367,7 @@ function cancelFoldMotion() {
     // Restore the complete upright pose, not just the Y component.
     env.getPlayerGroup().rotation.set(0,-P.player.dir*Math.PI/4,0);
   }
-function beginFoldDrag(r, c, startY) {
+function foldDragPlan(r, c) {
     if (
       P.mode !== "play" ||
       P.moving ||
@@ -407,6 +407,7 @@ function beginFoldDrag(r, c, startY) {
       !inFoldRange(group, { r, c })
     )
       return false;
+    const axisCells=new Set(group.cells.map(p=>p.r+','+p.c));
     const cells = [],
       creaseCells = [];
     for (let row = 0; row < map.height; row++)
@@ -421,13 +422,24 @@ function beginFoldDrag(r, c, startY) {
         if (side(p) * playerSide > 0) cells.push(p);
         else if (
           side(p) === 0 &&
-          group.cells.some((q) => q.r === row && q.c === column)
+          axisCells.has(row+','+column)
         )
           creaseCells.push(p);
       }
     const hinge = env.getFoldHinge(group);
     hinge.side = playerSide;
     const axis = { ...P.chosenFold };
+    return {axis,cells,creaseCells,hinge};
+  }
+function prepareFoldMotion(){
+    if(!env.foldView?.prepare)return false;
+    const plan=foldDragPlan(P.player.r,P.player.c);
+    return !!plan&&env.foldView.prepare(plan.cells,plan.hinge,plan.creaseCells);
+  }
+function beginFoldDrag(r,c,startY){
+    const plan=foldDragPlan(r,c);
+    if(!plan)return false;
+    const {axis,cells,creaseCells,hinge}=plan;
     // Snapshot the selection so a rejected fold can hand control back to it.
     const previousSelection = {
       fold: P.chosenFold ? { ...P.chosenFold } : null,
@@ -448,7 +460,7 @@ function beginFoldDrag(r, c, startY) {
       angle: 0,
       dragAngle: 0,
       lastTick: null,
-      sign: playerSide,
+      sign: hinge.side,
       phase: "drag",
       ready: false,
     };
@@ -565,6 +577,6 @@ function resetPosition(){P.player={...env.getMap().spawn};}
 function resetProgress(){turnManager.reset();P.steps=P.teleports=0;P.playHistory=[];resetRegions();resetPosition();}
 function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150)P.playHistory.shift();}
 function undo(){cancelFoldMotion();if(P.moving||P.mode!=='play')return;const previous=P.playHistory.pop();if(previous)restore(previous);}
-return {foldHighlightRegions,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
+return {foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
 }
 module.exports={playerPrefabDefaults,Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift};

@@ -86,6 +86,8 @@ export function defaultComponents():ComponentRegistry {
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
   registry.register('rayEmitter',{validate:rayEmitter.validate,canEnter:()=> '方向喷射方块不可进入'});
   registry.register('foldSwitch',{validate:config=>{if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
+  registry.register('firebird',{validate:config=>{if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
+  registry.register('flame',{validate:config=>{if(config.source!==undefined&&typeof config.source!=='boolean')throw new Error('火焰来源标记无效');},canEnter:()=> '火焰覆盖的方格不可进入'});
   registry.register('fragile',{canEnter:(_context,_config,state)=>state.broken?'易碎方块已破碎':undefined,events:{leave:context=>context.trigger==='walk'||context.trigger==='teleport'?{state:{broken:true}}:{}}});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{

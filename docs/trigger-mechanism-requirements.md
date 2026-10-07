@@ -21,10 +21,18 @@
 ```text
 beforeTransition  -> foldSwitch
 afterTransition   -> rayEmitter
+afterTransition   -> flame, firebird
 afterMechanisms   -> lift
 ```
 
 这套表是连接层，不替代机制自身的条件和效果实现。新增机制先选择生命周期阶段，再注册受控处理器；机制之间不能直接互相调用。
+
+## 火焰与火焰鸟
+
+- `flame` 是覆盖格子的运行时危险效果；它不写回地图配置。成功行动后，已有火焰向四个正交邻格扩散一层，边界裁剪并去重；本回合新生成的火焰从下一回合开始扩散。
+- 火焰覆盖格不可进入。行动结算完成后若玩家位于火焰格，统一效果入口设置 `gameOver`。
+- `firebird` 占据完整 3×3，配置 `direction: north|east|south|west`，静态不可进入。行动后检查中心格周围 9×9（按中心格 Chebyshev 距离不超过 4）：范围外给行动起点添加火焰，范围内生成预设方向 3×21 火焰并写入一次性 `replaced` 运行时标记。
+- 火焰鸟的替换状态、火焰集合和命中结果属于运行时快照；撤销、重开和异常回滚恢复它们，保存地图仍只保留初始配置。
 
 ## 升降纸张方块
 

@@ -1,7 +1,7 @@
 import type {EntityWorld} from './entity-world.js';
 import type {EntityNode} from './entity-model.js';
 
-export const terrainComponents = ['campfire', 'ice', 'fire', 'eruption', 'rayEmitter', 'foldSwitch'] as const;
+export const terrainComponents = ['campfire', 'ice', 'fire', 'eruption', 'rayEmitter', 'foldSwitch', 'firebird', 'flame'] as const;
 export function isTerrainEntity(node:EntityNode):boolean {
   return terrainComponents.some(id => Object.hasOwn(node.components, id));
 }
@@ -15,10 +15,11 @@ export function validateTerrainStacking(world:EntityWorld):{nodes:EntityNode[];b
     const footprint=world.transforms.get(node.transformId).footprint;
     if(node.components.fragile&&!node.components.surface)throw new Error('易碎组件必须属于单格纸张本体');
     if((node.components.rayEmitter||node.components.foldSwitch)&&(footprint.width!==1||footprint.height!==1||footprint.occupied.filter(Boolean).length!==1))throw new Error('方向喷射和折线开关方块只能占一个方格');
+    if(node.components.firebird&&(footprint.width!==3||footprint.height!==3||footprint.occupied.filter(Boolean).length!==9))throw new Error('火焰鸟必须占据完整 3×3 范围');
     if(node.components.foldSwitch){
       for(const {r,c} of world.transforms.worldCells(node.transformId)){const folds=new Set(world.at(r,c).flatMap(owner=>(owner.components.fold?.directions??[]) as string[]));if(folds.size!==1)throw new Error('折线开关方块必须位于恰好一条折线上');}
     }
-    if(Object.hasOwn(node.components,'surface')&&(footprint.width!==1||footprint.height!==1))throw new Error('纸张实体只能占一个方格：'+node.id);
+    if(Object.hasOwn(node.components,'surface')&&(footprint.width!==1||footprint.height!==1)&&!node.components.firebird)throw new Error('纸张实体只能占一个方格：'+node.id);
     if (terrainComponents.filter(id => Object.hasOwn(node.components, id)).length > 1)
       throw new Error('同一实体不能同时包含多种地形：' + node.id);
     for (const {r, c} of world.transforms.worldCells(node.transformId)) {

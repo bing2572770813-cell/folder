@@ -72,7 +72,7 @@ export function normalizePrefab(data) {
   if(!data||data.version!==1||typeof data.id!=='string'||! /^[a-zA-Z0-9_-]{1,80}$/.test(data.id)||typeof data.name!=='string'||!data.name.trim()||(!data.tile&&!data.components))throw new Error('实体需要 version:1、id、name 和 tile 或 components');
   const size=data.size??{width:1,height:1};if(!Number.isInteger(size.width)||!Number.isInteger(size.height)||size.width<1||size.height<1||size.width>128||size.height>128)throw new Error('实体尺寸无效');const occupied=data.occupied??Array(size.width*size.height).fill(true);if(!Array.isArray(occupied)||occupied.length!==size.width*size.height||occupied.some(v=>typeof v!=='boolean')||!occupied.some(Boolean))throw new Error('实体占用方格无效');
   const BaseEntity=normalizeBaseEntity(data.BaseEntity);
-  if((data.tile||Object.hasOwn(data.components??{},'surface'))&&(size.width!==1||size.height!==1))throw new Error('纸张实体只能占一个方格');
+  if((data.tile||Object.hasOwn(data.components??{},'surface'))&&(size.width!==1||size.height!==1)&&!Object.hasOwn(data.components??{},'firebird'))throw new Error('纸张实体只能占一个方格');
   const propertySchema=normalizePropertySchema(data.propertySchema??data.tile?.propertySchema??{});
   const extras={};
   if(data.visual!==undefined)extras.visual=normalizeVisual(data.visual);

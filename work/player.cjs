@@ -2,6 +2,8 @@ const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
 const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
 const {ACTION_TRIGGERS,dispatchTriggerList}=require('./mechanics/trigger-list.cjs');
+const flameField=require('./mechanics/flame-field.cjs');
+const firebird=require('./mechanics/firebird.cjs');
 function rayCells(origin,direction,width,height){
  const delta=rayEmitterConfig.directions[direction];if(!delta)throw new Error('Invalid ray emitter direction');
  const cells=[];for(let step=1;step<=3;step++){const r=origin.r+delta.r*step,c=origin.c+delta.c*step;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;
@@ -143,30 +145,31 @@ function resetPrefabState() {
     );
     P.moveHeight = defaults.moveHeight;
     P.foldDrop = defaults.foldDrop;
-    P.terrainState = { ...createTerrainState(), ...defaults.terrainState };
+    P.terrainState = { ...createTerrainState(), ...defaults.terrainState, flames:[] };
   }
  resetPrefabState();
 function world(){return env.getEntityWorld?.();}
 function activeAt(r,c){const tree=world(),nodes=tree.at(r,c);return isBrokenCell(tree,nodes)?[]:nodes;}
 function switchesOpen(){const tree=world();return !tree||tree.serialize().every(node=>!node.components.foldSwitch||(tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState)===1);}
 function updateFoldSwitches(action){
- const tree=world();if(!tree||action?.source!=='fold')return;
- const axis=action.axis,group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);if(!group)return;
+ const effects=[],tree=world();if(!tree||action?.source!=='fold')return effects;
+ const axis=action.axis,group=axis&&foldGroupAt(env.getFoldAxes(),axis.r,axis.c,axis.type);if(!group)return effects;
  const used=new Set(group.cells.map(cell=>cell.r+','+cell.c));
  for(const node of tree.serialize())if(node.components.foldSwitch&&tree.transforms.worldCells(node.transformId).some(cell=>used.has(cell.r+','+cell.c))){
-  const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;tree.setRuntime(node.id,'foldSwitch',{state:state===1?0:1});
+  const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;effects.push({type:'runtime',entityId:node.id,component:'foldSwitch',state:{state:state===1?0:1}});
  }
+ return effects;
 }
 function fireRayEmitters(){
- const tree=world(),map=env.getMap();if(!tree)return;
+ const effects=[],tree=world(),map=env.getMap();if(!tree)return effects;
  for(const node of tree.serialize())if(node.components.rayEmitter){
   const origin=tree.transforms.worldCells(node.transformId)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
   const direction=tree.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection;
   const lastShot=rayCells(origin,direction,map.width,map.height);
-  tree.setRuntime(node.id,'rayEmitter',{direction:rayEmitterConfig.directions[direction].opposite,lastShot,shotDirection:direction});
-  if(lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被方向喷射射线命中，游戏结束';}
+  effects.push({type:'runtime',entityId:node.id,component:'rayEmitter',state:{direction:rayEmitterConfig.directions[direction].opposite,lastShot,shotDirection:direction}});
+  if(lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c))effects.push({type:'gameOver',message:'被方向喷射射线命中，游戏结束'});
  }
- env.refreshMechanismSurfaces?.();
+ return effects;
 }
 function syncLiftHeights(){const tree=world(),map=env.getMap();if(!tree)return false;let changed=false;
  for(const node of tree.serialize())if(node.components.lift){const state=tree.runtime(node.id,'lift'),height=Number(state.height??node.components.lift.initialHeight);for(const cell of tree.transforms.worldCells(node.transformId)){const tile=map.tiles[cell.r]?.[cell.c];if(tile&&Math.abs((tile.height??0)-height)>1e-9){tile.height=height;changed=true;}}}
@@ -182,16 +185,63 @@ function updateLifts(advance=false){const tree=world(),map=env.getMap();if(!tree
  return changed;
 }
 const triggerList=[
+ {event:'leave',triggers:ACTION_TRIGGERS,handler:'leaveComponents'},
+ {event:'enter',triggers:ACTION_TRIGGERS,handler:'enterComponents'},
  {event:'beforeTransition',triggers:ACTION_TRIGGERS,handler:'foldSwitch'},
  {event:'afterTransition',triggers:ACTION_TRIGGERS,handler:'rayEmitter'},
+ {event:'afterTransition',triggers:ACTION_TRIGGERS,handler:'flame'},
+ {event:'afterTransition',triggers:ACTION_TRIGGERS,handler:'firebird'},
  {event:'afterMechanisms',triggers:ACTION_TRIGGERS,handler:'lift'},
 ];
 const triggerHandlers={
+ leaveComponents:context=>componentEffects('leave',context.action.from,context.action.trigger),
+ enterComponents:context=>componentEffects('enter',context.action.position??P.player,context.action.trigger),
  foldSwitch:context=>updateFoldSwitches(context.action),
  rayEmitter:()=>fireRayEmitters(),
- lift:()=>updateLifts(true),
+ flame:()=>resolveFlameEffects(),
+ firebird:context=>resolveFirebirdEffects(context.action),
+ lift:()=>resolveLiftEffects(),
 };
-function dispatchMechanismEvent(event,action){return dispatchTriggerList(triggerList,event,{action},triggerHandlers);}
+function componentEffects(type,position,trigger){
+ if(!world())return [];
+ const result=treeEvent(type,position,P.terrainState,world().snapshotRuntime(),undefined,trigger);
+ if(!result.valid)throw new Error(result.reason||'目标不可进入');
+ return [{type:'components',result}];
+}
+function resolveLiftEffects(){
+ const tree=world();if(!tree)return [];
+ return tree.serialize().filter(node=>node.components.lift).map(node=>{
+  const occupied=tree.transforms.worldCells(node.transformId).some(cell=>cell.r===P.player.r&&cell.c===P.player.c);
+  const state=tree.runtime(node.id,'lift');
+  return {type:'runtime',entityId:node.id,component:'lift',state:advanceLift(state.height===undefined?liftInitial(node.components.lift):state,node.components.lift,occupied)};
+ });
+}
+function flameSources(){
+ const tree=world();return tree?tree.serialize().filter(node=>node.components.flame).flatMap(node=>tree.transforms.worldCells(node.transformId).filter(cell=>activeAt(cell.r,cell.c).some(owner=>owner.id===node.id))):[];
+}
+function hasFlameAt(r,c){return flameField.contains(P.terrainState.flames,{r,c})||flameField.contains(flameSources(),{r,c});}
+function resolveFlameEffects(){
+ const map=env.getMap();return [{type:'addFlame',cells:flameField.spreadFlame(P.terrainState.flames,flameSources(),map.width,map.height)}];
+}
+function resolveFirebirdEffects(action){
+ const tree=world(),map=env.getMap();if(!tree)return [];
+ return tree.serialize().filter(node=>node.components.firebird&&!tree.runtime(node.id,'firebird').replaced).flatMap(node=>{
+  const cells=tree.transforms.worldCells(node.transformId),origin={r:Math.min(...cells.map(cell=>cell.r)),c:Math.min(...cells.map(cell=>cell.c))};
+  if(!cells.some(cell=>activeAt(cell.r,cell.c).some(owner=>owner.id===node.id)))return [];
+  return firebird.resolveFirebird({id:node.id,origin,footprint:{width:3,height:3},config:node.components.firebird},action,P.player,map.width,map.height);
+ });
+}
+function applyMechanismEffects(effects){
+ for(const effect of effects){
+  if(effect.type==='runtime')world().setRuntime(effect.entityId,effect.component,effect.state);
+  else if(effect.type==='components'){P.terrainState={...effect.result.actor,message:effect.result.messages.join('；')};world().restoreRuntime(effect.result.runtime);}
+  else if(effect.type==='addFlame'){const map=env.getMap();P.terrainState.flames=flameField.addFlame(P.terrainState.flames,effect.cells,map.width,map.height);}
+  else if(effect.type==='replaceFirebird')world().setRuntime(effect.entityId,'firebird',{replaced:true});
+  else if(effect.type==='gameOver'){if(!P.terrainState.gameOver){P.terrainState.gameOver=true;P.terrainState.message=effect.message;}}
+  else throw new Error('Unknown mechanism effect: '+effect.type);
+ }
+}
+function dispatchMechanismEvent(event,action){const effects=dispatchTriggerList(triggerList,event,{action},triggerHandlers);applyMechanismEffects(effects);return effects;}
 // Structural checks ignore temporary mechanisms such as the eruption cycle.
 function structuralEntryCheck(r,c){
  if(!inside(r,c))return {valid:false,reason:'目标超出地图'};
@@ -209,7 +259,7 @@ function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRu
 function treeEntryCheck(position,actor=P.terrainState,trigger){
  return env.componentRegistry.checkEntry({trigger,nodes:activeAt(position.r,position.c),actor,runtime:world().snapshotRuntime()});
 }
-function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)return canEnterTerrain(env.getMap(),{r,c},P.terrainState);
+function entryCheck(r,c,ignoreHidden=false,trigger){if(hasFlameAt(r,c))return {valid:false,reason:'火焰覆盖的方格不可进入'};const tree=world();if(!tree)return canEnterTerrain(env.getMap(),{r,c},P.terrainState);
  if(!inside(r,c)||(!ignoreHidden&&env.isHidden(r,c)))return {valid:false,reason:'目标为空格或未揭示区域'};
  const nodes=activeAt(r,c);if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false))return {valid:false,reason:'目标是阻挡方块'};
@@ -218,8 +268,8 @@ function entryCheck(r,c,ignoreHidden=false,trigger){const tree=world();if(!tree)
 function canFoldCell(r,c){return env.canFoldCell?.(r,c)??(env.getMap().tiles[r]?.[c]?.followFold!==false);}
 function canMoveTo(r,c){const map=env.getMap();const delta=(map.tiles[r]?.[c]?.height??.09)-(map.tiles[P.player.r]?.[P.player.c]?.height??.09);return (world()?true:walkable(r,c))&&delta<=P.moveHeight.maxUp+1e-9&&-delta<=P.moveHeight.maxDown+1e-9&&entryCheck(r,c,false,Trigger.Walk).valid;}
 function commitTreeEvent(type,position,nodes,trigger){const tree=world(),result=treeEvent(type,position,P.terrainState,tree.snapshotRuntime(),nodes,trigger);if(result.valid){P.terrainState={...result.actor,message:result.messages.join('；')};tree.restoreRuntime(result.runtime);}return result;}
-function leaveTree(position,trigger){if(world())commitTreeEvent('leave',position,undefined,trigger);}
-function enterTree(trigger){P.terrainState={...P.terrainState,message:'',gameOver:false,won:false};const result=commitTreeEvent('enter',P.player,undefined,trigger);if(!result.valid)throw new Error(result.reason||'目标不可进入');if(P.terrainState.frozen&&!P.terrainState.gameOver){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if((dr||dc)&&world().at(P.player.r+dr,P.player.c+dc).some(node=>Object.hasOwn(node.components,'campfire'))){P.terrainState.frozen=false;P.terrainState.message='篝火解除冰冻';return;}}}}
+function leaveTree(position,trigger){if(world())dispatchMechanismEvent('leave',{trigger,from:position});}
+function enterTree(trigger){P.terrainState={...P.terrainState,message:'',gameOver:false,won:false};dispatchMechanismEvent('enter',{trigger,position:{...P.player}});if(P.terrainState.frozen&&!P.terrainState.gameOver){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if((dr||dc)&&world().at(P.player.r+dr,P.player.c+dc).some(node=>Object.hasOwn(node.components,'campfire'))){P.terrainState.frozen=false;P.terrainState.message='篝火解除冰冻';return;}}}}
 function interact(){if(!world()||P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit)return;record();const result=commitTreeEvent('interact',P.player);if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);buildPaper();updateUI();checkRunEnd();return result;}
 function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vertical,foldHorizontal=P.foldDrop.horizontal,overheat=P.terrainState.overheat,frozen=P.terrainState.frozen,actions=P.terrainState.actions,collectedKeys=P.terrainState.collectedKeys}) {
  if(P.mode!=='play'||P.moving||P.foldMotion)throw new Error('请在游玩模式且移动结束后修改玩家属性');
@@ -346,9 +396,12 @@ function settleAction(action){
  const transitioned=!P.terrainState.gameOver&&transitionRegion();
  if(transitioned)arrive(Trigger.Teleport);
  dispatchMechanismEvent('afterTransition',action);
+ if(hasFlameAt(P.player.r,P.player.c))applyMechanismEffects([{type:'gameOver',message:'被火焰命中，游戏结束'}]);
  if(!switchesOpen()&&exitIsValid()&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
- dispatchMechanismEvent('afterMechanisms',action);return transitioned;
+ dispatchMechanismEvent('afterMechanisms',action);
+ if(syncLiftHeights())env.refreshLiftSurfaces?.();
+ env.refreshMechanismSurfaces?.();return transitioned;
 }
 // Compatibility helper for direct terrain simulations; gameplay uses turnManager.
 function applyTerrainEntry(trigger=Trigger.Walk){arrive(trigger);return settleAction();}
@@ -378,7 +431,7 @@ const turnManager=createTurnManager({
  validate:validateAction,
  snapshot:()=>({game:snapshot(),history:[...P.playHistory]}),record,
  restore:previous=>{P.playHistory=previous.history;restore(previous.game);},
- leave:context=>{P.moving=true;context.from={...P.player};leaveTree(context.from,context.action.trigger);},
+ leave:context=>{P.moving=true;context.from={...P.player};context.action.from={...P.player};leaveTree(context.from,context.action.trigger);},
  act:context=>{
   const {to,trigger,source}=context.action;
   P.player={...to};P.steps++;if(trigger===Trigger.Teleport)P.teleports++;

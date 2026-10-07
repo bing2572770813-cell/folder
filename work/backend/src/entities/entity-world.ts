@@ -24,6 +24,7 @@ export class EntityWorld {
     for(const field of ['followFold','canDropOnFold'])if(components.physics?.[field]!==undefined&&typeof components.physics[field]!=='boolean')throw new Error('Invalid physics '+field);
     return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:validateEntityTags(node.tags),static:freezeJson(validateStaticFields(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
   }
+  has(id:string):boolean{return this.entities.has(id);}
   get(id:string):EntityNode {
     const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;

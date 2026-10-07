@@ -37,6 +37,7 @@
   },
   "components": {
     "physics": {
+      "followFold": true,
       "canDropOnFold": true
     }
   },

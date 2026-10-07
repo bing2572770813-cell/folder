@@ -12,6 +12,7 @@
   "scripts": {
     "check": "node tools/check.cjs",
     "check:tools": "node --test tools/test/*.test.cjs",
+    "check:report": "node tools/check-report.cjs",
     "preview": "node tools/preview.cjs",
     "experiment:cost": "node tools/cost-experiments.cjs",
     "frontend:fast": "node tools/frontend-fast.cjs",

@@ -27,3 +27,5 @@ behaviors.mjs 将受控 scriptId、parameters 和 state JSON 恢复为行为对�
 node-permissions.mjs 双向合并 legacy 字段和 canonical 组件的权限，任一来源禁止即禁止；保存同时过滤两份表示。tree-commands 的全格验证也用于树粘贴，纯标签节点仍检查标量冲突与唯一入口。旧高度/区域编辑保留非投影代表的组合组件。
 
 升降纸张的回合推进与占据约束集中在 `player.cjs`，`lift-runtime.mjs` 仅提供兼容导出。`lift.turnsPerLeg` 是走完最低到最高高度的单程回合数（1–100，默认 3）；每次成功行走或传送推进一段，失败动作和空闲帧不推进。玩家占据时只下降，到最低后保持；离开后恢复往返。旧地图的 `durationMs` 导入为默认 3 回合，保存时移除旧字段。编辑投影使用 `lift.initialHeight`，游玩渲染显式读取 runtime 高度，撤销恢复高度和方向，重开恢复初始高度。方块本体是厚度不变的独立网格，升降图案附着其上，两者一起移动，不与相邻纸面形成渐变坡面。回合变化更新方块、边线和地形标记的位置，不重建地图或清除玩家选择。移动动画端点也读取平台当前高度。
+
+placeCategorizedPrefab 是编辑器统一放置入口：根据 static.entityType 与 BaseEntity 原子检查，地形清空占格后替换，道具保留支持实体并去除兼容 tile 的 surface。拒绝隐藏占格、多格覆盖和间接越界删除；区域固定格数据及标签/折线保留。旧 replaceTreePrefab/placeTreePrefab 仅供旧数据与受控树工具兼容。

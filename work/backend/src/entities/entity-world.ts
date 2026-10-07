@@ -15,6 +15,7 @@ export class EntityWorld {
     this.transforms.get(node.transformId);
     const components:Record<string,JsonObject>={};
     for(const [id,config] of Object.entries(jsonObject(node.components)))components[id]=jsonObject(config);
+    if(components.physics?.followFold!==undefined&&typeof components.physics.followFold!=='boolean')throw new Error('Invalid physics followFold');
     return {id:node.id,prefabId:node.prefabId,transformId:node.transformId,components,tags:validateEntityTags(node.tags),static:freezeJson(validateStaticFields(node.static)),...(node.configuration?{configuration:jsonObject(node.configuration)}:{})};
   }
   get(id:string):EntityNode {

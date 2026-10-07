@@ -74,3 +74,17 @@ for(const invalid of [{overheat:-1},{overheat:1.5},{actions:Infinity},{frozen:'y
 assert.deepEqual(hintController.snapshot(),statusEdited);assert.equal(P.playHistory.length,statusHistory);
 hintController.undo();assert.deepEqual(P.terrainState,statusBefore.terrainState);hintController.setPlayerProperties({...statusArgs,overheat:3,frozen:true,actions:5,collectedKeys:[]});assert.equal(P.terrainState.hasKey,false);hintController.restart();assert.equal(P.terrainState.overheat,0);assert.equal(P.terrainState.frozen,false);assert.equal(P.terrainState.actions,0);
 console.log('PASS: mechanism state debugging, derived key/eruption states, validation, independent undo and lifecycle reset.');
+// Entry-free exits reveal cumulatively without relocation, duplicate actions or destination effects.
+hintController.setMode('edit');map.tiles[0][1].tags={exitTo:'B',requiredKeys:[]};delete map.tiles[3][3].tags.entry;
+assert.equal(hintController.validateForPlay().valid,true);hintController.setMode('play');hintController.selectPlayer();hintController.movePlayer(0,1);
+assert.deepEqual(P.player,{r:0,c:1,dir:2});assert.ok(P.revealedRegions.has('B'));assert.equal(P.animation.type,'move');assert.equal(P.steps,1);assert.equal(P.teleports,0);assert.equal(P.terrainState.actions,1);
+hintController.tick(performance.now()+1000);hintController.undo();assert.deepEqual(P.player,map.spawn);assert.deepEqual([...P.revealedRegions],['A']);assert.equal(P.terrainState.actions,0);
+map.tiles[0][1].tags.requiredKeys=['调试钥匙'];hintController.selectPlayer();hintController.movePlayer(0,1);assert.equal(P.revealedRegions.has('B'),false);hintController.tick(performance.now()+1000);hintController.restart();
+hintController.setPlayerProperties({r:P.player.r,c:P.player.c,dir:P.player.dir,maxUp:1,maxDown:1,collectedKeys:['调试钥匙']});hintController.selectPlayer();hintController.movePlayer(0,1);assert.equal(P.revealedRegions.has('B'),true);assert.equal(P.player.c,1);
+console.log('PASS: entry-free exits reveal without teleport; key gates, action counts and undo remain valid.');
+const {readFileSync}=await import('node:fs');const playerPrefab=JSON.parse(readFileSync(new URL('../assets/prefab/entity/player_ai.json',import.meta.url),'utf8'));
+const customPlayer=structuredClone(playerPrefab);customPlayer.behavior.parameters.moveHeight={maxUp:.3,maxDown:2};customPlayer.behavior.state={overheat:2,frozen:true,actions:2,collectedKeys:['调试钥匙']};
+const defaults=runtime.playerPrefabDefaults(customPlayer);assert.equal(defaults.moveHeight.maxUp,.3);assert.equal(defaults.terrainState.hasKey,true);defaults.terrainState.collectedKeys.push('独立状态');assert.equal(customPlayer.behavior.state.collectedKeys.length,1);
+assert.throws(()=>runtime.playerPrefabDefaults({...customPlayer,behavior:{scriptId:'replace-cell'}}),/player prefab/);
+P.moving=false;P.animation=null;const prefabController=runtime.createPlayerController({...env,getPlayerPrefab:()=>customPlayer});assert.deepEqual(P.moveHeight,{maxUp:.3,maxDown:2});assert.equal(P.terrainState.overheat,2);P.terrainState.overheat=0;prefabController.restart();assert.equal(P.terrainState.overheat,2);assert.equal(P.terrainState.frozen,true);assert.equal(P.terrainState.actions,2);assert.equal(customPlayer.behavior.state.overheat,2);
+console.log('PASS: player prefab initializes and resets movement/status, validates controlled scripts and isolates runtime state.');

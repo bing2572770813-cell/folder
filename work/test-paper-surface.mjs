@@ -14,3 +14,42 @@ assert.ok(paperSurface(customPaper,0,0));
 assert.equal(paperSurface({tiles:[[{...customPaper.tiles[0][0],surfaceConnected:false},customPaper.tiles[0][1]]]},0,0),null);
 assert.equal(normalizeTile(customPaper.tiles[0][0]).surfaceConnected,true);
 console.log('PASS: custom paper connection uses explicit surface capability instead of prefab identity.');
+for(const type of ['h','v','d1','d2']){
+ const folded=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:[type]}]]},0,0);
+ assert.ok(Math.abs(folded.points[544][1]-.96)<1e-10);
+ for(let i=0;i<folded.points.length;i++)assert.ok(Math.abs(Math.hypot(...folded.points[i].map((v,j)=>v-folded.bottomPoints[i][j]))-.1)<1e-10);
+ assert.ok(folded.positions.every(Number.isFinite));
+ assert.equal(paperSurface({tiles:[[{...tile(1),folds:[type]}]]},0,0,()=>false,false),null);
+}
+const crossing=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:['h','v','d1','d2']}]]},0,0);
+assert.ok(Math.abs(crossing.points[544][1]-.96)<1e-10);
+// 折痕深度: 1 完全不下压, 0 压穿整层厚度后该处不再渲染实体。
+const grooved=type=>paperSurface({tiles:[[{...tile(1),thickness:.1,folds:[type]}]]},0,0,()=>false,true);
+const flat=grooved('h');assert.ok(Math.abs(flat.points[544][1]-.96)<1e-10,'default crease depth presses 40% of the slab');
+const lifted=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:['h']}]]},0,0,()=>false,true,1);
+assert.ok(Math.abs(lifted.points[544][1]-1)<1e-10,'crease depth 1 never presses the surface');
+assert.equal(lifted.positions.length,flat.positions.length);
+const cut=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:['h']}]]},0,0,()=>false,true,0);
+assert.ok(Math.abs(cut.points[544][1]-.9)<1e-10,'crease depth 0 presses through the whole slab');
+assert.ok(cut.positions.length<flat.positions.length,'crease depth 0 removes the crease-line faces');
+console.log('PASS: four crease directions, non-additive intersections, normal thickness, crease depth and visibility.');
+
+const {entityEdgeSegments}=await import('./render/entity-edges.mjs');
+for(const flat of [tile(1),{...tile(1),surfaceConnected:true}, {...tile(4),gradualRate:0}]){
+ const segments=entityEdgeSegments(flat,null);assert.equal(segments.length,4);
+ assert.ok(segments.flat().every(p=>p[1]===flat.height+.004),'flat paper borders only its front');
+}
+const curvedEdges=entityEdgeSegments(thin.tiles[0][0],thinSurface);
+assert.deepEqual(curvedEdges,thinSurface.boundarySegments.map(segment=>segment.map(p=>[p[0],p[1]+.004,p[2]])),'curved paper borders only its front boundary');
+assert.equal(entityEdgeSegments({prefabId:'obstacle_ai',height:1},null).length,12,'non-paper keeps its box edges');
+console.log('PASS: flat, custom and curved paper have front-only borders, without underside or vertical edges.');
+
+const {validateLighting,lightingDefaults}=await import('./render/lighting.mjs');
+assert.equal(validateLighting({...lightingDefaults,creaseDepth:-.5}).creaseDepth,-.5);
+for(const type of ['h','v','d1','d2']){
+ const raised=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:[type]}]]},0,0,()=>false,true,-.5);
+ assert.ok(Math.abs(raised.points[544][1]-1.05)<1e-10,'negative depth raises the crease');
+ assert.ok(raised.positions.every(Number.isFinite));
+ for(let i=0;i<raised.points.length;i++)assert.ok(Math.abs(Math.hypot(...raised.points[i].map((v,axis)=>v-raised.bottomPoints[i][axis]))-.1)<1e-10,'raised crease preserves normal thickness');
+}
+console.log('PASS: negative crease depth raises all four crease directions and preserves thickness.');

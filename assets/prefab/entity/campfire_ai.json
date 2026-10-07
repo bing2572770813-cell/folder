@@ -16,5 +16,11 @@
   },
   "occupied": [
     true
+  ],
+  "static": {
+    "entityType": "terrain"
+  },
+  "BaseEntity": [
+    "void_ai"
   ]
 }

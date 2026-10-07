@@ -25,3 +25,9 @@ export const renderSelectionMarkup = (multiple, props) =>
       )}
     </MantineProvider>,
   );
+
+import {EntityGrid,EntityChecklist} from './react/catalogs.jsx';
+export const renderEntityOptionsMarkup=(multiple,props)=>renderToStaticMarkup(
+ <MantineProvider theme={editorTheme} forceColorScheme="light">
+  {multiple?<EntityChecklist {...props}/>:<EntityGrid {...props}/>}
+ </MantineProvider>);

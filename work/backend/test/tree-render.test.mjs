@@ -24,7 +24,7 @@ test('stacked surfaces and every terrain marker project without losing native co
 test('hidden nodes, hidden cells and render-disabled surfaces are omitted',()=>{
  const {document,add}=fixture();add('off',{surface:{},fire:{}},{render:false});add('transparent',{surface:{}},{transparent:true});
  const view=renderTreeCells(document,{nodeHidden:node=>node.id==='b'});assert.deepEqual(view.surfaceCells.map(cell=>cell.nodeId),['a']);assert.equal(view.terrainCells.length,0);
- const hidden=renderTreeCells(document,{cellHidden:()=>true});assert.deepEqual(hidden,{surfaceCells:[],terrainCells:[],tagCells:[]});
+ const hidden=renderTreeCells(document,{cellHidden:()=>true});assert.deepEqual(hidden,{surfaceCells:[],terrainCells:[],tagCells:[],tokenCells:[]});
 });
 
 test('surface-free overlays produce markers without fabricated paper',()=>{
@@ -50,4 +50,14 @@ test('lift rendering shares initial and runtime height with markers without chan
  assert.equal(projection.surfaceCells.find(cell=>cell.nodeId==='lift').tile.height,.6);
  assert.equal(projection.tagCells.find(cell=>cell.nodeId==='lift').surfaceTop,.6);
  assert.deepEqual(document.world.serialize(),before);
+});
+
+test('player tokens render without their legacy slab, preserving support and visibility',()=>{
+ const {document,add}=fixture();add('token',{surface:{height:.09,color:'red'},collision:{blocked:true}},{},{kind:'player-token'});
+ const view=renderTreeCells(document);assert.equal(view.surfaceCells.length,2);
+ assert.equal(view.tokenCells.length,1);assert.equal(view.tokenCells[0].surfaceTop,.3);
+ assert.equal(view.tokenCells[0].tile.color,'red');
+ assert.equal(renderTreeCells(document,{nodeHidden:node=>node.id==='token'}).tokenCells.length,0);
+ assert.equal(renderTreeCells(document,{cellHidden:()=>true}).tokenCells.length,0);
+ assert.ok(document.world.get('token').components.surface,'read-only render projection preserves legacy map data');
 });

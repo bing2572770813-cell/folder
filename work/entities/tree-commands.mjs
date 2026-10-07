@@ -11,6 +11,7 @@ const copy=value=>structuredClone(value);
 const merge=(a={},b={})=>{const result=copy(a);for(const [key,value] of Object.entries(b))result[key]=value&&typeof value==='object'&&!Array.isArray(value)&&result[key]&&typeof result[key]==='object'&&!Array.isArray(result[key])?merge(result[key],value):copy(value);return result;};
 const terrainComponentIds=['campfire','ice','fire','eruption','rayEmitter','foldSwitch','firebird','flame'];
 const isTerrainNode=node=>node.static.entityType==='terrain'||Object.hasOwn(node.components,'surface')||terrainComponentIds.some(id=>Object.hasOwn(node.components,id));
+const matchesBase=(node,bases)=>bases?.some(base=>base==='paper_ai'?Object.hasOwn(node.components,'surface'):base===node.prefabId);
 export function forkTreeDocument(document){
   return document.clone();
 }
@@ -163,7 +164,7 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  for(const cell of cells){
   const existing=world.at(cell.r,cell.c).filter(node=>node.prefabId!=='void_ai');
   if(category==='item'&&!existing.length)throw new Error('道具不能放置在虚空中');
-  if(!ground&&bases&&!existing.some(node=>bases.includes(node.prefabId)))throw new Error('放置条件不符：需要 '+bases.map(id=>options.resolve?.(id)?.name??id).join('、')+' 作为基底');
+  if(!ground&&bases&&!existing.some(node=>matchesBase(node,bases)))throw new Error('放置条件不符：需要 '+bases.map(id=>options.resolve?.(id)?.name??id).join('、')+' 作为基底');
  }
  let candidate=forkTreeDocument(document),configuration=copy(tile);
  if(category==='terrain'){

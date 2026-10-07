@@ -33,13 +33,7 @@ export function renameTreeKeys(document,cells,name,{isHidden=()=>false,nodeHidde
 }
 function subtree(world,id){return [id,...world.transforms.childrenOf(id).flatMap(child=>subtree(world,child))];}
 function nodesForTransforms(world,ids){
- const nodes=[];
- // Every valid footprint has an occupied cell; all owners share that footprint.
- for(const id of new Set(ids)){
-  const cell=world.transforms.worldCells(id)[0];
-  nodes.push(...world.at(cell.r,cell.c).filter(node=>node.transformId===id));
- }
- return nodes;
+ return [...new Set(ids)].flatMap(id=>world.forTransform(id));
 }
 function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   for(const node of nodesForTransforms(world,ids))if(nodeHidden(node))throw new Error('不能修改隐藏实体');

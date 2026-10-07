@@ -34,7 +34,7 @@ function classifyFiles(files) {
     if (relative.startsWith('tools/')) scope = 'tools';
     else if (relative.startsWith('backend/')) scope = 'backend';
     else if (/^(editor|entities|render|resources|tags|ui|core)\//.test(relative)
-      || /^(app|build|server|player|test-runner)\.(cjs|mjs|js)$/.test(relative)
+      || /^(app|build|server|player|test-runner)\.(cjs|mjs|js|ts|tsx)$/.test(relative)
       || /^(index|game)\.html$/.test(relative)) scope = 'frontend';
     if (scope) {
       scopes.add(scope);

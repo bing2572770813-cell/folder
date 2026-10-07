@@ -31,8 +31,8 @@ test('production persistence keeps the committed world and saves metadata withou
  map.name='新地图';map.spawn.dir=3;map.bestSteps=6;
  let notifications=0;
  const source=readFileSync(new URL('../../app.js',import.meta.url),'utf8');
- const persistSource=source.slice(source.indexOf('function persist()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
- const context={documentModel,map,console,applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
+ const persistSource=source.slice(source.indexOf('function notifyMapChanged()'),source.indexOf('\nfunction toast(',source.indexOf('function persist()')));
+ const context={documentModel,map,console,gestureBefore:null,editRefresh:{request:()=>context.notifyMapChanged()},applyMap:()=>{throw new Error('persistence must not reimport the map');},editorBus:{emit:(event,payload)=>{assert.equal(event,'map:changed');assert.equal(payload.map,map);notifications++;return [];}}};
  runInNewContext(persistSource,context);for(let i=0;i<20;i++)context.persist();
  assert.equal(notifications,20);assert.equal(documentModel.world,world);
  const saved=documentModel.serialize();assert.deepEqual(saved.entities,before.entities);assert.deepEqual(saved.transforms,before.transforms);assert.deepEqual(world.snapshotRuntime(),runtime);

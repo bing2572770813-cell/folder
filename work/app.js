@@ -37,6 +37,7 @@ import { rectangle, region, pasteRegion,unionCells,cellBounds,selectionRegion } 
 import {inspectionCells,batchProperties,selectionDetails} from './editor/batch-inspection.mjs';
 import {projectedCellSchema,assertNodePropertyChanges} from './editor/node-edit-permissions.mjs';
 import {createEditSnapshot,trimHistory} from './editor/history-model.mjs';
+import {createEditRefresh} from './editor/edit-refresh.mjs';
 import {clearMapCells} from './editor/clear-map.mjs';
 import {inspectCell} from './entities/cell-entity.mjs';
 import {EventBus} from './core/event-bus.mjs';
@@ -123,12 +124,13 @@ function candidateForMap(next){if(P?.mode==='edit')assertHiddenContentUnchanged(
 function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);if(saveHistory)record();documentModel=candidate;map=candidate.view();}
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
-function persist() {documentModel.metadata=documentModel.cleanMetadata(map);for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
+function notifyMapChanged(){for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
+function persist() {documentModel.metadata=documentModel.cleanMetadata(map);editRefresh.request({save:true},!!gestureBefore);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
 function editSnapshot(snapshot=documentModel.serialize()){return {...createEditSnapshot(snapshot,editRect,selectedCells),directSelectedCells:clone(directSelectedCells)};}
 function record({snapshot,refresh=true}={}) {if(P.mode==='play'){controller.recordPlay();if(refresh)updateUI();return;}if(gestureBefore)return;editHistory.push(editSnapshot(snapshot));redoHistory=[];trimHistory(editHistory);if(refresh)updateUI();}
-function finishGesture(){if(!gestureBefore)return;const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(documentModel.serialize())){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
+function finishGesture(){if(!gestureBefore)return;editRefresh.flush();const before=gestureBefore;gestureBefore=null;if(JSON.stringify(before.map)!==JSON.stringify(documentModel.serialize())){editHistory.push(before);trimHistory(editHistory);redoHistory=[];updateUI();}}
 
 const viewport=$('viewport');
 const scene=new THREE.Scene(); scene.background=new THREE.Color('#cbd8d0');
@@ -230,7 +232,9 @@ function makeToken(color){
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
 let liftLineRanges=[];
-function buildPaper() {
+const editRefresh=createEditRefresh({rebuild:rebuildPaper,notify:notifyMapChanged,requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle)});
+function buildPaper(){editRefresh.request({scene:true},!!gestureBefore);}
+function rebuildPaper() {
   hoverDescriptionKey=null;
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();

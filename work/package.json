@@ -18,6 +18,7 @@
     "experiment:cost": "node tools/cost-experiments.cjs",
     "frontend:fast": "node tools/frontend-fast.cjs",
     "browser:check": "node tools/browser-check.cjs",
+    "browser:scenario": "node tools/browser-smoke.cjs",
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "npm run backend:build && node server.cjs",

@@ -4,12 +4,14 @@ export type BackendConfig = {
   port: number;
   outputRoot: string;
   prefabRoot: string;
+  assetRoot?: string;
 };
 
 type BackendRoots = {
   workRoot: string;
   outputRoot?: string;
   prefabRoot?: string;
+  assetRoot?: string;
 };
 
 const DEFAULT_PORT = 4173;
@@ -32,5 +34,6 @@ export function loadBackendConfig(
     port: parsePort(env.FOLD_PORT),
     outputRoot: path.resolve(roots.outputRoot ?? path.join(workRoot, '../outputs')),
     prefabRoot: path.resolve(roots.prefabRoot ?? path.join(workRoot, '../assets/prefab')),
+    assetRoot: path.resolve(roots.assetRoot ?? path.join(workRoot, '../assets')),
   };
 }

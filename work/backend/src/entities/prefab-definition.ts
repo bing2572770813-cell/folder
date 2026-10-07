@@ -1,4 +1,5 @@
 import {jsonObject,freezeJson,type JsonObject,type EntityNode} from './entity-model.js';
+import {normalizeVisual} from '../../../resources/visual-definition.mjs';
 
 export interface TreePrefab {
   id:string;
@@ -6,6 +7,7 @@ export interface TreePrefab {
   components?:Record<string,JsonObject>;
   tags?:JsonObject;
   static?:JsonObject;
+  visual?:JsonObject|null;
 }
 function merge(base:JsonObject,next:JsonObject):JsonObject {
   const result=jsonObject(base);
@@ -41,21 +43,22 @@ export class PrefabRegistry {
       if(raw.extends!==undefined&&(typeof raw.extends!=='string'||!raw.extends))throw new Error('Invalid prefab parent');
       const components:Record<string,JsonObject>={};
       for(const [id,config] of Object.entries(jsonObject(raw.components??{})))components[id]=jsonObject(config);
-      this.definitions.set(raw.id,{id:raw.id,...(raw.extends?{extends:raw.extends as string}:{}),components,tags:jsonObject(raw.tags??{}),static:jsonObject(raw.static??{})});
+      this.definitions.set(raw.id,{id:raw.id,...(raw.extends?{extends:raw.extends as string}:{}),components,tags:jsonObject(raw.tags??{}),static:jsonObject(raw.static??{}),...(raw.visual!==undefined?{visual:raw.visual===null?null:jsonObject(raw.visual)}:{})});
     }
   }
-  resolve(id:string):Required<Pick<TreePrefab,'id'|'components'|'tags'|'static'>> {
-    return this.resolveChain(id,new Set());
+  resolve(id:string):Required<Pick<TreePrefab,'id'|'components'|'tags'|'static'>>&Pick<TreePrefab,'visual'> {
+    const resolved=this.resolveChain(id,new Set());if(resolved.visual!==undefined){const visual=normalizeVisual(resolved.visual);resolved.visual=visual===null?null:jsonObject(visual);}return resolved;
   }
-  private resolveChain(id:string,visited:Set<string>):Required<Pick<TreePrefab,'id'|'components'|'tags'|'static'>> {
+  private resolveChain(id:string,visited:Set<string>):Required<Pick<TreePrefab,'id'|'components'|'tags'|'static'>>&Pick<TreePrefab,'visual'> {
     if(visited.has(id))throw new Error('Prefab inheritance cycle');visited.add(id);
     const definition=this.definitions.get(id);if(!definition)throw new Error('Unknown prefab: '+id);
-    const base=definition.extends?this.resolveChain(definition.extends,visited):{components:{},tags:{},static:{}};
-    return {id,components:merge(base.components,definition.components??{}) as Record<string,JsonObject>,tags:merge(base.tags,definition.tags??{}),static:merge(base.static,definition.static??{})};
+    const base=definition.extends?this.resolveChain(definition.extends,visited):{components:{},tags:{},static:{},visual:undefined};
+    const visual=definition.visual===undefined?base.visual:definition.visual===null?null:merge(base.visual??{},definition.visual);
+    return {id,components:merge(base.components,definition.components??{}) as Record<string,JsonObject>,tags:merge(base.tags,definition.tags??{}),static:merge(base.static,definition.static??{}),...(visual!==undefined?{visual}:{})};
   }
   instantiate(prefabId:string,id:string,transformId:string):EntityNode {
     if(!id||!transformId)throw new Error('Instance identity is required');
     const definition=this.resolve(prefabId);
-    return {id,prefabId,transformId,components:definition.components,tags:definition.tags,static:freezeJson(definition.static)};
+    return {id,prefabId,transformId,components:definition.components,tags:definition.tags,static:freezeJson(definition.static),...(definition.visual!==undefined?{configuration:{visual:definition.visual}}:{})};
   }
 }

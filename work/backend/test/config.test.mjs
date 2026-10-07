@@ -8,6 +8,7 @@ test('loads default backend configuration', () => {
   assert.equal(config.port, 4173);
   assert.equal(config.outputRoot, path.resolve('C:/project/outputs'));
   assert.equal(config.prefabRoot, path.resolve('C:/project/assets/prefab'));
+  assert.equal(config.assetRoot, path.resolve('C:/project/assets'));
 });
 
 test('accepts a configured port', () => {

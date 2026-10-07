@@ -754,7 +754,7 @@ function drawPlacementPreview(hit){
  if(placementCheckCache?.document===documentModel&&placementCheckCache.key===key)reason=placementCheckCache.reason;
  else{let candidate;try{candidate=placementCandidate(hit.r,hit.c,{preview:true});}catch(error){reason=error.message;}placementCheckCache={document:documentModel,key,reason,candidate};}
  const invalid=!!reason;
- const previewMap=invalid?null:placementCheckCache.candidate.view();
+ const previewMap=invalid?null:placementPreviewMap(placementCheckCache.candidate,cells);
  if(!invalid){
   const candidate=placementCheckCache.candidate,view=previewMap,affected=new Set(cells.map(p=>p.r+','+p.c));
   const projection=renderTreeCells(candidate,{nodeHidden,cellHidden,cells}),surfaceCells=projection.surfaceCells;
@@ -774,6 +774,13 @@ function drawPlacementPreview(hit){
  }
  for(const p of cells){const geometry=new THREE.PlaneGeometry(.94,.94),line=new THREE.LineSegments(new THREE.EdgesGeometry(geometry),new THREE.LineBasicMaterial({color:invalid?'#ce554c':'#59966d',depthTest:false}));geometry.dispose();line.rotation.x=-Math.PI/2;const top=invalid?tileTop(p.r,p.c):tileHeight(previewMap.tiles[p.r]?.[p.c]);line.position.set(wx(p.c),inside(p.r,p.c)&&!cellHidden(p.r,p.c)?top+.04:.04,wz(p.r));line.renderOrder=12;placementLayer.add(line);}
  $('hoverCoord').textContent=(invalid?'无法放置 · '+reason+' · ':'放置预览 · ')+prefab.name+' · '+prefab.size.width+' × '+prefab.size.height+' / '+cells.length+' 格';
+}
+
+function placementPreviewMap(candidate,cells){
+ const preview={...map,tiles:map.tiles.map(row=>row.slice())};
+ const changes=candidate.viewCells(cells);
+ for(const {r,c} of cells)preview.tiles[r][c]=changes.get(r+','+c)??null;
+ return preview;
 }
 
 $('applyKeyName').onclick=()=>{try{if(P.mode!=='edit')throw new Error('仅编辑模式可修改钥匙');commitTree(renameTreeKeys(documentModel,selectedCells,$('keyName').value,{isHidden:cellHidden,nodeHidden,schemaFor:nodeSchema}));}catch(error){toast(error.message,true);}};

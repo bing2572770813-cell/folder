@@ -103,6 +103,11 @@ for (const type of ['h', 'v', 'd1', 'd2']) {
       assert.ok(heights.every(y => Math.abs(y - (HEIGHT + .004)) < 1e-9),
         'a flat paper surface has a flat selection highlight');
   }
+  const raisedHighlight=creaseSelection(map,groups[0],{creaseDepth:-.5});
+  const raisedGuides=creaseGuides(map,groups,{creaseDepth:-.5});
+  assert.ok(raisedHighlight.positions.every(Number.isFinite));
+  assert.ok(raisedGuides.positions.every(Number.isFinite));
+  assert.ok(raisedHighlight.positions.some((value,index)=>index%3===1&&value>HEIGHT+.004),'selection follows raised crease');
   // Void creases: no groove to hug, so the hint rides the supplied plane.
   const hollowMap = fixture(type, { hollow: true });
   const hollowGuides = creaseGuides(hollowMap, uniqueFoldAxes(hollowMap), {

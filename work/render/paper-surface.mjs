@@ -1,8 +1,8 @@
 import {tileHeight,tileThickness,tileGradualRate,foldsAt} from '../entities/tile-model.mjs';import {entityType} from '../entities/visibility-model.mjs';
 export const isPaper=tile=>!!tile&&!tile.lift&&(tile.surfaceConnected??entityType(tile)==='paper_ai');
-// 折痕深度: 1 为完全不下压, 0 为把折纸线处压穿整层厚度, 该处不再渲染实体。
+// 保留 0–1 的下压规则；负值沿法线突起，幅度为其绝对值乘以厚度。
 export const DEFAULT_CREASE_DEPTH=.6;
-export const creaseRatio=value=>Math.min(1,Math.max(0,Number.isFinite(value)?value:DEFAULT_CREASE_DEPTH));
+export const creaseRatio=value=>Math.min(1,Math.max(-1,Number.isFinite(value)?value:DEFAULT_CREASE_DEPTH));
 // Shared top boundaries join flat centers; thickness offsets the underside along surface normals.
 export function paperSurface(map,r,c,hidden=()=>false,showFolds=true,creaseDepth=DEFAULT_CREASE_DEPTH){
  const tile=map.tiles[r]?.[c];if(!isPaper(tile)||hidden(r,c))return null;const height=tileHeight(tile),thickness=tileThickness(tile),folds=showFolds?foldsAt(map,r,c):[];
@@ -32,7 +32,7 @@ export function paperSurface(map,r,c,hidden=()=>false,showFolds=true,creaseDepth
   for(const n of result){const length=Math.hypot(...n);for(let i=0;i<3;i++)n[i]/=length;}
   return result;
  };
- if(folds.length){const press=thickness*(1-creaseRatio(creaseDepth)),offsets=[];const baseNormals=vertexNormals();points=points.map((p,index)=>{
+ if(folds.length){const ratio=creaseRatio(creaseDepth),press=thickness*(ratio<0?ratio:1-ratio),offsets=[];const baseNormals=vertexNormals();points=points.map((p,index)=>{
   const distance=Math.min(...folds.map(type=>type==='h'?Math.abs(p[2]):type==='v'?Math.abs(p[0]):Math.abs(type==='d1'?p[2]-p[0]:p[2]+p[0])/Math.SQRT2));
   const depth=press*Math.max(0,1-distance/.065);offsets[index]=depth;
   return p.map((v,i)=>v-baseNormals[index][i]*depth);

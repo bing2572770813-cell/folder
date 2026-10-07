@@ -7,7 +7,7 @@ export const lightingFields = [
   ['azimuth','光照方位角',-180,180,1], ['elevation','光照仰角',1,89,1],
   ['exposure','曝光',.1,4,.05],
   ['foldMaxSpeed','折叠最大角速度 (rad/s)',.1,20,.1],
-  ['creaseDepth','折痕深度',0,1,.01],
+  ['creaseDepth','折痕深度',-1,1,.01],
 ];
 export function validateLighting(values){
  const next={};for(const [key,label,min,max] of lightingFields){const value=Number(values[key]);if(!Number.isFinite(value)||value<min||value>max)throw new Error(`${label}须为 ${min}–${max}`);next[key]=value;}return next;

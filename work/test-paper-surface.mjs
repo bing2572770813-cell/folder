@@ -43,3 +43,13 @@ const curvedEdges=entityEdgeSegments(thin.tiles[0][0],thinSurface);
 assert.deepEqual(curvedEdges,thinSurface.boundarySegments.map(segment=>segment.map(p=>[p[0],p[1]+.004,p[2]])),'curved paper borders only its front boundary');
 assert.equal(entityEdgeSegments({prefabId:'obstacle_ai',height:1},null).length,12,'non-paper keeps its box edges');
 console.log('PASS: flat, custom and curved paper have front-only borders, without underside or vertical edges.');
+
+const {validateLighting,lightingDefaults}=await import('./render/lighting.mjs');
+assert.equal(validateLighting({...lightingDefaults,creaseDepth:-.5}).creaseDepth,-.5);
+for(const type of ['h','v','d1','d2']){
+ const raised=paperSurface({tiles:[[{...tile(1),thickness:.1,folds:[type]}]]},0,0,()=>false,true,-.5);
+ assert.ok(Math.abs(raised.points[544][1]-1.05)<1e-10,'negative depth raises the crease');
+ assert.ok(raised.positions.every(Number.isFinite));
+ for(let i=0;i<raised.points.length;i++)assert.ok(Math.abs(Math.hypot(...raised.points[i].map((v,axis)=>v-raised.bottomPoints[i][axis]))-.1)<1e-10,'raised crease preserves normal thickness');
+}
+console.log('PASS: negative crease depth raises all four crease directions and preserves thickness.');

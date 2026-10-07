@@ -12,6 +12,7 @@
   "scripts": {
     "check": "node tools/check.cjs",
     "check:tools": "node --test tools/test/*.test.cjs",
+    "preview": "node tools/preview.cjs",
     "backend:build": "tsc -p backend/tsconfig.json",
     "backend:test": "npm run backend:build && node --test backend/test/*.test.mjs",
     "start": "npm run backend:build && node server.cjs",

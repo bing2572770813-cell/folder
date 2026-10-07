@@ -17,3 +17,11 @@ Existing `test`, `backend:test` and `build` commands are unchanged. The new entr
 For faster feedback during implementation, use `npm --prefix work run check -- backend`, `-- frontend`, or `-- tools`. Backend scope compiles and runs every backend test. Frontend scope compiles the shared backend, builds HTML and runs the frontend suite. Tools scope runs all auxiliary tool tests. These are explicitly partial checks, not substitutes for the default full check before committing. Unknown scopes fail. No test-result caching is used.
 
 Browser performance sampling and screenshots are separate checks; a successful report does not prove a frame-time target or visual correctness. Review generated HTML changes before committing. Logs may contain local paths and application error details; inspect them before sharing.
+
+## Preview Preparation
+
+Run `npm --prefix work run preview` to compile the backend, rebuild editor/game HTML, verify both pages and the prefab catalog over HTTP, and keep a preview server available. The command prints editor and game URLs after verification. The OS assigns an unused loopback port; it does not stop or reuse any existing server. Ctrl+C closes the preview. This is a freshly built snapshot, not a watcher: re-run after editing source. Build failures stop preparation and retain logs in `.dev-checks`.
+
+For unattended environment checks, run `npm --prefix work run preview -- --smoke`. It performs the same build and HTTP checks, records their timings, then closes the temporary server. Requests time out after five seconds; missing pages, invalid page types and empty or erroneous catalogs fail. This checks HTTP readiness only, not browser execution, rendering or interaction correctness.
+
+Do not run these commands concurrently in one checkout because HTML and compiled backend outputs are shared. Use separate worktrees for parallel development.

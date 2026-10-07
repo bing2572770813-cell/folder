@@ -51,18 +51,27 @@ export class TreeDocument {
     this.metadata=this.cleanMetadata({...this.metadata,...checked});
   }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
-  primaryAt(r,c){return this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id)).find(visible)??null;}
+  cellNodes(){
+    const byCell=new Map();
+    for(const node of this.world.serialize())for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
+      const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
+    }
+    for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));
+    return byCell;
+  }
+  primaryAt(r,c){return (this.cellNodes().get(r+','+c)??[]).find(visible)??null;}
   view(){
     const {width,height}=this.world.transforms;
+    const byCell=this.cellNodes();
     const tiles=Array.from({length:height},()=>Array(width).fill(null)),foldCells=[];
     for(let r=0;r<height;r++)for(let c=0;c<width;c++){
-      const nodes=this.world.at(r,c).sort((a,b)=>a.id.localeCompare(b.id));
+      const nodes=byCell.get(r+','+c)??[];
       const primary=nodes.find(visible);
       const folds=[...new Set(nodes.flatMap(node=>node.components.fold?.directions??[]))];
       if(primary){const tile=tileOf(primary);tile.tags=mergedTags(nodes);tile.regionTag=this.cellTags[r+','+c]?.regionTag??'默认区域';tile.folds=folds;tile.fold=folds[0]??null;tiles[r][c]=normalizeTile(tile);}
       else foldCells.push(...folds.map(type=>({r,c,type})));
     }
-    const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if(this.world.at(r,c).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
+    const metadata=copy(this.metadata),spawns=[];for(let r=0;r<height;r++)for(let c=0;c<width;c++)if((byCell.get(r+','+c)??[]).some(node=>node.tags.spawn))spawns.push({r,c});if(spawns.length===1)metadata.spawn={...metadata.spawn,...spawns[0]};
     return {...metadata,version:1,width,height,tiles,foldCells};
   }
   serialize(options){return serializeTreeMap(this.world,{...this.metadata,spawn:this.view().spawn},this.cellTags,options);}

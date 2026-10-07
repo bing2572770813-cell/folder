@@ -19,12 +19,13 @@ export class TransformManager {
   get(id:string):TransformNode {const node=this.nodes.get(id);if(!node)throw new Error('Unknown transform: '+id);return copy(node);}
   clone():TransformManager {
     const result=new TransformManager(this.width,this.height);
-    result.nodes=new Map(structuredClone([...this.nodes]));
-    result.index=new Map(structuredClone([...this.index]));
+    // Nodes and index arrays are replaced on writes and never exposed directly.
+    result.nodes=new Map(this.nodes);
+    result.index=new Map(this.index);
     result.references=new Map([...this.references].map(([id,owners])=>[id,new Set(owners)]));
     return result;
   }
-  serialize():TransformNode[]{return [...this.nodes.values()].map(copy);}
+  serialize():TransformNode[]{return copy([...this.nodes.values()]);}
   childrenOf(id:string):string[]{if(!this.nodes.has(id))throw new Error('Unknown transform: '+id);return [...this.nodes.values()].filter(n=>n.parentId===id).map(n=>n.id);}
   world(id:string):GridTransform{return this.resolve(this.nodes,id,new Set());}
   at(r:number,c:number):string[]{return [...(this.index.get(r+','+c)??[])];}

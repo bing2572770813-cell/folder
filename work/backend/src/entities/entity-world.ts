@@ -30,12 +30,13 @@ export class EntityWorld {
   }
   clone():EntityWorld {
     const result=new EntityWorld(this.transforms.clone());
-    result.entities=new Map(structuredClone([...this.entities]));
+    // Stored records are replaced on writes; getters return detached copies.
+    result.entities=new Map(this.entities);
     result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
     result.states=new Map([...this.states].map(([id,states])=>[id,new Map(structuredClone([...states]))]));
     result.order=new Map(this.order);result.nextOrder=this.nextOrder;
     result.positions=new Map(structuredClone([...this.positions]));
-    result.rebuildPositionIndex();
+    if(result.positions.size)result.rebuildPositionIndex();
     return result;
   }
   add(node:EntityNode):void {
@@ -135,5 +136,9 @@ export class EntityWorld {
     }
     this.states=states;
   }
-  serialize():EntityNode[]{return [...this.entities.keys()].map(id=>this.get(id));}
+  serialize():EntityNode[]{
+    const nodes=structuredClone([...this.entities.values()]);
+    for(const node of nodes)freezeJson(node.static);
+    return nodes;
+  }
 }

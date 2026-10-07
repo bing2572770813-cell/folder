@@ -59,9 +59,9 @@ export class TreeDocument {
     return candidate;
   }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
-  cellNodes(){
+  cellNodes(nodes=this.world.serialize()){
     const byCell=new Map();
-    for(const node of this.world.serialize())for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
+    for(const node of nodes)for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
       const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
     }
     for(const items of byCell.values())items.sort((a,b)=>a.id.localeCompare(b.id));

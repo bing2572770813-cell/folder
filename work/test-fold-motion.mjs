@@ -6,6 +6,7 @@ import {uniqueFoldAxes,foldGroupAt,inFoldRange} from './tags/fold-geometry.mjs';
 import {blocked,foldsAt} from './entities/tile-model.mjs';
 import {validateRegions,taggedCells,regionOf} from './tags/regions.mjs';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction,validateTerrains} from './entities/mechanism-rules.mjs';
+import {paperSurface} from './render/paper-surface.mjs';
 
 function fixture(type='h'){
  const map={width:7,height:7,spawn:{r:2,c:3,dir:0},tiles:Array.from({length:7},()=>Array.from({length:7},()=>({prefabId:'paper_ai',height:.09,thickness:.025,color:'white',folds:[],tags:{},regionTag:'A'}))),foldCells:[],maxSteps:0,bestSteps:null,exit:null};
@@ -103,3 +104,54 @@ for(const type of ['h','v','d1','d2'])for(let dir=0;dir<8;dir++){
  assert.ok(Math.abs(f.player.quaternion.dot(before))>1-1e-9,`${type} rebound preserves rendered facing ${dir}`);
 }
 console.log('PASS: rebound restores rendered and logical facing for all eight headings and four fold axes.');
+
+// Preparation must be observational: no selection/turn/model or render changes.
+const preparedFold=fixture(),stateBefore=preparedFold.controller.snapshot(),childrenBefore=[...preparedFold.player.parent.children],poseBefore=preparedFold.player.matrixWorld.clone();
+assert.equal(preparedFold.controller.prepareFoldMotion(),true);
+assert.equal(preparedFold.view.active(),false);
+assert.deepEqual(preparedFold.controller.snapshot(),stateBefore);
+assert.deepEqual(preparedFold.player.parent.children,childrenBefore);
+assert.deepEqual(preparedFold.player.matrixWorld.elements,poseBefore.elements);
+assert.equal(preparedFold.mesh.visible,true);
+assert.equal(preparedFold.controller.beginFoldDrag(2,3,300),true);
+assert.equal(preparedFold.view.stats().reused,true,'controller start consumes the exact prepared plan');
+preparedFold.controller.cancelFoldMotion();preparedFold.controller.clearSelection();
+assert.equal(preparedFold.controller.prepareFoldMotion(),false,'no crease selected means no preparation');
+
+// Dense paper faces share one entity eligibility lookup, not thousands of clones.
+const denseRoot=new THREE.Group(),denseLayer=new THREE.Group(),densePlayer=new THREE.Group();denseRoot.add(denseLayer,densePlayer);
+const denseMap={width:1,height:1,tiles:[[{prefabId:'paper_ai',height:.09,thickness:.09,folds:['h']}]]};
+const denseSurface=paperSurface(denseMap,0,0),denseGeometry=new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(denseSurface.positions,3));denseGeometry.computeVertexNormals();
+const denseMesh=new THREE.Mesh(denseGeometry,new THREE.MeshBasicMaterial());denseMesh.userData.triangleCells=Array.from({length:denseSurface.positions.length/9},()=>({r:0,c:0,nodeId:'one-paper'}));denseLayer.add(denseMesh);
+let eligibilityReads=0,eligible=true;
+const denseView=createFoldMotionView({paper:denseRoot,layers:[denseLayer],playerGroup:densePlayer,wx:c=>c,wz:r=>r,canFold:()=>{eligibilityReads++;return eligible;}}),denseHinge={origin:[0,0,0],direction:[1,0,0],side:1},denseCells=[{r:0,c:0}];
+denseView.prepare([],denseHinge,denseCells);assert.equal(eligibilityReads,1);
+denseView.begin([],denseHinge,denseCells);assert.equal(eligibilityReads,1);
+const firstBuffers=denseRoot.children.filter(o=>o!==denseLayer&&o!==densePlayer).flatMap(g=>g.children).filter(o=>o.isMesh).map(o=>o.geometry);
+assert.equal(firstBuffers.length,2);denseView.setAngle(.9);denseView.reset();denseView.begin([],denseHinge,denseCells);
+assert.equal(eligibilityReads,1,'rebound reuses the buffers');assert.equal(denseView.stats().reused,true);
+assert.ok(firstBuffers.every(g=>denseRoot.children.some(group=>group.children.some(o=>o.geometry===g))));
+denseView.reset();let disposed=0;firstBuffers.forEach(g=>g.addEventListener('dispose',()=>disposed++));denseView.invalidatePrepared();assert.equal(disposed,2);
+eligible=false;denseView.prepare([],denseHinge,denseCells);assert.equal(eligibilityReads,2);denseView.begin([],denseHinge,denseCells);
+assert.equal(denseRoot.children.filter(o=>o!==denseLayer).at(-1).children.filter(o=>o.isMesh).length,0,'invalidated physics flags keep the surface fixed');denseView.reset();
+denseGeometry.attributes.position.needsUpdate=true;denseView.prepare([],denseHinge,denseCells);assert.equal(eligibilityReads,3,'modified source buffers invalidate the split');denseView.invalidatePrepared();
+
+// Compare direct copies and intersected indexed triangles against the original
+// polygon clipper, including normal/UV interpolation and vertices on the axis.
+const testVertices=[[-2,0,-2],[-1,0,-2],[-1,0,-1],[1,0,1],[2,0,1],[1,0,2],[-1,0,-1],[1,0,1],[0,0,2],[0,0,0],[1,0,0],[-1,0,0]];
+for(const indexed of [false,true]){
+ const root=new THREE.Group(),layer=new THREE.Group(),player=new THREE.Group();root.add(layer,player);
+ const geometry=new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(testVertices.flat(),3)).setAttribute('uv',new THREE.Float32BufferAttribute(testVertices.flatMap(([x,,z])=>[x,z]),2));
+ if(indexed)geometry.setIndex(testVertices.map((_,i)=>i));
+ const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial());mesh.userData.triangleCells=Array.from({length:4},()=>({r:0,c:0}));layer.add(mesh);
+ const view=createFoldMotionView({paper:root,layers:[layer],playerGroup:player,wx:c=>c,wz:r=>r});view.begin([],denseHinge,denseCells);
+ for(const [moving,group] of root.children.filter(o=>o!==layer&&o!==player).entries()){
+  const expected=[];
+  for(let i=0;i<testVertices.length;i+=3){const vertices=testVertices.slice(i,i+3).map(position=>({position,uv:[position[0],position[2]]}));const polygon=clipFoldPolygon(vertices,v=>-v.position[2],!!moving);for(let j=1;j<polygon.length-1;j++)expected.push(polygon[0],polygon[j],polygon[j+1]);}
+  const output=group.children.find(o=>o.isMesh)?.geometry;
+  assert.deepEqual(Array.from(output.attributes.position.array),expected.flatMap(v=>v.position).map(Math.fround));
+  assert.deepEqual(Array.from(output.attributes.uv.array),expected.flatMap(v=>v.uv).map(Math.fround));
+ }
+ view.reset();view.invalidatePrepared();geometry.dispose();mesh.material.dispose();
+}
+console.log('PASS: idle preparation is inert, eligibility reads are bounded per entity, cached buffers reuse/dispose/invalidate, and indexed triangle attributes preserve clipping.');

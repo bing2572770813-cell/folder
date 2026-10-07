@@ -13,26 +13,55 @@ export function tabletopHeight(map,hidden=()=>false){
 
 // Temporary render transforms only. Static map cells are never mutated.
 export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGroup, wx, wz, canFold=()=>true }) {
-  let session = null;
+  let session = null,prepared=null;
+  const diagnostics={prepareMs:0,beginMs:0,reused:false};
+  function dispose(target){
+    if(!target)return;
+    for(const geometry of target.geometries)geometry.dispose();
+    for(const mesh of target.instances)mesh.dispose();
+    target.fixed.removeFromParent();target.pivot.removeFromParent();
+  }
   function reset() {
     if (!session) return;
     paper.attach(playerGroup);
     playerGroup.quaternion.copy(session.playerQuaternion);
     for (const [object, visible] of session.originals) object.visible = visible;
-    for (const geometry of session.geometries) geometry.dispose();
-    for (const mesh of session.instances) mesh.dispose();
-    session.fixed.removeFromParent();
-    session.pivot.removeFromParent();
-    session = null;
+    session.fixed.removeFromParent();session.pivot.removeFromParent();
+    session.pivot.quaternion.identity();
+    if(prepared&&prepared!==session)dispose(prepared);
+    prepared=session;session=null;
   }
-  function begin(cells, hinge, hingeCells = []) {
+  function invalidatePrepared(){if(!session){dispose(prepared);prepared=null;}}
+  function signature(cells,hinge,hingeCells){
+    const sources=layers.filter(layer=>!fixedLayers.includes(layer)&&layer.visible).map(layer=>[layer.uuid,layer.position.toArray(),layer.quaternion.toArray(),layer.scale.toArray(),layer.children.filter(o=>o.visible).map(o=>[o.uuid,o.geometry?.uuid,o.geometry?.index?.version,Object.values(o.geometry?.attributes??{}).map(a=>a.version),o.instanceMatrix?.version,o.count,o.position.toArray(),o.quaternion.toArray(),o.scale.toArray()])]);
+    return JSON.stringify([cells,hinge,hingeCells,sources]);
+  }
+  function prepare(cells,hinge,hingeCells=[]){
+    if(session)return false;
+    const key=signature(cells,hinge,hingeCells);
+    diagnostics.reused=prepared?.key===key;
+    if(diagnostics.reused)return true;
+    const start=performance.now();
+    dispose(prepared);prepared=build(cells,hinge,hingeCells);prepared.key=key;
+    diagnostics.prepareMs=performance.now()-start;
+    return true;
+  }
+  function begin(cells,hinge,hingeCells=[]){
+    const start=performance.now();
     reset();
+    prepare(cells,hinge,hingeCells);session=prepared;prepared=null;
+    session.playerQuaternion.copy(playerGroup.quaternion);
+    for(const [object] of session.originals)object.visible=false;
+    paper.add(session.fixed,session.pivot);session.pivot.attach(playerGroup);
+    diagnostics.beginMs=performance.now()-start;
+    return true;
+  }
+  function build(cells, hinge, hingeCells) {
     const selected = new Set(cells.map((p) => p.r + "," + p.c)),
       fixed = new THREE.Group(),
       pivot = new THREE.Group();
-    paper.add(fixed, pivot);
     pivot.position.fromArray(hinge.origin);
-    session = {
+    const next = {
       fixed,
       pivot,
       originals: [],
@@ -42,6 +71,11 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
       axis: new THREE.Vector3().fromArray(hinge.direction),
     };
     const creaseCells = new Set(hingeCells.map((p) => p.r + "," + p.c));
+    // A fold uses a fixed snapshot: node lookup/structuredClone is per entity,
+    // never per triangle of the same creased surface.
+    const eligibility=new Map();
+    const foldable=cell=>{const key=cell?.nodeId??(cell?cell.r+','+cell.c:null);if(!eligibility.has(key))eligibility.set(key,canFold(cell));return eligibility.get(key);};
+
     const side = (x, z) =>
       ((x - hinge.origin[0]) * hinge.direction[2] -
         (z - hinge.origin[2]) * hinge.direction[0]) *
@@ -62,15 +96,14 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
       if (!layer.visible) continue;
       for (const object of [...layer.children]) {
         if (!object.visible) continue;
-        session.originals.push([object, object.visible]);
-        object.visible = false;
+        next.originals.push([object, object.visible]);
         if (object.isInstancedMesh) {
           const matrix = new THREE.Matrix4();
           const batches=[[],[]];
           for (let i = 0; i < object.count; i++) {
             object.getMatrixAt(i, matrix);
             const cell = object.userData.cells?.[i];
-            if (cell && canFold(cell) && creaseCells.has(cell.r + "," + cell.c)) {
+            if (cell && foldable(cell) && creaseCells.has(cell.r + "," + cell.c)) {
               const mesh = new THREE.Mesh(
                 object.geometry.clone().applyMatrix4(matrix),
                 object.material,
@@ -88,7 +121,7 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
               splitObject(mesh);
               mesh.geometry.dispose();
             } else {
-              const moving=canFold(cell)&&(cell?selected.has(cell.r+','+cell.c):selectedPosition(matrix.elements[12],matrix.elements[14]));
+              const moving=foldable(cell)&&(cell?selected.has(cell.r+','+cell.c):selectedPosition(matrix.elements[12],matrix.elements[14]));
               batches[Number(moving)].push(matrix.clone());
             }
           }
@@ -97,7 +130,7 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
             const mesh=new THREE.InstancedMesh(object.geometry,object.material,matrices.length);
             matrices.forEach((matrix,i)=>mesh.setMatrixAt(i,matrix));mesh.instanceMatrix.needsUpdate=true;
             mesh.castShadow=object.castShadow;mesh.receiveShadow=object.receiveShadow;mesh.renderOrder=object.renderOrder;
-            session.instances.push(mesh);add(mesh,!!moving);
+            next.instances.push(mesh);add(mesh,!!moving);
           });
           continue;
         }
@@ -108,7 +141,7 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
         const clone = object.clone(true);
         if(layer.position.lengthSq()>0){clone.position.add(layer.position);clone.quaternion.premultiply(layer.quaternion);}
         clone.visible = true;
-        add(clone, canFold(object.userData.cell)&&selectedPosition(clone.position.x, clone.position.z));
+        add(clone, foldable(object.userData.cell)&&selectedPosition(clone.position.x, clone.position.z));
       }
     }
     function splitObject(object) {
@@ -116,55 +149,52 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
         index = geometry.index,
         position = geometry.attributes.position,
         primitive = object.isLineSegments ? 2 : 3,
-        split = [{}, {}];
+        split = [{count:0}, {count:0}];
+      const attributes=Object.entries(geometry.attributes),capacity=(index?.count??position.count)*2;
+      const storage=(bucket,name,size)=>bucket[name]??=(new Float32Array(capacity*size));
+      const appendIndices=(bucket,indices)=>{
+        for(const [name,attribute] of attributes){
+          const size=attribute.itemSize,values=storage(bucket,name,size),array=attribute.array;let offset=bucket.count*size;
+          for(const vertex of indices)for(let j=0;j<size;j++)values[offset++]=array[vertex*size+j];
+        }
+        bucket.count+=indices.length;
+      };
+      const append=(bucket,vertices)=>{
+        for(const [name,attribute] of attributes){
+          const size=attribute.itemSize,values=storage(bucket,name,size);let offset=bucket.count*size;
+          for(const vertex of vertices)for(let j=0;j<size;j++)values[offset++]=vertex[name][j];
+        }
+        bucket.count+=vertices.length;
+      };
       for (let i = 0; i < (index?.count ?? position.count); i += primitive) {
-        const indices = Array.from({ length: primitive }, (_, j) =>
-          index ? index.getX(i + j) : i + j,
-        );
-        const cell = primitive===2?object.userData.segmentCells?.[i/2]:object.userData.triangleCells?.[i / 3];
-        const x = indices.reduce((n, k) => n + position.getX(k), 0) / primitive,
-          z = indices.reduce((n, k) => n + position.getZ(k), 0) / primitive;
-        const key = cell
-          ? cell.r + "," + cell.c
-          : Math.round(wzInverse(z)) + "," + Math.round(wxInverse(x));
-        const vertices = indices.map((k) =>
-          Object.fromEntries(
-            Object.entries(geometry.attributes).map(([name, a]) => [
-              name,
-              Array.from(a.array.slice(k * a.itemSize, (k + 1) * a.itemSize)),
-            ]),
-          ),
-        );
-        if(!canFold(cell)){append(split[0],vertices);continue;}
-        if (creaseCells.has(key)) {
-          for (let moving = 0; moving < 2; moving++) {
-            const polygon = clipFoldPolygon(
-              vertices,
-              (v) => side(v.position[0], v.position[2]),
-              !!moving,
-            );
-            if(primitive===2){if(polygon.length>=2)append(split[moving],polygon.slice(0,2));}
-            else for (let j = 1; j < polygon.length - 1; j++)
-              append(split[moving], [polygon[0], polygon[j], polygon[j + 1]]);
-          }
-        } else
-          append(
-            split[Number(cell ? selected.has(key) : selectedPosition(x, z))],
-            vertices,
-          );
+        const indices=primitive===2?[i,i+1]:[i,i+1,i+2];
+        if(index)for(let j=0;j<primitive;j++)indices[j]=index.getX(indices[j]);
+        const cell=primitive===2?object.userData.segmentCells?.[i/2]:object.userData.triangleCells?.[i/3];
+        if(!foldable(cell)){appendIndices(split[0],indices);continue;}
+        let key;
+        if(cell)key=cell.r+','+cell.c;
+        else{let x=0,z=0;for(const k of indices){x+=position.getX(k);z+=position.getZ(k);}key=Math.round(wzInverse(z/primitive))+','+Math.round(wxInverse(x/primitive));}
+        if(!creaseCells.has(key)){
+          appendIndices(split[Number(selected.has(key))],indices);
+          continue;
+        }
+        const distances=indices.map(k=>side(position.getX(k),position.getZ(k))),min=Math.min(...distances),max=Math.max(...distances);
+        // Most triangles in an axis cell are wholly on one side. Copy their
+        // typed attributes directly; only intersected faces need vertex objects.
+        if(min>=0){appendIndices(split[1],indices);if(max===0)appendIndices(split[0],indices);continue;}
+        if(max<=0){appendIndices(split[0],indices);continue;}
+        const vertices=indices.map(k=>Object.fromEntries(attributes.map(([name,a])=>[name,Array.from(a.array.subarray(k*a.itemSize,(k+1)*a.itemSize))])));
+        for(let moving=0;moving<2;moving++){
+          const polygon=clipFoldPolygon(vertices,v=>side(v.position[0],v.position[2]),!!moving);
+          if(primitive===2){if(polygon.length>=2)append(split[moving],polygon.slice(0,2));}
+          else for(let j=1;j<polygon.length-1;j++)append(split[moving],[polygon[0],polygon[j],polygon[j+1]]);
+        }
       }
       split.forEach((bucket, moving) => {
-        if (!bucket.position?.length) return;
+        if (!bucket.count) return;
         const g = new THREE.BufferGeometry();
-        for (const [name, values] of Object.entries(bucket))
-          g.setAttribute(
-            name,
-            new THREE.Float32BufferAttribute(
-              values,
-              geometry.attributes[name].itemSize,
-            ),
-          );
-        session.geometries.push(g);
+        for(const [name,attribute] of attributes)g.setAttribute(name,new THREE.BufferAttribute(bucket[name].slice(0,bucket.count*attribute.itemSize),attribute.itemSize));
+        next.geometries.push(g);
         const clone = object.isLineSegments
           ? new THREE.LineSegments(g, object.material)
           : new THREE.Mesh(g, object.material);
@@ -174,15 +204,7 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
         add(clone, !!moving);
       });
     }
-    function append(bucket, vertices) {
-      for (const vertex of vertices)
-        for (const [name, values] of Object.entries(vertex)) {
-          bucket[name] ??= [];
-          bucket[name].push(...values);
-        }
-    }
-    pivot.attach(playerGroup);
-    return true;
+    return next;
   }
   function setAngle(angle) {
     if (session) session.pivot.quaternion.setFromAxisAngle(session.axis, angle);
@@ -192,7 +214,7 @@ export function createFoldMotionView({ paper, layers, fixedLayers=[], playerGrou
   }
   // The model's anchor is 0.018 above its supporting surface.
   function footPosition(){return playerGroup.localToWorld(new THREE.Vector3(0,-.018,0)).toArray();}
-  return { begin, setAngle, playerPosition, footPosition, reset, active: () => !!session };
+  return { begin, prepare, invalidatePrepared, setAngle, playerPosition, footPosition, reset, active: () => !!session, stats:()=>({...diagnostics}) };
 }
 
 export function clipFoldPolygon(vertices, distance, positive) {

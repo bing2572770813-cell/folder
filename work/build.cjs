@@ -13,6 +13,17 @@ async function build() {
     asset,'data:'+(asset.endsWith('.png')?'image/png':'application/octet-stream')+';base64,'+
       fs.readFileSync(path.join(root,'../assets',asset)).toString('base64'),
   ]));
+  const audioDir=path.join(root,'../assets/audio/音乐素材');
+  const audioNames={
+    'opening-bgm':'openinglevel1_bgm.mp3','level23-bgm':'level23_bgm.mp3','level45-bgm':'level45_bgm.mp3','level67-bgm':'level67_bgm.mp3','ending-bgm':'Ending_BGM.mp3',
+    'level-complete':'level_complete.mp3','game-over':'GameOver.mp3','footstep':'footstep.mp3','flip':'flip_sound.wav','paper-fracture':'paper_fracture.mp3',
+    'fire-spit':'fire_spit(1).mp3','phoenix-roar':'phoenix_roar.mp3','switch-open':'switch_open.mp3','switch-close':'switch_close.mp3','fire-environment':'fire_environment.wav',
+  };
+  const audioAssets=Object.fromEntries(Object.entries(audioNames).map(([name,file])=>{
+    const ext=path.extname(file).toLowerCase();
+    const mime=ext==='.wav'?'audio/wav':'audio/mpeg';
+    return [name,`data:${mime};base64,${fs.readFileSync(path.join(audioDir,file)).toString('base64')}`];
+  }));
   const shared = {
     bundle: true,
     write: false,
@@ -54,7 +65,7 @@ async function build() {
     .replace("<style>", "<style>" + css + "</style><style>")
     .replace("<!--REACT_MARKUP-->", markup);
   const code =
-    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';'+
+    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';window.__FOLD_FIELD_AUDIO_ASSETS__??='+JSON.stringify(audioAssets)+';'+
     "window.__FOLD_FIELD_TAGS__??=" +
     JSON.stringify(catalog.tags).replace(/</g, "\\u003c") +
     ";window.__FOLD_FIELD_PREFABS__??=" +

@@ -24,9 +24,13 @@
     {
       "id": "player_ai",
       "category": "creature",
-      "reference": "Player.jpg",
+      "reference": "Player_1.jpg",
       "status": "converted",
-      "collision": "gameplay prefab remains authoritative"
+      "collision": "gameplay prefab remains authoritative",
+      "thumbnail": "assets/raw_design/artworks/player_ai_lowpoly_thumbnail.png",
+      "blend": "assets/raw_design/artworks/player_ai_lowpoly.blend",
+      "glb": "assets/model/player_ai_lowpoly.glb",
+      "design": "mouse-ear hood, short charcoal cloak, angular folded collar, readable eyes and separate feet"
     },
     {
       "id": "key_ai",
@@ -69,7 +73,6 @@
   ],
   "pendingConcepts": [
     "Characters.jpg",
-    "Player_1.jpg",
     "Player_2.jpg",
     "Key_2.jpg",
     "Key_3.jpg",

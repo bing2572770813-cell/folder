@@ -38,7 +38,7 @@ def mat(name,hex_color,rough=.84,metal=0.0):
     bsdf.inputs['Base Color'].default_value=(*rgb,1); bsdf.inputs['Roughness'].default_value=rough; bsdf.inputs['Metallic'].default_value=metal
     m['color_srgb']=hex_color
     return m
-paper=mat('Paper white','#f4f5ed'); paper_edge=mat('Paper edge','#414140'); eye=mat('Token eye','#ffffff',.35); pupil=mat('Token pupil','#182721',.35); gold=mat('Key brass','#d99a38',.55,.25); grass=mat('Grass','#6f9f73'); grass_dark=mat('Grass shadow','#426b52'); ice=mat('Ice','#9fd2e8',.35); stone=mat('Blocker stone','#56645f'); fire=mat('Fire','#e75e36',.45); ember=mat('Fire core','#f5c34f',.4); dark=mat('Dark base','#303a38')
+paper=mat('Paper white','#f4f5ed'); paper_edge=mat('Paper edge','#414140'); cloak=mat('Player cloak','#26302f'); collar=mat('Player folded collar','#60736e'); hair=mat('Player charcoal hair','#303a38'); eye=mat('Token eye','#ffffff',.35); pupil=mat('Token pupil','#182721',.35); gold=mat('Key brass','#d99a38',.55,.25); grass=mat('Grass','#6f9f73'); grass_dark=mat('Grass shadow','#426b52'); ice=mat('Ice','#9fd2e8',.35); stone=mat('Blocker stone','#56645f'); fire=mat('Fire','#e75e36',.45); ember=mat('Fire core','#f5c34f',.4); dark=mat('Dark base','#303a38')
 
 def link(obj,collection=assets):
     for c in list(obj.users_collection): c.objects.unlink(obj)
@@ -96,16 +96,36 @@ def parent(name,objects):
     for o in objects:o.parent=root
     return root
 
+def custom_mesh(name,verts,faces,material,collection=assets):
+    mesh=bpy.data.meshes.new(name+' mesh');mesh.from_pydata(verts,[],faces);mesh.update();obj=bpy.data.objects.new(name,mesh);collection.objects.link(obj);obj.data.materials.append(material)
+    for face in mesh.polygons:face.use_smooth=False
+    return obj
+
+def detailed_player_yup(collection=assets,scale=1,origin=(0,0,0)):
+    x,y,z=origin;s=scale;parts=[]
+    parts.append(cone('player_ai_cloak',(x,y+.42*s,z),.37*s,.25*s,.72*s,cloak,6,collection))
+    parts.append(ico('player_ai_hair',(x,y+1.00*s,z+.01*s),(.31*s,.25*s,.34*s),hair,1,collection))
+    parts.append(ico('player_ai_face',(x,y+1.00*s,z-.225*s),(.235*s,.055*s,.265*s),paper,1,collection))
+    parts.append(ico('player_ai_bob_left',(x-.245*s,y+.91*s,z-.005*s),(.115*s,.20*s,.29*s),hair,1,collection))
+    parts.append(ico('player_ai_bob_right',(x+.245*s,y+.91*s,z-.005*s),(.115*s,.20*s,.29*s),hair,1,collection))
+    parts.append(ico('player_ai_ear_left',(x-.20*s,y+1.30*s,z+.01*s),(.17*s,.15*s,.17*s),hair,1,collection))
+    parts.append(ico('player_ai_ear_right',(x+.20*s,y+1.30*s,z+.01*s),(.17*s,.15*s,.17*s),hair,1,collection))
+    v=[(-.38,.70,-.24),(-.04,.93,-.31),(-.02,.57,-.34),(.02,.57,-.34),(.04,.93,-.31),(.38,.70,-.24),(0,1.04,-.38)]
+    parts.append(custom_mesh('player_ai_folded_collar',[(x+vx*s,y+vy*s,z+vz*s) for vx,vy,vz in v],[(0,1,2),(2,1,6),(2,6,3),(3,6,4),(3,4,5)],collar,collection))
+    parts.append(ico('player_ai_eye_left',(x-.085*s,y+1.04*s,z-.285*s),(.037*s,.045*s,.028*s),pupil,1,collection))
+    parts.append(ico('player_ai_eye_right',(x+.085*s,y+1.04*s,z-.285*s),(.037*s,.045*s,.028*s),pupil,1,collection))
+    parts.append(cube('player_ai_clasp',(x,y+.79*s,z-.355*s),(.075*s,.075*s,.025*s),gold,.012*s,collection))
+    parts.append(cube('player_ai_foot_left',(x-.12*s,y+.055*s,z-.06*s),(.14*s,.11*s,.26*s),dark,.025*s,collection))
+    parts.append(cube('player_ai_foot_right',(x+.12*s,y+.055*s,z-.06*s),(.14*s,.11*s,.26*s),dark,.025*s,collection))
+    root=parent('player_ai',parts);root['asset_id']='player_ai';root['category']='creature';root['source_concept']='Player_1.jpg';root['design']='mouse-ear hood, short cloak, folded collar';return root
+
 # Runtime paper tile; the top is exactly Y=0 so it agrees with the existing table.
 paper_tile=cube('paper_ai',(0,-.045,0),(.98,.09,.98),paper,.025); paper_tile['asset_id']='paper_ai'; paper_tile['category']='terrain'; paper_tile['source_concept']='Paper_1.png'
 # Intrinsic dark rim is geometry/material, independent from the editor grid toggle.
 edge=cube('paper_ai_edge',(0,.002,0),(.99,.012,.99),paper_edge,.018); edge['asset_id']='paper_ai'; edge['role']='intrinsic_edge'
 
-# Player token: dodecahedron has no bottom plane and keeps the current eye language.
-token=dodeca('player_ai',(0,.42,0),.36,paper); token['asset_id']='player_ai'; token['category']='creature'; token['source_concept']='Player.jpg'
-for x in (-.11,.11):
-    e=ico('player_ai_eye',(x,.50,-.29),(.065,.065,.065),eye,1); e.parent=token
-    p=ico('player_ai_pupil',(x,.50,-.346),(.029,.029,.029),pupil,1); p.parent=token
+# Player token: a visual character blockout with no bottom plane.
+token=detailed_player_yup()
 
 # Key prop: a flat ring, hexagonal shaft and two block teeth.
 ring=torus('key_ai_ring',(0,.16,0),.18,.045,gold,rotation=(math.pi/2,0,0)); shaft=cyl('key_ai_shaft',(0,.16,-.23),.055,.46,gold,6); shaft.rotation_euler[0]=math.pi/2
@@ -147,7 +167,7 @@ manifest={
  'assets':[
   {'id':'boardgame_table_ai','category':'environment','reference':'boardgame_table_ai.png','status':'converted','collision':'tabletop participates in fold collision'},
   {'id':'paper_ai','category':'terrain','reference':'Paper_1.png','status':'converted','collision':'physical'},
-  {'id':'player_ai','category':'creature','reference':'Player.jpg','status':'converted','collision':'gameplay prefab remains authoritative'},
+  {'id':'player_ai','category':'creature','reference':'Player_1.jpg','status':'converted','collision':'gameplay prefab remains authoritative'},
   {'id':'key_ai','category':'item','reference':'Key_1.jpg','status':'converted','collision':'prefab remains authoritative'},
   {'id':'grass_ai','category':'terrain','reference':'Environment_1.jpg','status':'converted'},
   {'id':'ice_ai','category':'terrain','reference':'Environment_2.jpg','status':'converted'},

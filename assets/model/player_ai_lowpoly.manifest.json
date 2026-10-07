@@ -1,0 +1,19 @@
+{
+  "id": "player_ai",
+  "sourceConcept": "assets/raw_design/artworks/Player_1.jpg",
+  "thumbnail": "assets/raw_design/artworks/player_ai_lowpoly_thumbnail.png",
+  "blend": "assets/raw_design/artworks/player_ai_lowpoly.blend",
+  "glb": "assets/model/player_ai_lowpoly.glb",
+  "coordinates": "Blender Z-up / glTF Y-up",
+  "fixedView": "Three.js editor fixedView orthographic",
+  "design": [
+    "mouse-ear hair silhouette",
+    "short bob panels",
+    "faceted face and readable eyes",
+    "short charcoal folded cloak",
+    "broad angular folded-paper collar",
+    "separate feet for board-cell readability",
+    "no bottom plane under token body"
+  ],
+  "gameplay": "Existing player.cjs and player prefab remain authoritative; this asset is visual only."
+}

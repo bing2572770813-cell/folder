@@ -130,13 +130,13 @@ test('switch placement requires exactly one crease, one cell and supported terra
  node.components.fold.directions=[];f.world.remove(node.id);f.world.add(node);assert.throws(()=>validateTerrainStacking(f.world),/恰好一条/);
 });
 
-test('fragile paper breaks on successful departure; failed moves, previews, undo and restart preserve it',()=>{
+test('fragile paper consumes global actions; failed moves, previews, undo and restart preserve it',()=>{
  const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
  const before=f.controller.snapshot();f.controller.selectPlayer();
  assert.equal(f.controller.movePlayer(99,99),false);assert.deepEqual(f.world.runtime('fragile','fragile'),{});
  assert.equal(f.move(2,2),true);assert.equal(f.world.runtime('fragile','fragile').broken,true);
  assert.equal(f.controller.canMoveTo(2,1),false,'broken support is void even if other owners remain');
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.controller.canMoveTo(2,1),true);
- f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').broken,true);
- f.controller.tick(performance.now()+1000);f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').breaking,true);f.controller.tick(performance.now()+1000);assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
 });

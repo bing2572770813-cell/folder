@@ -441,7 +441,7 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
  for(const cell of [...cells.surfaceCells,...enemyCells]){
   const node=documentModel.world.get(cell.nodeId),components=node.components;
   if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile&&!components.firebird)continue;
-  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
+  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),fragile:documentModel.world.runtime(node.id,'fragile'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
   const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
   if(components.rayEmitter){
    const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
@@ -569,12 +569,13 @@ function inspectedPropertySchema(r,c,tile){
   const node=documentModel.primaryAt(r,c);
   return projectedCellSchema(node,documentModel.world.at(r,c),tile,nodeSchema,entityPropertySchema(tile,tagCatalog));
 }
-const MECHANISM_COMPONENTS=['lift','foldSwitch','rayEmitter','firebird'];
+const MECHANISM_COMPONENTS=['lift','foldSwitch','rayEmitter','firebird','fragile'];
 const mechanismNodeAt=(r,c)=>documentModel.world.at(r,c).find(node=>MECHANISM_COMPONENTS.find(id=>node.components?.[id]));
 function mechanismInspection(node){
   if(!node)return null;
   const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
   if(!type)return null;
+  if(type==='fragile')return {type,count:Number(node.components.fragile.count??1)};
   return {type,triggers:normalizeComponentTriggers(node.components[type])};
 }
 function applyPropertyMap(next){
@@ -590,10 +591,10 @@ function inspectSelection(){
     const mechanism=mechanismInspection(mechanismNodeAt(r,c));
     if(mechanism)values.mechanism=mechanism;
     const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
-    if(mechanism){schema.mechanism={label:'机制触发',children:{type:{label:'机制类型',tempEditable:false},triggers:{label:'触发方式',tempEditable:true}}};}
+    if(mechanism){schema.mechanism={label:mechanism.type==='fragile'?'易碎方块':'机制触发',children:mechanism.type==='fragile'?{type:{label:'机制类型',tempEditable:false},count:{label:'触发次数',tempEditable:true}}:{type:{label:'机制类型',tempEditable:false},triggers:{label:'触发方式',tempEditable:true}}};}
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
-  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
+  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。',fragile:'易碎方块：每次成功行走或传送都会减少一次触发次数，归零后播放破碎动画并变为空格。'};
   const mechanismTypes=[...new Set(cells.map(({r,c})=>mechanismInspection(mechanismNodeAt(r,c))?.type??(map.tiles[r][c]?.lift?'lift':map.tiles[r][c]?.terrain??'none')))];
   const mechanismLabels={lift:'升降纸张',foldSwitch:'折线开关',rayEmitter:'方向喷射',firebird:'火焰鸟'};
   renderMechanismText($('mechanismDescriptions'),mechanismTypes.map(type=>descriptions[type]||(mechanismLabels[type]?mechanismLabels[type]+'：支持行走触发与传送触发。':type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
@@ -624,10 +625,17 @@ function inspectSelection(){
 function applyInspectedProperty(path,value,scope='entity'){
   if(P.mode!=='edit'||!selectedCells.length)throw new Error('请先选择方格');
   if(path[0]==='mechanism'){
-    if(path[1]!=='triggers'||selectedCells.length!==1)throw new Error('机制触发方式只能单格编辑');
+    if(selectedCells.length!==1)throw new Error('机制属性只能单格编辑');
     const {r,c}=selectedCells[0],node=mechanismNodeAt(r,c);if(!node)throw new Error('当前方格没有机制实体');
     const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
-    const components=clone(node.components);components[type]={...components[type],triggers:normalizeComponentTriggers(value)};
+    const components=clone(node.components);
+    if(type==='fragile'){
+      if(path[1]!=='count')throw new Error('易碎方块只支持编辑触发次数');
+      components.fragile={...components.fragile,count:Number(value)};
+    }else{
+      if(path[1]!=='triggers')throw new Error('机制触发方式只能单格编辑');
+      components[type]={...components[type],triggers:normalizeComponentTriggers(value)};
+    }
     commitTree(configureNode(documentModel,node.id,components,node.tags,cellHidden,nodeHidden,nodeSchema(node)));
     persist();scheduleInspection();return;
   }
@@ -1035,6 +1043,6 @@ $('moveNode').onclick=()=>treeAction(()=>moveNode(documentModel,selectedNodeId,{
 $('reparentNode').onclick=()=>treeAction(()=>reparentNode(documentModel,selectedNodeId,$('nodeParent').value||null,$('preserveWorld').checked,cellHidden,nodeHidden));
 $('deleteNode').onclick=()=>treeAction(()=>deleteNode(documentModel,selectedNodeId,cellHidden,nodeHidden));
 function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema),components=clone(value.components??{});for(const id of ['lift','foldSwitch','rayEmitter','firebird'])if(components[id])components[id]={...components[id],triggers:components[id].triggers??['walk','teleport']};const physics={followFold:nodeFollowsFold(node),...(['item','creature'].includes(entityCategory(node))?{canDropOnFold:nodeCanDropOnFold(node)}:{}) ,...components.physics};return projectProperties({...value,components:{...components,physics}},schema,'readable');}
-function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
+function nodeSchema(node){const prefab=prefabs.find(item=>item.id===node.prefabId),source={...(prefab?.tile??{}),...(node.configuration??{}),prefabId:node.prefabId,...(prefab?.propertySchema?{propertySchema:prefab.propertySchema}:{})};return nodePermissions(node,entityPropertySchema(source,tagCatalog));}
 function applyTreeConfiguration(node,shown,after,schema){if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,node.id,after.components,after.tags,cellHidden,nodeHidden,schema);commitTree(next);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);refreshTreePanel();$('nodeEditStatus').textContent='已应用';}
 $('applyNodeConfig').onclick=()=>{try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable');applyTreeConfiguration(node,shown,{...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)},schema);}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}};

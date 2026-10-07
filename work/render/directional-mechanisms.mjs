@@ -17,7 +17,7 @@ export function mechanismMarker(THREE,components,runtime={}){
   const points=state===0?[[-.18,-.26],[.18,-.26],[.18,-.26],[.18,.26],[.18,.26],[-.18,.26],[-.18,.26],[-.18,-.26]]:[[0,-.26],[0,.26],[-.1,-.14],[0,-.26],[-.14,.26],[.14,.26]];
   line(points,state===0?'#9f292d':'#176a41');line(state===0?[[-.1,-.04],[.1,.04]]:[[0,-.1],[0,.1]],'#ffffff',.8);group.userData.switchState=state;
  }
- if(components.fragile){badge('#c99a48',.12);line([[-.4,-.2],[-.08,-.1],[-.08,-.1],[.02,.07],[.02,.07],[.32,.32],[.02,.07],[-.13,.33],[.02,.07],[.32,-.12]],'#554437');line([[-.28,.3],[-.08,.12],[-.08,.12],[.1,.24]],'#8b5c35',.8);}
+ if(components.fragile){const breaking=runtime.fragile?.breaking===true,progress=Number(runtime.fragile?.progress??0),pulse=breaking?1+Math.sin(progress*Math.PI*6)*.08:1;badge(breaking?'#d56b3d':'#c99a48',breaking?.22:.12);line([[-.4,-.2],[-.08,-.1],[-.08,-.1],[.02,.07],[.02,.07],[.32,.32],[.02,.07],[-.13,.33],[.02,.07],[.32,-.12]],breaking?'#9c3f2d':'#554437');line([[-.28,.3],[-.08,.12],[-.08,.12],[.1,.24]],'#8b5c35',.8);group.scale.setScalar(pulse);}
  if(components.firebird){const replaced=runtime.firebird?.replaced===true;badge(replaced?'#3e4548':'#e05a2a',.26);line([[-.28,-.28],[.28,.28],[-.28,.28],[.28,-.28]],replaced?'#252b2d':'#d13a24');group.userData.firebird=!replaced;group.userData.replaced=replaced;}
  if(components.flame){group.userData.flame=true;badge('#ed7d24',.32);line([[-.08,-.3],[.12,-.08],[-.08,.02],[.14,.3]],'#f3b52b');}
  group.traverse(object=>{object.raycast=()=>{};});return group;

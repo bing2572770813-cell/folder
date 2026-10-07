@@ -1,5 +1,7 @@
 # Development Checks
 
+Required use of these tools during development and before commits is defined in [work/agent.md](../work/agent.md). This document describes command behavior and evidence limits; follow that workflow when choosing checks.
+
 Run from the repository root:
 
 ```powershell

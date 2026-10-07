@@ -1,6 +1,6 @@
 const {spawnSync}=require('node:child_process');
 const path=require('node:path');
-const entityModelTest=spawnSync(process.execPath,['--test',...['local-placement-preview','categorized-placement','transform'].map(name=>path.join(__dirname,'backend/test/'+name+'.test.mjs'))],{stdio:'inherit'});
+const entityModelTest=spawnSync(process.execPath,['--test',...['local-placement-preview','categorized-placement','transform','tree-commands','tree-document'].map(name=>path.join(__dirname,'backend/test/'+name+'.test.mjs'))],{stdio:'inherit'});
 if(entityModelTest.status!==0)process.exit(entityModelTest.status||1);
 const spatialTest=spawnSync(process.execPath,[path.join(__dirname,'test-spatial-batches.mjs')],{stdio:'inherit'});
 if(spatialTest.status!==0)process.exit(spatialTest.status||1);

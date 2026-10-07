@@ -46,9 +46,9 @@ function check(world,ids,isHidden=()=>false,nodeHidden=()=>false){
   for(const id of ids)for(const cell of world.transforms.worldCells(id))if(isHidden(cell.r,cell.c))throw new Error('不能修改隐藏区域');
 }
 export function validateTreeDocument(candidate){
- validateTerrainStacking(candidate.world);const registry=defaultComponents();
- for(const node of candidate.world.serialize()){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
- const spawns=[],entries=new Map(),byCell=candidate.cellNodes();
+ const {nodes,byCell}=validateTerrainStacking(candidate.world),registry=defaultComponents();
+ for(const node of nodes){registry.validate(node);if(Object.hasOwn(node.tags,'regionTag'))throw new Error('区域标签只能属于地图格');}
+ const spawns=[],entries=new Map();
  // Only occupied cells contribute entity tags; avoid allocating a full legacy map.
  for(const [key,nodes] of byCell){
   const tags={};for(const node of nodes)for(const [name,value] of Object.entries(node.tags)){

@@ -17,7 +17,9 @@ test('serialization derives moved spawn without allocating a display projection'
  doc.world.transforms.setLocal(node.transformId,{r:3,c:2,dir:0});
  const expected=doc.view().spawn;
  doc.view=()=>{throw new Error('serialization must not build the display map');};
+ const serialize=doc.world.serialize.bind(doc.world);let snapshots=0;doc.world.serialize=()=>{snapshots++;return serialize();};
  const snapshot=doc.serialize();
+ assert.equal(snapshots,1,'serialization reuses the validated entity snapshot');
  assert.deepEqual(snapshot.legacyMetadata.spawn,expected);
  assert.deepEqual(new TreeDocument(snapshot).view().spawn,expected);
  doc.world.remove(node.id);

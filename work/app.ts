@@ -61,6 +61,7 @@ import {DebugState} from './editor/debug-state.mjs';
 import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderRegionChecklist,renderMechanismText} from './ui/react/catalogs.jsx';
 import {renderPropertyInspector,clearPropertyInspector} from './ui/property-inspector.mjs';
 import {triggerEditorChoiceMap} from './ui/trigger-editor-options.mjs';
+import {normalizeComponentTriggers} from './mechanics/trigger-list.cjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound, MoveVertical } from 'lucide';
 import {Trash2} from 'lucide';
@@ -566,6 +567,14 @@ function inspectedPropertySchema(r,c,tile){
   const node=documentModel.primaryAt(r,c);
   return projectedCellSchema(node,documentModel.world.at(r,c),tile,nodeSchema,entityPropertySchema(tile,tagCatalog));
 }
+const MECHANISM_COMPONENTS=['lift','foldSwitch','rayEmitter','firebird'];
+const mechanismNodeAt=(r,c)=>documentModel.world.at(r,c).find(node=>MECHANISM_COMPONENTS.find(id=>node.components?.[id]));
+function mechanismInspection(node){
+  if(!node)return null;
+  const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
+  if(!type)return null;
+  return {type,triggers:normalizeComponentTriggers(node.components[type])};
+}
 function applyPropertyMap(next){
  const checked=forkTreeDocument(documentModel);checked.applyProjection(next);
  assertNodePropertyChanges(documentModel,checked,nodeSchema);
@@ -576,11 +585,16 @@ function inspectSelection(){
   const entries=cells.map(({r,c})=>{
     const entity=inspectCell(map,r,c,cellHidden);
     const values=entity.properties??{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds};
+    const mechanism=mechanismInspection(mechanismNodeAt(r,c));
+    if(mechanism)values.mechanism=mechanism;
     const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
+    if(mechanism){schema.mechanism={label:'机制触发',children:{type:{label:'机制类型',tempEditable:false},triggers:{label:'触发方式',tempEditable:true}}};}
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
   const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰河：首次进入使玩家冰冻，并清空过热层数。冰冻状态下再次进入冰河，游戏结束。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
-  renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>{const tile=map.tiles[p.r][p.c];return tile?.lift?'lift':tile?.terrain??'none';}))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
+  const mechanismTypes=[...new Set(cells.map(({r,c})=>mechanismInspection(mechanismNodeAt(r,c))?.type??(map.tiles[r][c]?.lift?'lift':map.tiles[r][c]?.terrain??'none')))];
+  const mechanismLabels={lift:'升降纸张',foldSwitch:'折线开关',rayEmitter:'方向喷射',firebird:'火焰鸟'};
+  renderMechanismText($('mechanismDescriptions'),mechanismTypes.map(type=>descriptions[type]||(mechanismLabels[type]?mechanismLabels[type]+'：支持行走触发与传送触发。':type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
   inspectedCell=cells[0];
   const cellKeys=new Set(['tags','folds','fold']);
   const wholeEntries=entries.map(entry=>({...entry,values:Object.fromEntries(Object.entries(entry.values).filter(([key])=>!cellKeys.has(key)))}));
@@ -607,6 +621,14 @@ function inspectSelection(){
 }
 function applyInspectedProperty(path,value,scope='entity'){
   if(P.mode!=='edit'||!selectedCells.length)throw new Error('请先选择方格');
+  if(path[0]==='mechanism'){
+    if(path[1]!=='triggers'||selectedCells.length!==1)throw new Error('机制触发方式只能单格编辑');
+    const {r,c}=selectedCells[0],node=mechanismNodeAt(r,c);if(!node)throw new Error('当前方格没有机制实体');
+    const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
+    const components=clone(node.components);components[type]={...components[type],triggers:normalizeComponentTriggers(value)};
+    commitTree(configureNode(documentModel,node.id,components,node.tags,cellHidden,nodeHidden,nodeSchema(node)));
+    persist();scheduleInspection();return;
+  }
   let candidate=clone(map);const pendingDebug=[],targets=scope==='cell'&&path[0]!=='regionTag'?directSelectedCells:inspectionCells(map,selectedCells);
   if(path[0]==='tags'&&value===true&&(path[1]==='spawn'&&targets.length>1||path[1]==='entry'&&new Set(targets.map(p=>regionOf(map.tiles[p.r][p.c]))).size<targets.length))throw new Error('唯一位置标签不能批量设置到多个方格');
   for(const {r,c} of targets){

@@ -19,7 +19,15 @@ const {readFileSync}=await import('node:fs');const {runInNewContext}=await impor
 const appSource=readFileSync(new URL('./app.js',import.meta.url),'utf8');const tickSource=appSource.slice(appSource.indexOf('function tick(now)'),appSource.indexOf('\nresetRegions();',appSource.indexOf('function tick(now)')));
 let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
 Object.assign(context,{cameraInteraction:{active:false},lastZoomLabel:null,diagnosticsEnabled:false});
+context.renderer.shadowMap={needsUpdate:false};
 runInNewContext(tickSource,context);context.tick(0);assert.equal(corrections,0,'idle player must not undo manual pan');position.x=2;context.tick(1);assert.equal(corrections,1,'movement corrects camera');context.manualPan=true;context.P.moving=true;context.tick(2);assert.equal(corrections,1,'active right drag is respected');context.manualPan=false;context.tick(3);assert.equal(corrections,2,'correction resumes after pan');
 let axes=0;context.updateFoldAxes=()=>axes++;context.cameraInteraction.active=true;context.tick(4);assert.equal(axes,0,'camera gestures skip fold-axis work');context.cameraInteraction.active=false;context.tick(5);assert.equal(axes,1,'fold-axis work resumes after camera gestures');
 let diagnostics=0;context.screenPoints=()=>diagnostics++;context.renderedFrames=9;context.tick(6);assert.equal(diagnostics,0,'default rendering does not write diagnostics');context.diagnosticsEnabled=true;context.renderedFrames=19;context.tick(7);assert.equal(diagnostics,1,'diagnostics are explicitly enabled');context.cameraInteraction.active=true;context.renderedFrames=29;context.tick(8);assert.equal(diagnostics,1,'camera gestures suspend diagnostics');
 console.log('PASS: production camera loop preserves idle pan and corrects after movement.');
+context.P.moving=false;context.P.foldMotion=null;context.renderer.shadowMap.needsUpdate=false;
+context.tick(9);assert.equal(context.renderer.shadowMap.needsUpdate,false,'camera-only frames reuse shadows');
+context.P.moving=true;context.controller.tick=()=>{context.P.moving=false;};context.tick(10);
+assert.equal(context.renderer.shadowMap.needsUpdate,true,'last animation frame refreshes shadows even after movement ends');
+context.renderer.shadowMap.needsUpdate=false;context.P.foldMotion={phase:'return'};context.tick(11);
+assert.equal(context.renderer.shadowMap.needsUpdate,true,'fold rebound refreshes shadows');
+console.log('PASS: idle camera frames reuse shadows; movement completion and folding invalidate them.');

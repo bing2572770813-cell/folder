@@ -7,7 +7,14 @@ const {chromium} = require('playwright-core');
 const {openPreview} = require('./preview-session.cjs');
 const {assertBrowserEvidence} = require('./browser-evidence.cjs');
 
+function parseScenario(args = process.argv.slice(2)) {
+  if (args.length === 0) return 'all';
+  if (args.length === 2 && args[0] === '--scenario' && ['all', 'desktop', 'mobile'].includes(args[1])) return args[1];
+  throw new Error('Usage: node tools/browser-smoke.cjs [--scenario all|desktop|mobile]');
+}
+
 async function main() {
+  const scenario = parseScenario();
   const cwd = path.resolve(__dirname, '..');
   const directory = path.join(cwd, '.dev-checks', 'browser-' + randomUUID().slice(0, 8));
   fs.mkdirSync(directory, {recursive: true});
@@ -64,36 +71,40 @@ async function main() {
     const launch = process.env.FOLD_BROWSER_EXECUTABLE ? {executablePath: process.env.FOLD_BROWSER_EXECUTABLE} :
       {channel: process.env.FOLD_BROWSER_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : 'chrome')};
     browser = await chromium.launch({...launch, headless: true});
-    await open({width: 1280, height: 800}, '/');
-    await page.waitForFunction(() => document.getElementById('editMode')?.getAttribute('aria-pressed') === 'true');
-    await capture('desktop-editor');
-    const originalName = await page.locator('#mapName').inputValue();
-    await page.locator('#mapName').fill('Development smoke fixture');
-    await page.locator('#mapName').press('Tab');
-    assert.equal(await page.locator('#mapName').inputValue(), 'Development smoke fixture');
-    await page.locator('#undoBtn').click();
-    assert.equal(await page.locator('#mapName').inputValue(), originalName);
-    results.push({name: 'rename-and-undo', status: 'pass'});
-    await page.locator('#playMode').click();
-    await page.waitForFunction(() => document.getElementById('playMode').getAttribute('aria-pressed') === 'true');
-    assert.equal(await page.locator('#playPanel').isVisible(), true);
-    await page.locator('#restartBtn').click();
-    assert.equal(await page.locator('#canvasSteps').textContent(), '00');
-    await capture('desktop-play');
-    await page.locator('#editMode').click();
-    await page.waitForFunction(() => document.getElementById('editMode').getAttribute('aria-pressed') === 'true');
-    assert.equal(await page.locator('#editPanel').isVisible(), true);
-    await page.reload({waitUntil: 'networkidle'});
-    assert.equal(await page.locator('#mapName').inputValue(), originalName);
-    await capture('desktop-reload');
-    await closeContext('desktop');
-    await open({width: 390, height: 844}, '/');
-    await capture('mobile-editor');
-    await closeContext('mobile-editor');
-    await open({width: 390, height: 844}, '/game.html');
-    await page.waitForFunction(() => document.body.classList.contains('game-only'));
-    await capture('mobile-game');
-    await closeContext('mobile-game');
+    if (scenario === 'all' || scenario === 'desktop') {
+      await open({width: 1280, height: 800}, '/');
+      await page.waitForFunction(() => document.getElementById('editMode')?.getAttribute('aria-pressed') === 'true');
+      await capture('desktop-editor');
+      const originalName = await page.locator('#mapName').inputValue();
+      await page.locator('#mapName').fill('Development smoke fixture');
+      await page.locator('#mapName').press('Tab');
+      assert.equal(await page.locator('#mapName').inputValue(), 'Development smoke fixture');
+      await page.locator('#undoBtn').click();
+      assert.equal(await page.locator('#mapName').inputValue(), originalName);
+      results.push({name: 'rename-and-undo', status: 'pass'});
+      await page.locator('#playMode').click();
+      await page.waitForFunction(() => document.getElementById('playMode').getAttribute('aria-pressed') === 'true');
+      assert.equal(await page.locator('#playPanel').isVisible(), true);
+      await page.locator('#restartBtn').click();
+      assert.equal(await page.locator('#canvasSteps').textContent(), '00');
+      await capture('desktop-play');
+      await page.locator('#editMode').click();
+      await page.waitForFunction(() => document.getElementById('editMode').getAttribute('aria-pressed') === 'true');
+      assert.equal(await page.locator('#editPanel').isVisible(), true);
+      await page.reload({waitUntil: 'networkidle'});
+      assert.equal(await page.locator('#mapName').inputValue(), originalName);
+      await capture('desktop-reload');
+      await closeContext('desktop');
+    }
+    if (scenario === 'all' || scenario === 'mobile') {
+      await open({width: 390, height: 844}, '/');
+      await capture('mobile-editor');
+      await closeContext('mobile-editor');
+      await open({width: 390, height: 844}, '/game.html');
+      await page.waitForFunction(() => document.body.classList.contains('game-only'));
+      await capture('mobile-game');
+      await closeContext('mobile-game');
+    }
   } catch (error) {
     failure = error;
     if (page) await page.screenshot({path: path.join(directory, 'failure.png'), fullPage: true, timeout: 2000}).catch(() => {});
@@ -105,7 +116,7 @@ async function main() {
     if (browser) await browser.close().catch(error => {failure ??= error;});
     if (preview) await preview.app.close().catch(error => {failure ??= error;});
     if (errors.length) failure ??= new Error('Browser errors: ' + errors.join('\n'));
-    const report = {status: failure ? 'fail' : 'pass', durationMs: Math.round(performance.now() - started), results, errors,
+    const report = {scenario, status: failure ? 'fail' : 'pass', durationMs: Math.round(performance.now() - started), results, errors,
       failure: failure?.stack ?? null, limitations: 'Smoke scenarios only; screenshots and color checks do not prove visual correctness or performance.'};
     fs.writeFileSync(path.join(directory, 'report.json'), JSON.stringify(report, null, 2) + '\n');
     console.log(report.status.toUpperCase() + ' browser smoke: ' + results.length + ' scenarios; ' + report.durationMs + 'ms');
@@ -113,4 +124,6 @@ async function main() {
   }
   if (failure) throw failure;
 }
-main().catch(error => {console.error(error); process.exitCode = 1;});
+if (require.main === module) main().catch(error => {console.error(error); process.exitCode = 1;});
+
+module.exports = {parseScenario};

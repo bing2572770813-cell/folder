@@ -58,7 +58,7 @@
   },
   "visual": {
     "model": "model/bird_ai.fbx",
-    "scale": [0.015, 0.015, 0.015],
+    "scale": [0.03, 0.03, 0.03],
     "offset": [0, 0, 0],
     "rotation": [0, 0, 0],
     "textures": {}

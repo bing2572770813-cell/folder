@@ -14,7 +14,9 @@
     "paper_ai",
     "plain_ai",
     "player_token_ai",
-    "void_ai"
+    "void_ai",
+    "fragile_paper_ai",
+    "fold_switch_ai"
   ],
   "behavior": {
     "scriptId": "tag-fold",

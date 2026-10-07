@@ -47,8 +47,8 @@
   },
   "BaseEntity": [],
   "visual": {
-    "model": "model/player_witch_ai.fbx",
-    "scale": [1, 1, 1],
+    "model": "model/newwitch.fbx",
+    "scale": [0.01, 0.01, 0.01],
     "offset": [0, 0, 0],
     "rotation": [0, 0, 0],
     "textures": {}

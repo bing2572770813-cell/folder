@@ -46,9 +46,9 @@
   "visual": {
     "model": "model/snake_ai.fbx",
     "scale": [
-      0.005,
-      0.005,
-      0.005
+      0.01,
+      0.01,
+      0.01
     ],
     "offset": [
       0,

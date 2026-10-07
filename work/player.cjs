@@ -1,6 +1,7 @@
 const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
 const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
+const {ACTION_TRIGGERS,dispatchTriggerList}=require('./mechanics/trigger-list.cjs');
 function rayCells(origin,direction,width,height){
  const delta=rayEmitterConfig.directions[direction];if(!delta)throw new Error('Invalid ray emitter direction');
  const cells=[];for(let step=1;step<=3;step++){const r=origin.r+delta.r*step,c=origin.c+delta.c*step;if(r>=0&&r<height&&c>=0&&c<width)cells.push({r,c});}return cells;
@@ -180,6 +181,17 @@ function updateLifts(advance=false){const tree=world(),map=env.getMap();if(!tree
  if(changed){env.refreshLiftSurfaces?.();if(!P.animation)renderPlayer();}
  return changed;
 }
+const triggerList=[
+ {event:'beforeTransition',triggers:ACTION_TRIGGERS,handler:'foldSwitch'},
+ {event:'afterTransition',triggers:ACTION_TRIGGERS,handler:'rayEmitter'},
+ {event:'afterMechanisms',triggers:ACTION_TRIGGERS,handler:'lift'},
+];
+const triggerHandlers={
+ foldSwitch:context=>updateFoldSwitches(context.action),
+ rayEmitter:()=>fireRayEmitters(),
+ lift:()=>updateLifts(true),
+};
+function dispatchMechanismEvent(event,action){return dispatchTriggerList(triggerList,event,{action},triggerHandlers);}
 // Structural checks ignore temporary mechanisms such as the eruption cycle.
 function structuralEntryCheck(r,c){
  if(!inside(r,c))return {valid:false,reason:'目标超出地图'};
@@ -187,6 +199,8 @@ function structuralEntryCheck(r,c){
  if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked))return {valid:false,reason:'目标是阻挡方块'};
  if(nodes.some(node=>Object.hasOwn(node.components,'campfire')))return {valid:false,reason:'篝火方块不可进入'};
+ if(nodes.some(node=>Object.hasOwn(node.components,'rayEmitter')))return {valid:false,reason:'方向喷射方块不可进入'};
+ if(nodes.some(node=>Object.hasOwn(node.components,'foldSwitch')))return {valid:false,reason:'折线开关方块不可进入'};
  return {valid:true,reason:''};
 }
 function treeEvent(type,position,actor=P.terrainState,runtime=world().snapshotRuntime(),nodes=activeAt(position.r,position.c),trigger){
@@ -327,14 +341,14 @@ function arrive(trigger){
  else{P.terrainState=enterTerrain(env.getMap(),P.player,P.terrainState).state;collectKey();}
 }
 function settleAction(action){
- updateFoldSwitches(action);
+ dispatchMechanismEvent('beforeTransition',action);
  P.terrainState=finishAction(P.terrainState);
  const transitioned=!P.terrainState.gameOver&&transitionRegion();
  if(transitioned)arrive(Trigger.Teleport);
- fireRayEmitters();
+ dispatchMechanismEvent('afterTransition',action);
  if(!switchesOpen()&&exitIsValid()&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='仍有状态为 0 的折线开关，出口尚未开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
- updateLifts(true);return transitioned;
+ dispatchMechanismEvent('afterMechanisms',action);return transitioned;
 }
 // Compatibility helper for direct terrain simulations; gameplay uses turnManager.
 function applyTerrainEntry(trigger=Trigger.Walk){arrive(trigger);return settleAction();}

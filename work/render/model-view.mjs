@@ -22,7 +22,7 @@ export function createModelView({layer,library,onChange=()=>{},onError=()=>{}}){
       pending.error=error;onError(pending.descriptor,error);
      });
     }
-    entry.descriptor=descriptor;entry.host.userData.cell=descriptor.cell;
+    entry.descriptor=descriptor;entry.host.userData.cell=descriptor.cell?{...descriptor.cell,nodeId:descriptor.nodeId??descriptor.cell.nodeId}:undefined;
     entry.host.position.fromArray(descriptor.position);entry.host.rotation.y=-(descriptor.dir??0)*Math.PI/4;
     if(entry.instance){if(!entry.instance.parent)entry.host.add(entry.instance);(descriptor.parent??layer).add(entry.host);ready.add(id);}
    }

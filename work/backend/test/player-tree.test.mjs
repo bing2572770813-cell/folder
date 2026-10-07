@@ -230,6 +230,16 @@ test('play validation checks overlays and exit uses stable structural walkabilit
  f.add('blocked-exit',1,1,{collision:{blocked:true}});assert.equal(f.controller.exitIsValid(),false);assert.equal(f.controller.validateForPlay().valid,false);
 });
 
+test('play validation rejects exits on permanently inaccessible mechanism tiles',()=>{
+ const f=fixture();
+ f.map.exit={r:1,c:1};
+ f.add('emitter-exit',1,1,{rayEmitter:{initialDirection:'north'}});
+ assert.equal(f.controller.validateForPlay().valid,false);
+ f.world.remove('emitter-exit',true);
+ f.add('switch-exit',1,1,{foldSwitch:{initialState:1}});
+ assert.equal(f.controller.validateForPlay().valid,false);
+});
+
 test('invalid spawn components return a validation failure before any event or runtime change',()=>{
  for(const components of [{unknown:{}},{fire:{damage:-1}}]){const f=fixture();f.add('invalid-start',1,0,components);const before=structuredClone(f.state),runtime=f.world.snapshotRuntime();assert.doesNotThrow(()=>f.controller.validateForPlay());assert.equal(f.controller.validateForPlay().valid,false);assert.deepEqual(f.state,before);assert.deepEqual(f.world.snapshotRuntime(),runtime);}
  });

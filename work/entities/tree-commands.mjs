@@ -178,7 +178,11 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
  if(category==='terrain'){
   // Terrain replacement removes the paper and old terrain only. Items and
   // creatures are independent overlays and must survive the replacement.
-  const removed=[...new Map([...targets.values()].filter(isTerrainNode).map(node=>[node.id,node])).values()];
+  const removedMap=new Map();
+  for(const root of [...targets.values()].filter(isTerrainNode))
+   for(const transformId of subtree(world,root.transformId))
+    for(const node of world.forTransform(transformId))if(isTerrainNode(node))removedMap.set(node.id,node);
+  const removed=[...removedMap.values()];
   const ids=new Set(removed.map(node=>node.transformId));
   check(world,[...ids],options.isHidden,options.nodeHidden);
   for(const node of removed){const f=world.transforms.get(node.transformId).footprint;if(f.width>1||f.height>1)throw new Error('不能覆盖多方块实体，请先删除整个实体');}

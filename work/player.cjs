@@ -1,5 +1,4 @@
 const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
-const defaultIcePrefab=require('../assets/prefab/entity/ice_ai.json');
 const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
 const firebirdRules=require('./mechanics/firebird.cjs');
@@ -177,35 +176,20 @@ function updateFoldSwitches(action){
   const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;tree.setRuntime(node.id,'foldSwitch',{state:state===1?0:1});playSound?.(state===1?'switch-close':'switch-open');
  }
 }
-function isRayTerrain(node){
- if(node.static.entityType==='creature'||node.static.entityType==='prop'||node.components.rayEmitter||node.components.firebird||node.configuration?.kind==='player-token')return false;
- return node.static.entityType==='terrain'||!!node.components.surface||['campfire','ice','fire','eruption','foldSwitch'].some(id=>node.components[id]);
-}
-function iceReplacement(node,prefab,tree){
- const tile=prefab.tile??{},surface=node.components.surface;
- // Legacy terrain-only overlays are silenced; their supporting surface becomes the single ice entity.
- if(!surface)return {...node,prefabId:prefab.id,components:{...(node.components.fold?{fold:clone(node.components.fold)}:{} )},static:{...node.static,transparent:true,walkable:true},configuration:{prefabId:prefab.id}};
- const height=node.components.lift?(tree.runtime(node.id,'lift').height??node.components.lift.initialHeight):(surface.height??node.configuration?.height??.09);
- const geometry=Object.fromEntries(['thickness','gradualRate','edgeColor'].filter(key=>surface[key]!==undefined).map(key=>[key,surface[key]]));
- const components={...clone(prefab.components??{}),surface:{...geometry,height,color:tile.color??'blue',connected:false},collision:{blocked:tile.blocked??false},ice:clone(prefab.components?.ice??tile.terrainConfig??{}),physics:{...clone(prefab.components?.physics??{}),followFold:tile.followFold??false},...(node.components.fold?{fold:clone(node.components.fold)}:{}),...(node.components.key?{key:clone(node.components.key)}:{})};
- return {id:node.id,prefabId:prefab.id,transformId:node.transformId,components,tags:clone(node.tags),static:{...clone(prefab.static??{}),entityType:'terrain',walkable:prefab.static?.walkable??true},configuration:{...clone(tile),...geometry,height,color:tile.color??'blue',blocked:tile.blocked??false,prefabId:prefab.id,...(prefab.visual?{visual:clone(prefab.visual)}:{})}};
-}
 function fireRayEmitters(){
  const tree=world(),map=env.getMap();if(!tree)return;
- const emitters=tree.serialize().filter(node=>node.components.rayEmitter);if(!emitters.length&&!tree.snapshotReplacements?.().length)return;
- // Restore all original terrain first, then combine every current beam before replacing.
- tree.replaceRuntimeEntities([]);const affected=new Map(),prefab=env.getEntityPrefab?.('ice_ai')??defaultIcePrefab;
+ const emitters=tree.serialize().filter(node=>node.components.rayEmitter);if(!emitters.length)return;
+ let changed=false;
  for(const node of emitters){
   const origin=tree.cells(node.id)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
   const previous=tree.runtime(node.id,'rayEmitter'),triggered=componentTriggerMatches(node.components.rayEmitter,P.turn.trigger);
   if(!triggered&&!previous.fired)continue;
   const direction=triggered&&previous.fired?rayEmitterConfig.directions[previous.direction??node.components.rayEmitter.initialDirection].opposite:(previous.direction??node.components.rayEmitter.initialDirection);
-  const lastShot=rayCells(origin,direction,map.width,map.height);
-  if(triggered){tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot,shotDirection:direction});playSound?.('fire-spit');}
-  if(triggered&&lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被射线冻死';}
-  for(const cell of lastShot){if(env.isHidden(cell.r,cell.c))continue;const nodes=activeAt(cell.r,cell.c);if(!nodes.some(owner=>owner.components.surface))continue;for(const owner of nodes)if(isRayTerrain(owner))affected.set(owner.id,owner);}
+  const danger=rayCells(origin,previous.direction??node.components.rayEmitter.initialDirection,map.width,map.height);
+  if(triggered&&!env.isHidden(P.player.r,P.player.c)&&activeAt(P.player.r,P.player.c).some(owner=>owner.components.surface)&&danger.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被射线冻死';}
+  if(triggered){tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot:rayCells(origin,direction,map.width,map.height),shotDirection:direction});playSound?.('fire-spit');changed=true;}
  }
- tree.replaceRuntimeEntities([...affected.values()].map(node=>iceReplacement(node,prefab,tree)));buildPaper();
+ if(changed){if(env.refreshMechanismSurfaces)env.refreshMechanismSurfaces();else buildPaper();}
 }
 // Notification deduplication is presentation-only; threat itself is derived from live entities.
 let previousFirebirdThreat=new Map();

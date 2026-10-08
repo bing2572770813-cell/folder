@@ -23,7 +23,13 @@ export function mechanismMarker(THREE,components,runtime={}){
  group.traverse(object=>{object.raycast=()=>{};});return group;
 }
 
-export function shotMarker(THREE,{last=false}={}){
- const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.84,.84),new THREE.MeshBasicMaterial({color:last?'#e04b3d':'#3e91a8',opacity:last?.34:.075,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
- mesh.rotation.x=-Math.PI/2;mesh.raycast=()=>{};mesh.userData.lastShot=last;return mesh;
+export function shotMarker(THREE,{last=false,iceTexture=null}={}){
+ const group=new THREE.Group();
+ const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.94,.94),new THREE.MeshBasicMaterial({color:last?'#e04b3d':'#7ebed3',opacity:.72,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+ mesh.rotation.x=-Math.PI/2;group.add(mesh);
+ if(iceTexture){
+  const icon=new THREE.Mesh(new THREE.PlaneGeometry(.72,.72),new THREE.MeshBasicMaterial({map:iceTexture,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
+  icon.rotation.x=-Math.PI/2;icon.position.y=.006;group.add(icon);
+ }
+ group.traverse(object=>{object.raycast=()=>{};});group.userData.lastShot=last;group.userData.iceIcon=!!iceTexture;return group;
 }

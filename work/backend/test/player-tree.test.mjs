@@ -331,10 +331,13 @@ test('closed eruption entry stays structurally valid and reports an atomic runti
 
 test('region arrival commits destination effects once and counts only the original action',()=>{
  const f=fixture([['destination-fire',2,3,{fire:{}}],['destination-key',2,3,{key:{name:'铜'}}]]);
+ f.registry.register('destinationAction',{events:{action:()=>({actor:{destinationActionSeen:true}})}});
  f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+ f.add('destination-action',2,3,{destinationAction:{}});f.controller.resetRegions();
  f.move(1,1);assert.deepEqual(f.state.player,{r:2,c:3,dir:2});assert.equal(f.state.steps,1);
  assert.equal(f.state.terrainState.actions,1);assert.equal(f.state.terrainState.overheat,1);
  assert.deepEqual(f.state.terrainState.collectedKeys,['铜']);assert.deepEqual(f.world.runtime('destination-key','key'),{collected:true});
+ assert.equal(f.state.terrainState.destinationActionSeen,undefined,'target entities must not receive the exit action trigger');
 });
 
 

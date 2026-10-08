@@ -412,17 +412,26 @@ function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();upda
 function testTeleport(r,c){return turnManager.execute({trigger:Trigger.Teleport,source:'test',r,c});}
 function setFoldHints(enabled){P.foldHints=!!enabled;const axis=P.chosenFold,selected=env.getSelectionRing().visible;if(axis)selectFold(axis.r,axis.c,axis.type);else if(selected)selectPlayer();updateUI();}
 function animatePlayer(from,to,type,turnId,fromPosition){const map=env.getMap();P.moving=true;P.animation={start:performance.now(),duration:type==='teleport'?480:220,fromCell:{...from},toCell:{...to},fromPosition:fromPosition?.clone(),from:fromPosition?.clone()??new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,turnId,checkEnd:true};updateUI();}
-function transitionRegion(){
- const tile=env.getMap().tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;
- if(!switchesOpen(tile.tags)){P.terrainState.message='出口绑定的开关尚未全部开启';return false;}
- const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}
+function prepareRegionTransition(){
+ const tile=env.getMap().tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return null;
+ if(!switchesOpen(tile.tags)){P.terrainState.message='出口绑定的开关尚未开启';return null;}
+ const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return null;}
  const entry=taggedCells(configuredMap(),'entry').find(p=>regionOf(p.tile)===target);
- if(!entry){revealRegion(target);buildPaper();toast('显示区域：'+target);return false;}
- const wasRevealed=P.revealedRegions.has(target);revealRegion(target);
- const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);
- if(!check.valid){if(!wasRevealed){P.revealedRegions.delete(target);syncRegionEntities();}P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}
- leaveTree(P.player,Trigger.Teleport);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;
+ if(!entry)return {target,entry:null};
+ const check=withConfiguredWorld(()=>entryCheck(entry.r,entry.c,true,Trigger.Teleport),true);
+ if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return null;}
+ return {target,entry};
 }
+function commitRegionTransition(transition,{deferReveal=false}={}){
+ if(!transition)return false;
+ const {target,entry}=transition;
+ if(!entry){if(!deferReveal){revealRegion(target);buildPaper();toast('显示区域：'+target);}return false;}
+ if(!deferReveal)revealRegion(target);
+ leaveTree(P.player,Trigger.Teleport);P.player={r:entry.r,c:entry.c,dir:P.player.dir};
+ if(!deferReveal){buildPaper();toast('进入区域：'+target);}
+ return true;
+}
+function transitionRegion(){return commitRegionTransition(prepareRegionTransition());}
 function collectKey(){if(world()){const tree=world(),nodes=tree.at(P.player.r,P.player.c).filter(node=>Object.hasOwn(node.components,'key')&&node.static.walkable!==false&&!node.components.collision?.blocked&&!tree.runtime(node.id,'key').collected).map(node=>({...node,components:{key:node.components.key}}));if(nodes.length)commitTreeEvent('enter',P.player,nodes);return;}const tile=env.getMap().tiles[P.player.r]?.[P.player.c];if(tile?.terrain!=='key'||blocked(tile))return;const name=tile.keyName?.trim()||'钥匙';P.terrainState.collectedKeys=[...new Set([...P.terrainState.collectedKeys,name])];P.terrainState.hasKey=true;P.terrainState.message='获得钥匙：'+name;}
 function arrive(trigger){
  if(world())enterTree(trigger);
@@ -431,13 +440,17 @@ function arrive(trigger){
 function settleAction(action={trigger:P.turn.trigger??Trigger.Walk}){
  updateFoldSwitches(action);
  P.terrainState=finishAction(P.terrainState);
- const transitioned=!P.terrainState.gameOver&&transitionRegion();
- if(transitioned)arrive(Trigger.Teleport);
+ const transition=!P.terrainState.gameOver&&prepareRegionTransition();
  const actionResult=broadcastAction(action.trigger);if(!actionResult.valid)throw new Error(actionResult.reason||'行动广播失败');
+ const transitioned=!P.terrainState.gameOver&&commitRegionTransition(transition,{deferReveal:true});
  fireRayEmitters();
  refreshFirebirdThreat();
  if(!P.terrainState.gameOver)updateFirebirds(action);
  refreshFirebirdThreat(false);
+ if(transition){
+  if(transition.entry){revealRegion(transition.target);buildPaper();toast('进入区域：'+transition.target);if(transitioned&&!P.terrainState.gameOver)arrive(Trigger.Teleport);}
+  else commitRegionTransition(transition);
+ }
  if(exitIsValid()&&!switchesOpen(env.getMap().tiles[env.getMap().exit.r]?.[env.getMap().exit.c]?.tags)&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='出口绑定的开关尚未全部开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;

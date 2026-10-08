@@ -283,7 +283,7 @@ const visualAssetSource=createVisualAssetSource({offline:Boolean(EMBEDDED_ASSETS
 const modelLibrary=createModelLibrary({load:createFbxModelLoader(visualAssetSource)});
 let modelErrorKey='';
 const modelView=createModelView({layer:modelLayer,library:modelLibrary,onChange:()=>buildPaper(),onError:(descriptor,error)=>{const key=descriptor.id+':'+error.message;if(key!==modelErrorKey){modelErrorKey=key;console.warn('模型加载失败',descriptor.id,error);}}});
-let brokenViewKey='';
+let brokenViewKey='',replacedFirebirdViewKey='';
 
 const visibility={coords:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
@@ -358,7 +358,7 @@ function rebuildPaper() {
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
-  refreshModels();
+  refreshModels(true);
   paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
@@ -467,12 +467,18 @@ function refreshLiftSurfaces(){
  refreshMechanismMarkers();
 }
 function refreshMechanismSurfaces(){
- const key=documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|');
- if(key!==brokenViewKey){brokenViewKey=key;buildPaper();}else refreshMechanismMarkers();
+  const nodes=documentModel.world.serialize(),key=nodes.filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'),firebirdKey=nodes.filter(node=>node.components.firebird&&documentModel.world.runtime(node.id,'firebird').replaced).map(node=>node.id).sort().join('|');
+  if(key!==brokenViewKey){brokenViewKey=key;buildPaper();return;}
+  if(firebirdKey!==replacedFirebirdViewKey){replacedFirebirdViewKey=firebirdKey;refreshModels(true);}
+  refreshMechanismMarkers();
+}let modelDescriptorKey='';
+function refreshModels(force=false){
+ const descriptors=P.mode==='play'?collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id),nodeHidden,cellHidden,runtime:true,wx,wz,tileTop}):[];
+ const key=JSON.stringify(descriptors.map(({id,visual,cells,position,dir})=>({id,visual,cells,position,dir})));
+ if(!force&&key===modelDescriptorKey)return;
+ modelDescriptorKey=key;return modelView.update(descriptors);
 }
-function refreshModels(){return modelView.update(P.mode==='play'?collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id),nodeHidden,cellHidden,runtime:true,wx,wz,tileTop}):[]);}
 function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
- refreshModels();
  disposableClear(mechanismLayer);disposableClear(rayLayer);
  brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
  const enemyCells=documentModel.world.serialize().filter(node=>node.static.entityType==='creature'&&(node.components.rayEmitter||node.components.firebird)&&!nodeHidden(node)).flatMap(node=>{

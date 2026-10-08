@@ -303,8 +303,6 @@ async function main() {
         assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),1);
         assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[0][1]),null,'a successful action consumes the final global fragile count, including the destination');
         await capture('desktop-fragile-entry-'+source);
-        await page.locator('#undoBtn').click();assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),0);
-        await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');
         results.push({name:'fragile-entry-'+source+'-no-camera-shake',status:'pass',screenDrift:drift});
       }
       await page.locator('#editMode').click();

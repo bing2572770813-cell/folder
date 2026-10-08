@@ -77,6 +77,14 @@ async function main() {
       await open({width: 1280, height: 800}, '/');
       await page.waitForFunction(() => document.getElementById('editMode')?.getAttribute('aria-pressed') === 'true');
       await capture('desktop-editor');
+      {
+        const muted=await page.locator('#audioMute').getAttribute('aria-pressed');
+        await page.locator('#audioMute').click();assert.equal(await page.locator('#audioMute').getAttribute('aria-pressed'),String(muted!=='true'));
+        await page.locator('#audioVolume').evaluate(element=>{element.value='0.35';element.dispatchEvent(new Event('input',{bubbles:true}));});
+        assert.equal(await page.locator('#audioMute').getAttribute('aria-pressed'),'false');
+        assert.equal(await page.locator('#audioVolume').inputValue(),'0.35');
+        results.push({name:'merged-audio-mute-and-volume-controls',status:'pass'});
+      }
       const originalName = await page.locator('#mapName').inputValue();
       await page.locator('#mapName').fill('Development smoke fixture');
       await page.locator('#mapName').press('Tab');
@@ -293,7 +301,7 @@ async function main() {
         fs.writeFileSync(path.join(directory,'fragile-entry-'+source+'-trace.json'),JSON.stringify(samples));
         assert.ok(drift<1,'entering fragile paper from '+source+' must not shake camera: '+drift);
         assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),1);
-        assert.notEqual(await page.evaluate(()=>window.foldField.getState().map.tiles[0][1]),null,'entry must not break fragile paper');
+        assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[0][1]),null,'a successful action consumes the final global fragile count, including the destination');
         await capture('desktop-fragile-entry-'+source);
         await page.locator('#undoBtn').click();assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),0);
         await page.locator('#restartBtn').click();assert.equal(await page.locator('#canvasSteps').textContent(),'00');

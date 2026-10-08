@@ -20,13 +20,20 @@
     true
   ],
   "components": {
-    "fragile": {}
+    "fragile": {
+      "count": 1
+    }
   },
   "propertySchema": {
     "components": {
       "children": {
         "fragile": {
-          "children": {}
+          "children": {
+            "count": {
+              "label": "触发次数",
+              "tempEditable": true
+            }
+          }
         }
       }
     }

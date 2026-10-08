@@ -17,10 +17,12 @@ assert.deepEqual(boundedFollowTarget(new Vector3(6,1,4),14,10,4.5).toArray(),[4.
 console.log('PASS: boundary clamping, small-map centering and zoom-aware follow limits.');
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
 const appSource=readFileSync(new URL('./app.ts',import.meta.url),'utf8');const tickSource=appSource.slice(appSource.indexOf('function tick(now)'),appSource.indexOf('\nresetRegions();',appSource.indexOf('function tick(now)')));
-let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
+let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0,player:{r:0,c:0}},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
 Object.assign(context,{cameraInteraction:{active:false},lastZoomLabel:null,diagnosticsEnabled:false});
 context.renderer.shadowMap={needsUpdate:false};
-runInNewContext(tickSource,context);context.tick(0);assert.equal(corrections,0,'idle player must not undo manual pan');position.x=2;context.tick(1);assert.equal(corrections,1,'movement corrects camera');context.manualPan=true;context.P.moving=true;context.tick(2);assert.equal(corrections,1,'active right drag is respected');context.manualPan=false;context.tick(3);assert.equal(corrections,2,'correction resumes after pan');
+context.documentModel={world:{at:()=>[]}};context.paper={position:{y:0}};
+const followPositionSource=appSource.slice(appSource.indexOf('function getCameraFollowPosition('),appSource.indexOf('function correctFollowCamera('));
+runInNewContext(followPositionSource+'\n'+tickSource,context);context.tick(0);assert.equal(corrections,0,'idle player must not undo manual pan');position.x=2;context.tick(1);assert.equal(corrections,1,'movement corrects camera');context.manualPan=true;context.P.moving=true;context.tick(2);assert.equal(corrections,1,'active right drag is respected');context.manualPan=false;context.tick(3);assert.equal(corrections,2,'correction resumes after pan');
 let axes=0;context.updateFoldAxes=()=>axes++;context.cameraInteraction.active=true;context.tick(4);assert.equal(axes,0,'camera gestures skip fold-axis work');context.cameraInteraction.active=false;context.tick(5);assert.equal(axes,1,'fold-axis work resumes after camera gestures');
 let diagnostics=0;context.screenPoints=()=>diagnostics++;context.renderedFrames=9;context.tick(6);assert.equal(diagnostics,0,'default rendering does not write diagnostics');context.diagnosticsEnabled=true;context.renderedFrames=19;context.tick(7);assert.equal(diagnostics,1,'diagnostics are explicitly enabled');context.cameraInteraction.active=true;context.renderedFrames=29;context.tick(8);assert.equal(diagnostics,1,'camera gestures suspend diagnostics');
 console.log('PASS: production camera loop preserves idle pan and corrects after movement.');
@@ -31,3 +33,11 @@ assert.equal(context.renderer.shadowMap.needsUpdate,true,'last animation frame r
 context.renderer.shadowMap.needsUpdate=false;context.P.foldMotion={phase:'return'};context.tick(11);
 assert.equal(context.renderer.shadowMap.needsUpdate,true,'fold rebound refreshes shadows');
 console.log('PASS: idle camera frames reuse shadows; movement completion and folding invalidate them.');
+
+// The same production adapter must ignore surface crumble while retaining normal height tracking.
+const fragile={id:'fragile',components:{surface:{height:.7},fragile:{count:1}}};
+let fragileState={breaking:true,progress:.5};context.documentModel.world={at:()=>[fragile],runtime:()=>fragileState};
+position.y=.2;assert.equal(context.getCameraFollowPosition(new Vector3()).y,.718);
+fragileState={broken:true};position.y=.018;assert.equal(context.getCameraFollowPosition(new Vector3()).y,.718);
+fragileState={remaining:1};assert.equal(context.getCameraFollowPosition(new Vector3()).y,.018);
+console.log('PASS: crumbling/broken player support retains camera height; ordinary height tracking remains active.');

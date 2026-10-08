@@ -38,6 +38,39 @@ const esbuild = require("esbuild");
   assert.equal(nodeForm.querySelector('[aria-label="阻挡 (components.collision.blocked)"]').getAttribute('type'), 'checkbox');
   assert.ok(nodeForm.querySelector('[aria-label="所需钥匙 1"]'));
   assert.equal(nodeForm.querySelector('textarea'), null);
+  const triggerForm = parseHTML(module.exports.renderInspectorMarkup({
+    values: { components: { rayEmitter: { initialDirection: 'north', triggers: ['walk', 'teleport'] }, foldSwitch: { initialState: 0, triggers: ['walk', 'teleport'] } } },
+    schema: { components: { children: {
+      rayEmitter: { children: { initialDirection: { tempEditable: true } } },
+      foldSwitch: { children: { initialState: { tempEditable: true } } },
+    } } },
+    mixed: new Set(), onChange: () => {}, onError: () => {}, options: {
+      structured: true, expanded: true,
+      choices: {
+        'components.rayEmitter.initialDirection': [
+          { value: 'north', label: '上（北）' }, { value: 'east', label: '右（东）' },
+        ],
+        'components.foldSwitch.initialState': [
+          { value: 0, label: '0（关闭）' }, { value: 1, label: '1（开启）' },
+        ],
+      },
+    },
+  })).document;
+  assert.equal(triggerForm.querySelector('[aria-label="初始朝向 (components.rayEmitter.initialDirection)"]').tagName, 'SELECT');
+  assert.equal(triggerForm.querySelector('[aria-label="初始状态 (components.foldSwitch.initialState)"]').tagName, 'SELECT');
+  assert.ok(triggerForm.querySelector('[aria-label="冰冻射线 · 触发方式 · 行走触发"]'));
+  assert.ok(triggerForm.querySelector('[aria-label="冰冻射线 · 触发方式 · 传送触发"]'));
+  const mechanismForm = parseHTML(module.exports.renderInspectorMarkup({
+    values: { mechanism: { type: 'foldSwitch', triggers: ['walk', 'teleport'] } },
+    schema: { mechanism: { children: { type: { tempEditable: false }, triggers: { label: '触发方式', tempEditable: true } } } },
+    mixed: new Set(), onChange: () => {}, onError: () => {}, options: { structured: true, expanded: true },
+  })).document;
+  assert.equal(mechanismForm.querySelector('.trigger-editor-title').textContent, '触发条件');
+  assert.ok(mechanismForm.querySelector('.trigger-editor-row[data-trigger="walk"]'));
+  assert.ok(mechanismForm.querySelector('.trigger-editor-row[data-trigger="teleport"]'));
+  assert.equal(mechanismForm.querySelector('.trigger-editor-row[data-trigger="walk"] .trigger-editor-label').textContent, '行走触发');
+  assert.equal(mechanismForm.querySelector('.trigger-editor-row[data-trigger="teleport"] .trigger-editor-label').textContent, '传送触发');
+  assert.equal(mechanismForm.querySelector('.trigger-editor-help').textContent, '至少保留一种触发方式');
   const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(document.getElementById('lighting-directional').closest('[role="tabpanel"]').id,'panelPhysics');

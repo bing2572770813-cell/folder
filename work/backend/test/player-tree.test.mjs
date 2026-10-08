@@ -47,6 +47,18 @@ test('walk and teleport carry exclusive causes through leave and enter',()=>{
  f.controller.restart();assert.equal(f.state.turn.number,0);assert.equal(f.state.turn.phase,'idle');
 });
 
+test('mechanism component trigger settings apply per node',()=>{
+ const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,turnsPerLeg:3,triggers:['teleport']}}]]);
+ f.controller.selectPlayer();
+ f.controller.movePlayer(1,1);
+ assert.equal(f.world.runtime('lift','lift').height,.1);
+ f.controller.tick(performance.now()+1000);
+ f.controller.undo();
+ f.controller.setFreeTeleport(true);
+ assert.equal(f.controller.testTeleport(2,3),true);
+ assert.equal(f.world.runtime('lift','lift').height,.4);
+});
+
 test('walking into region exit enters destination by teleport within one turn',()=>{
  const f=fixture();f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
  f.registry.register('arrival',{events:{enter:context=>({actor:{arrival:context.trigger,arrivals:[...(context.actor.arrivals??[]),context.trigger]}})}});

@@ -88,18 +88,20 @@ test('entering fragile paper keeps departure height even when the source lift ad
  assert.equal(sourceHeight,1.7);
  f.controller.tick(f.state.animation.start+20);
  assert.equal(f.state.animation.from.y,.718,'departed terrain must not drag the player animation or camera upward');
- assert.deepEqual(f.world.runtime('destination-fragile','fragile'),{},'entering must not break the target');
+ assert.equal(f.world.runtime('destination-fragile','fragile').breaking,true,'successful arrival broadcasts the action to the target');
 });
 test('fragile scene refresh cannot lower the departure animation or shake camera tracking',()=>{
  const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
  const position=new THREE.Vector3(1,.718,2);
  f.env.getPlayerGroup().position.copy(position);
- f.env.refreshMechanismSurfaces=()=>{if(f.world.runtime('fragile','fragile').broken)f.map.tiles[2][1]=null;};
+ f.env.refreshMechanismSurfaces=()=>{const state=f.world.runtime('fragile','fragile');if(state.broken||state.breaking)f.map.tiles[2][1]=null;};
  f.controller.selectPlayer();assert.equal(f.controller.movePlayer(2,2),true);
- assert.equal(f.map.tiles[2][1],null);
+ assert.equal(f.world.runtime('fragile','fragile').breaking,true);
  assert.deepEqual(f.state.animation.from.toArray(),position.toArray(),'capture the rendered departure pose before destruction');
  f.controller.tick(f.state.animation.start+20);
+ assert.equal(f.map.tiles[2][1],null);
  assert.deepEqual(f.state.animation.from.toArray(),position.toArray(),'animation frames must not resample a destroyed departure surface');
+ f.controller.tick(f.state.animation.start+1000);
  assert.equal(f.world.runtime('fragile','fragile').broken,true);
 });
 test('placed firebird activates once after arrival, with undo/restart restoring its runtime',()=>{
@@ -178,15 +180,22 @@ test('switch placement requires exactly one crease, one cell and supported terra
  node.components.fold.directions=[];f.world.remove(node.id);f.world.add(node);assert.throws(()=>validateTerrainStacking(f.world),/恰好一条/);
 });
 
-test('fragile paper breaks on successful departure; failed moves, previews, undo and restart preserve it',()=>{
+test('fragile paper consumes global actions; failed moves, previews, undo and restart preserve it',()=>{
  const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
  const before=f.controller.snapshot();f.controller.selectPlayer();
  assert.equal(f.controller.movePlayer(99,99),false);assert.deepEqual(f.world.runtime('fragile','fragile'),{});
  assert.equal(f.move(2,2),true);assert.equal(f.world.runtime('fragile','fragile').broken,true);
  assert.equal(f.controller.canMoveTo(2,1),false,'broken support is void even if other owners remain');
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.controller.canMoveTo(2,1),true);
- f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').broken,true);
- f.controller.tick(performance.now()+1000);f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').breaking,true);f.controller.tick(performance.now()+1000);assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
+});
+
+test('broken fragile paper ignores later global actions',()=>{
+ const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
+ f.move(2,2);assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);
+ const state=f.world.runtime('fragile','fragile');assert.equal(state.broken,true);assert.equal(state.breaking,undefined);
 });
 
 
@@ -279,4 +288,21 @@ test('ray freeze death is not overwritten by subsequent firebird hazard processi
   world.add({id:'bird-priority',prefabId:'firebird_ai',transformId:'t-bird-priority',components:{firebird:{direction:'west'}},tags:{},static:{entityType:'creature'}});
  });
  f.move(3,1);assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.terrainState.message,'被射线冻死');assert.deepEqual(f.state.terrainState.flames,[]);
+});
+
+
+test('merged trigger settings preserve freeze until the next matching action and only play shot audio on firing',()=>{
+ const sounds=[];
+ const f=fixture('east',{r:3,c:0},()=>0,({world,env})=>{
+  const emitter=world.get('emitter');world.remove('emitter');emitter.components.rayEmitter.triggers=['walk'];world.add(emitter);
+  env.playSound=name=>sounds.push(name);
+ });
+ assert.equal(f.move(2,2),true);const fired=f.world.runtime('emitter','rayEmitter');
+ assert.equal(fired.direction,'east');assert.equal(f.world.get('3-1').prefabId,'ice_ai');
+ f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(1,1),true);f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.world.runtime('emitter','rayEmitter'),fired);assert.equal(f.world.get('3-1').prefabId,'ice_ai');
+ assert.equal(sounds.filter(name=>name==='fire-spit').length,1);
+ assert.equal(f.move(1,2),true);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');
+ assert.equal(f.world.get('3-1').prefabId,'test');assert.equal(sounds.filter(name=>name==='fire-spit').length,2);
+ f.controller.undo();assert.deepEqual(f.world.runtime('emitter','rayEmitter'),fired);assert.equal(f.world.get('3-1').prefabId,'ice_ai');
 });

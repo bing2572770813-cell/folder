@@ -32,6 +32,10 @@
             "initialState": {
               "label": "初始状态（0 关闭 / 1 开启）",
               "tempEditable": true
+            },
+            "triggers": {
+              "label": "触发方式",
+              "tempEditable": true
             }
           }
         }

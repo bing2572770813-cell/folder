@@ -61,6 +61,9 @@ import {projectProperties,updateProperty,mergeSerializableProperties,debugChange
 import {DebugState} from './editor/debug-state.mjs';
 import {renderEntityGrid,renderEntityChecklist,renderNameChecklist,renderRegionChecklist,renderMechanismText} from './ui/react/catalogs.jsx';
 import {renderPropertyInspector,clearPropertyInspector} from './ui/property-inspector.mjs';
+import {triggerEditorChoiceMap} from './ui/trigger-editor-options.mjs';
+import {normalizeComponentTriggers} from './mechanics/trigger-list.cjs';
+import {createAudioSystem} from './audio-system.mjs';
 import { createTerrainState, canEnterTerrain, enterTerrain, finishAction, validateTerrains } from './entities/mechanism-rules.mjs';
 import { Copy, ClipboardPaste, Redo2, FlameKindling, Snowflake, Flame, Mountain, KeyRound, MoveVertical } from 'lucide';
 import {Trash2} from 'lucide';
@@ -68,9 +71,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {LineSegments2} from 'three/examples/jsm/lines/LineSegments2.js';
 import {LineSegmentsGeometry} from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import {LineMaterial} from 'three/examples/jsm/lines/LineMaterial.js';
-import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2 } from 'lucide';
+import { createElement, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Volume2, VolumeX } from 'lucide';
 
-const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Copy, ClipboardPaste, Redo2 };
+const icons = { Trash2, Origami, FilePlus2, FolderOpen, Download, Pencil, Play, Paintbrush, SquarePlus, Eraser, Split, Navigation, Flag, Grid2x2, X, RotateCcw, RotateCw, Scaling, Waypoints, Box, Layers2, Plus, Minus, Scan, Undo2, Compass, Square, Table2, Volume2, VolumeX, Copy, ClipboardPaste, Redo2 };
 for (const node of document.querySelectorAll<HTMLElement>('[data-lucide]')) {
   const name=(node.dataset.lucide??'').replace(/(^|-)([a-z0-9])/g,(_,prefix,char)=>char.toUpperCase());
   const icon=icons[name as keyof typeof icons];
@@ -141,6 +144,7 @@ let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePr
 let tagCatalog=(window.__FOLD_FIELD_TAGS__||[]).map(normalizeTagPrefab);
 let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs.find(isPlaceableEntity)?.id??null;
 const getPlayerPrefab=()=>prefabs.find(p=>p.id==='player_ai');
+const audio=createAudioSystem(window.__FOLD_FIELD_AUDIO_ASSETS__||{});
 function brushTile(){const selected=prefabs.find(p=>p.id===selectedPrefabId);if(selected&&!selected.tile)return {prefabId:selected.id};const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,...(prefab.tile.lift?{lift:{...prefab.tile.lift,initialHeight:brushHeight}}:{}),thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let documentModel=new TreeDocument(defaultMap());
 let map=documentModel.view(),tool='place',color='white',foldType='h';
@@ -161,7 +165,7 @@ window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersisten
 const foldableCells=new Set();
 let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,playSound:audio.play,playMusic:audio.playMusic,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -215,7 +219,17 @@ let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
 let cameraMode='edit',editorCameraSnapshot=null;
 const cameraFollowTarget=new THREE.Vector3();
 const lastFollowPosition=new THREE.Vector3();let lastFollowSteps=0;
-function correctFollowCamera(){const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;playerGroup.getWorldPosition(lastFollowPosition);lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
+// Follow the support plane, not the crumbling surface animation.
+function getCameraFollowPosition(target){
+ playerGroup.getWorldPosition(target);
+ const nodes=documentModel.world.at(P.player.r,P.player.c);
+ if(nodes.some(node=>{if(!node.components.fragile)return false;const state=documentModel.world.runtime(node.id,'fragile');return state.breaking||state.broken;})){
+  const supports=nodes.filter(node=>node.components.surface);
+  if(supports.length)target.y=Math.max(...supports.map(node=>Number(node.components.surface.height??.09)))+.018+paper.position.y;
+ }
+ return target;
+}
+function correctFollowCamera(){const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;getCameraFollowPosition(lastFollowPosition);lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
 const paper=new THREE.Group(); scene.add(paper);
 const tableScenery=createTableScene(); scene.add(tableScenery.group);
 function paperUnderside(){return tabletopHeight(map,cellHidden); }
@@ -447,7 +461,7 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
  for(const cell of [...cells.surfaceCells,...enemyCells]){
   const node=documentModel.world.get(cell.nodeId),components=node.components;
   if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile&&!components.firebird)continue;
-  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
+  const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),fragile:documentModel.world.runtime(node.id,'fragile'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
   const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
   if(components.rayEmitter){
    const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
@@ -479,7 +493,7 @@ for(const [id,key] of [['coordsVisible','coords'],['foldsVisible','folds'],['pla
 
 function fitCamera(resetZoom=true) {
   if(P.mode==='play'){
-    playerGroup.getWorldPosition(lastFollowPosition);lastFollowSteps=P.steps;
+    getCameraFollowPosition(lastFollowPosition);lastFollowSteps=P.steps;
     if(resetZoom)camera.zoom=1;
     cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));
     cameraOffset.set(view==='top'?0:12,view==='top'?24:17.04,view==='top'?.001:15);
@@ -508,6 +522,8 @@ function updateCameraMode(){
 new ResizeObserver(()=>{fitCamera(false);}).observe(viewport);
 function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'],['topView','top']]){$(id).classList.toggle('active',view===value);$(id).setAttribute('aria-pressed',String(view===value));}document.querySelector('.viewport-corner span').textContent=view==='top'?'TOP VIEW':'ISOMETRIC';fitCamera();}
 $('fixedView').onclick=()=>changeView('fixed');$('topView').onclick=()=>changeView('top');$('fitView').onclick=()=>fitCamera();
+function syncAudioControls(){const muted=audio.isMuted(),button=$('audioMute'),icon=button.querySelector('svg');button.setAttribute('aria-pressed',String(muted));button.setAttribute('aria-label',muted?'打开声音':'静音');button.dataset.tip=muted?'打开声音':'静音';if(icon)icon.replaceWith(createElement(muted?VolumeX:Volume2));}
+$('audioMute').onclick=()=>{audio.setMuted(!audio.isMuted());syncAudioControls();};$('audioVolume').oninput=event=>{audio.setVolume(event.target.value);if(audio.isMuted())audio.setMuted(false);syncAudioControls();};syncAudioControls();
 $('zoomIn').onclick=()=>{camera.zoom=Math.min(64,camera.zoom*1.16);camera.updateProjectionMatrix();};$('zoomOut').onclick=()=>{camera.zoom=Math.max(.3,camera.zoom/1.16);camera.updateProjectionMatrix();};
 
 
@@ -575,6 +591,15 @@ function inspectedPropertySchema(r,c,tile){
   const node=documentModel.primaryAt(r,c);
   return projectedCellSchema(node,documentModel.world.at(r,c),tile,nodeSchema,entityPropertySchema(tile,tagCatalog));
 }
+const MECHANISM_COMPONENTS=['lift','foldSwitch','rayEmitter','firebird','fragile'];
+const mechanismNodeAt=(r,c)=>documentModel.world.at(r,c).find(node=>MECHANISM_COMPONENTS.find(id=>node.components?.[id]));
+function mechanismInspection(node){
+  if(!node)return null;
+  const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
+  if(!type)return null;
+  if(type==='fragile')return {type,count:Number(node.components.fragile.count??1)};
+  return {type,triggers:normalizeComponentTriggers(node.components[type])};
+}
 function applyPropertyMap(next){
  const checked=forkTreeDocument(documentModel);checked.applyProjection(next);
  assertNodePropertyChanges(documentModel,checked,nodeSchema);
@@ -585,11 +610,16 @@ function inspectSelection(){
   const entries=cells.map(({r,c})=>{
     const entity=inspectCell(map,r,c,cellHidden);
     const values=entity.properties??{transparent:entity.transparent,placeable:entity.placeable,blocked:entity.blocked,folds:entity.folds};
+    const mechanism=mechanismInspection(mechanismNodeAt(r,c));
+    if(mechanism)values.mechanism=mechanism;
     const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
+    if(mechanism){schema.mechanism={label:mechanism.type==='fragile'?'易碎方块':'机制触发',children:mechanism.type==='fragile'?{type:{label:'机制类型',tempEditable:false},count:{label:'触发次数',tempEditable:true}}:{type:{label:'机制类型',tempEditable:false},triggers:{label:'触发方式',tempEditable:true}}};}
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
-  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰块：蓝色阻挡地形，玩家不可进入；不改变冰冻、过热等状态。',rayEmitter:'冰冻射线：首次成功行动后临时替换初始方向前方三格地形；之后每次行动恢复原地形、反向并重新冻结，保留道具、生物及标签。命中玩家时提示被射线冻死并结束游戏。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
-  renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>{const tile=map.tiles[p.r][p.c];return tile?.lift?'lift':tile?.terrain??'none';}))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
+  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰块：蓝色阻挡地形，玩家不可进入；不改变冰冻、过热等状态。',rayEmitter:'冰冻射线：首次成功行动后临时替换初始方向前方三格地形；之后每次匹配所选触发方式的行动恢复原地形、反向并重新冻结，保留道具、生物及标签。命中玩家时提示被射线冻死并结束游戏。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。',fragile:'易碎方块：每次成功行走或传送都会减少一次触发次数，归零后播放破碎动画并变为空格。'};
+  const mechanismTypes=[...new Set(cells.map(({r,c})=>mechanismInspection(mechanismNodeAt(r,c))?.type??(map.tiles[r][c]?.lift?'lift':map.tiles[r][c]?.terrain??'none')))];
+  const mechanismLabels={lift:'升降纸张',foldSwitch:'折线开关',rayEmitter:'方向喷射',firebird:'火焰鸟'};
+  renderMechanismText($('mechanismDescriptions'),mechanismTypes.map(type=>descriptions[type]||(mechanismLabels[type]?mechanismLabels[type]+'：支持行走触发与传送触发。':type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
   inspectedCell=cells[0];
   const cellKeys=new Set(['tags','folds','fold']);
   const wholeEntries=entries.map(entry=>({...entry,values:Object.fromEntries(Object.entries(entry.values).filter(([key])=>!cellKeys.has(key)))}));
@@ -616,6 +646,21 @@ function inspectSelection(){
 }
 function applyInspectedProperty(path,value,scope='entity'){
   if(P.mode!=='edit'||!selectedCells.length)throw new Error('请先选择方格');
+  if(path[0]==='mechanism'){
+    if(selectedCells.length!==1)throw new Error('机制属性只能单格编辑');
+    const {r,c}=selectedCells[0],node=mechanismNodeAt(r,c);if(!node)throw new Error('当前方格没有机制实体');
+    const type=MECHANISM_COMPONENTS.find(id=>node.components?.[id]);
+    const components=clone(node.components);
+    if(type==='fragile'){
+      if(path[1]!=='count')throw new Error('易碎方块只支持编辑触发次数');
+      components.fragile={...components.fragile,count:Number(value)};
+    }else{
+      if(path[1]!=='triggers')throw new Error('机制触发方式只能单格编辑');
+      components[type]={...components[type],triggers:normalizeComponentTriggers(value)};
+    }
+    commitTree(configureNode(documentModel,node.id,components,node.tags,cellHidden,nodeHidden,nodeSchema(node)));
+    persist();scheduleInspection();return;
+  }
   let candidate=clone(map);const pendingDebug=[],targets=scope==='cell'&&path[0]!=='regionTag'?directSelectedCells:inspectionCells(map,selectedCells);
   if(path[0]==='tags'&&value===true&&(path[1]==='spawn'&&targets.length>1||path[1]==='entry'&&new Set(targets.map(p=>regionOf(map.tiles[p.r][p.c]))).size<targets.length))throw new Error('唯一位置标签不能批量设置到多个方格');
   for(const {r,c} of targets){
@@ -806,7 +851,7 @@ function screenPoints(){
 	  const animating=P.moving||!!P.foldMotion;
 	  controller.tick(now);
 	  if(animating||P.moving||P.foldMotion)renderer.shadowMap.needsUpdate=true;
-  if(P.mode==='play'&&!manualPan&&!P.foldMotion){playerGroup.getWorldPosition(cameraFollowTarget);if(P.moving||cameraFollowTarget.distanceToSquared(lastFollowPosition)>1e-12||P.steps!==lastFollowSteps)correctFollowCamera();}
+  if(P.mode==='play'&&!manualPan&&!P.foldMotion){getCameraFollowPosition(cameraFollowTarget);if(P.moving||cameraFollowTarget.distanceToSquared(lastFollowPosition)>1e-12||P.steps!==lastFollowSteps)correctFollowCamera();}
 	  const zoomLabel=Math.round(camera.zoom*100)+'%';if(zoomLabel!==lastZoomLabel){lastZoomLabel=zoomLabel;$('zoomLabel').textContent=zoomLabel;}
 	  renderer.render(scene,camera);renderedFrames++;if(diagnosticsEnabled&&!cameraBusy&&renderedFrames%10===0){screenPoints();}
 }
@@ -1016,7 +1061,7 @@ function refreshTreePanel(){
  const panel=$('treeNodes');if(!panel||!panel.closest('details')?.open)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
  renderTreeNodes(panel,entityTreeContext(documentModel.world,selectedNodeId,point).map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});
  const node=nodes.find(item=>item.id===selectedNodeId);$('treeFields').hidden=!node;if(!node){clearPropertyInspector($('nodeConfiguration'));return;}const transform=documentModel.world.transforms.get(node.transformId),world=documentModel.world.transforms.world(node.transformId);$('nodeLocalR').value=transform.local.r;$('nodeLocalC').value=transform.local.c;$('nodeLocalDir').value=transform.local.dir;renderTreeParents($('nodeParent'),entityParentChoices(documentModel.world,node.id).map(other=>({...other,disabled:nodeHidden(other)||documentModel.world.transforms.worldCells(other.transformId).some(p=>cellHidden(p.r,p.c))})));$('nodeParent').value=nodes.find(item=>item.transformId===transform.parentId)?.id??'';const schema=nodeSchema(node),readable=inspectNodeValues(node,schema);$('nodeComponents').value=JSON.stringify(readable.components??{},null,2);$('nodeTags').value=JSON.stringify(readable.tags??{},null,2);$('nodeIdentity').textContent=node.id;$('nodeWorldPosition').textContent='地图位置 '+coord(world.r,world.c)+' · 朝'+FACE_NAMES[world.dir];
- renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,hideReadOnly:true,choices:{'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label}))}});
+ renderPropertyInspector($('nodeConfiguration'),{components:readable.components??{},tags:readable.tags??{}},schema,(path,value)=>{if(P.mode!=='edit')throw new Error('仅编辑模式可修改实体');const current=documentModel.world.get(selectedNodeId),currentSchema=nodeSchema(current),before=inspectNodeValues(current,currentSchema),after=updateProperty(before,currentSchema,path,value);applyTreeConfiguration(current,before,after,currentSchema);},error=>{$('nodeEditStatus').textContent=error.message;toast(error.message,true);},new Set(),{identity:node.id,structured:true,expanded:true,hideReadOnly:true,choices:{'components.surface.color':Object.entries(COLOR_NAMES).map(([value,label])=>({value,label})),...triggerEditorChoiceMap()}});
  const locked=nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c));$('treeFields').disabled=locked;for(const id of ['moveNode','reparentNode','applyNodeConfig'])$(id).disabled=locked;const protectedNode=documentModel.world.transforms.childrenOf(node.transformId).length||documentModel.world.transforms.referenceOwners(node.transformId).some(owner=>owner!=='entity:'+node.id);$('deleteNode').disabled=locked||!!protectedNode;$('deleteNode').title=protectedNode?'实体有子节点或外部引用，暂不能删除':'删除当前实体';
 }
 $('treeNodes').closest('details').addEventListener('toggle',event=>{if(event.currentTarget.open)refreshTreePanel();});
@@ -1024,7 +1069,7 @@ function treeAction(action){try{if(P.mode!=='edit'||!selectedNodeId)throw new Er
 $('moveNode').onclick=()=>treeAction(()=>moveNode(documentModel,selectedNodeId,{r:Number($('nodeLocalR').value),c:Number($('nodeLocalC').value),dir:Number($('nodeLocalDir').value)},cellHidden,nodeHidden));
 $('reparentNode').onclick=()=>treeAction(()=>reparentNode(documentModel,selectedNodeId,$('nodeParent').value||null,$('preserveWorld').checked,cellHidden,nodeHidden));
 $('deleteNode').onclick=()=>treeAction(()=>deleteNode(documentModel,selectedNodeId,cellHidden,nodeHidden));
-function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema),physics={followFold:nodeFollowsFold(node),...(['item','creature'].includes(entityCategory(node))?{canDropOnFold:nodeCanDropOnFold(node)}:{}),...value.components?.physics};return projectProperties({...value,components:{...value.components,physics}},schema,'readable');}
-function nodeSchema(node){return nodePermissions(node,entityPropertySchema(node.configuration??{prefabId:node.prefabId},tagCatalog));}
+function inspectNodeValues(node,schema){const value=nodeDebug.values(node.id,node,schema),components=clone(value.components??{});for(const id of ['lift','foldSwitch','rayEmitter','firebird'])if(components[id])components[id]={...components[id],triggers:components[id].triggers??['walk','teleport']};const physics={followFold:nodeFollowsFold(node),...(['item','creature'].includes(entityCategory(node))?{canDropOnFold:nodeCanDropOnFold(node)}:{}) ,...components.physics};return projectProperties({...value,components:{...components,physics}},schema,'readable');}
+function nodeSchema(node){const prefab=prefabs.find(item=>item.id===node.prefabId),source={...(prefab?.tile??{}),...(node.configuration??{}),prefabId:node.prefabId,...(prefab?.propertySchema?{propertySchema:prefab.propertySchema}:{})};return nodePermissions(node,entityPropertySchema(source,tagCatalog));}
 function applyTreeConfiguration(node,shown,after,schema){if(!visibility.folds&&JSON.stringify(shown.components?.fold)!==JSON.stringify(after.components?.fold))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(shown.tags)!==JSON.stringify(after.tags))throw new Error('隐藏标签禁止编辑');updateProperty(shown,schema,['components'],after.components);updateProperty(shown,schema,['tags'],after.tags);const next=configureNode(documentModel,node.id,after.components,after.tags,cellHidden,nodeHidden,schema);commitTree(next);for(const change of debugChanges(shown,after,schema))nodeDebug.set(node.id,change.path,change.value);refreshTreePanel();$('nodeEditStatus').textContent='已应用';}
 $('applyNodeConfig').onclick=()=>{try{if(P.mode!=='edit'||!selectedNodeId)throw new Error('先选择实体节点');const node=documentModel.world.get(selectedNodeId),schema=nodeSchema(node),shown=projectProperties(nodeDebug.values(node.id,node,schema),schema,'readable');applyTreeConfiguration(node,shown,{...shown,components:JSON.parse($('nodeComponents').value),tags:JSON.parse($('nodeTags').value)},schema);}catch(error){$('nodeEditStatus').textContent=error.message;toast(error.message,true);}};

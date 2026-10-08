@@ -24,15 +24,32 @@ export const EditorLayout = React.memo(function EditorLayout() {
                   {"改颜色"}
                 </div>
               </div>
-              <div className="view-tabs">
-                <UiButton id="fixedView" className="active" aria-pressed="true">
-                  <i data-lucide="box" />
-                  {"固定视角"}
-                </UiButton>
-                <UiButton id="topView" aria-pressed="false">
-                  <i data-lucide="layers-2" />
-                  {"俯视角"}
-                </UiButton>
+              <div className="canvas-tools">
+                <div className="audio-controls" aria-label="音频设置">
+                  <UiButton
+                    className="icon-btn audio-mute"
+                    id="audioMute"
+                    data-tip="静音"
+                    aria-label="静音"
+                    aria-pressed="false"
+                  >
+                    <i data-lucide="volume-2" />
+                  </UiButton>
+                  <label className="audio-volume" htmlFor="audioVolume">
+                    <span className="sr-only">音量</span>
+                    <input id="audioVolume" type="range" min="0" max="1" step="0.01" defaultValue="0.7" aria-label="音量" />
+                  </label>
+                </div>
+                <div className="view-tabs">
+                  <UiButton id="fixedView" className="active" aria-pressed="true">
+                    <i data-lucide="box" />
+                    {"固定视角"}
+                  </UiButton>
+                  <UiButton id="topView" aria-pressed="false">
+                    <i data-lucide="layers-2" />
+                    {"俯视角"}
+                  </UiButton>
+                </div>
               </div>
             </div>
             <div className="game-hud" id="gameHud" hidden={true}>

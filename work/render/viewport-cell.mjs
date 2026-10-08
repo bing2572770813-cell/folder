@@ -13,7 +13,7 @@ export function describeViewportCell(document,r,c,{nameFor=id=>id,nodeHidden=()=
  for(const node of visible){
   if(node.components.rayEmitter){const direction=runtime?(document.world.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection):node.components.rayEmitter.initialDirection;labels.push('冰冻朝向 '+directionConfig.directions[direction].label,'射程 3 格');}
   if(node.components.foldSwitch){const state=runtime?(document.world.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState):node.components.foldSwitch.initialState;labels.push('开关 '+state+(state===0?'（限制出口）':'（开启）'));}
-  if(node.components.fragile)labels.push('成功离开后破碎');
+  if(node.components.fragile){const state=runtime?document.world.runtime(node.id,'fragile'):{};const remaining=state.remaining??node.components.fragile.count??1;labels.push(state.broken?'易碎方块已破碎':state.breaking?'易碎方块破碎中':'易碎次数 '+remaining);}
   if(node.components?.lift){
    const lift=node.components.lift,height=runtime?(document.world.runtime(node.id,'lift').height??lift.initialHeight):lift.initialHeight;
    labels.push((runtime?'当前高度 ':'初始高度 ')+Number(height.toFixed(3)),'单程 '+lift.turnsPerLeg+' 回合');

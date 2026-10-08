@@ -128,6 +128,7 @@ function createPlayerState(spawn, mode = "edit") {
     animation: null,
     terrainState: null,turn:initialTurn(),
     revealedRegions: new Set(),
+    lastRegionTransition: null,
   };
 }
 function liftInitial(config){return {height:Number(config.initialHeight),direction:Number(config.maxHeight)>Number(config.minHeight)?1:0,occupied:false};}
@@ -424,8 +425,10 @@ function prepareRegionTransition(){
 function commitRegionTransition(transition,{deferReveal=false}={}){
  if(!transition)return false;
  const {target,entry}=transition;
- if(!entry){if(!deferReveal){revealRegion(target);buildPaper();toast('显示区域：'+target);}return false;}
+ const fromTile=configuredMap().tiles[P.player.r]?.[P.player.c],fromRegion=regionOf(fromTile);
+ if(!entry){P.lastRegionTransition={fromRegion,exit:{r:P.player.r,c:P.player.c},toRegion:target};if(!deferReveal){revealRegion(target);buildPaper();toast('显示区域：'+target);}return false;}
  if(!deferReveal)revealRegion(target);
+ P.lastRegionTransition={fromRegion,exit:{r:P.player.r,c:P.player.c},toRegion:target};
  leaveTree(P.player,Trigger.Teleport);P.player={r:entry.r,c:entry.c,dir:P.player.dir};
  if(!deferReveal){buildPaper();toast('进入区域：'+target);}
  return true;
@@ -527,17 +530,27 @@ function setMode(next){
  if(next==='play'){const check=validateForPlay();if(!check.valid){toast(check.errors.join('；'),true);return;}}
  env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();
   const map=env.getMap();env.getPlayerGroup().scale.setScalar(1);P.mode=next;if(next==='edit')P.freeTeleport=false;playMusic?.(next==='play'?'opening-bgm':'ending-bgm');
- resetRegions();P.steps=0;P.teleports=0;P.playHistory=[];P.player={...map.spawn};resetPrefabState();
+ resetRegions();P.lastRegionTransition=null;P.steps=0;P.teleports=0;P.playHistory=[];P.player={...map.spawn};resetPrefabState();
  if(P.mode==='play')collectKey();clearSelection();buildPaper();if(P.mode==='play')updateLifts();renderPlayer();updateUI();if(P.mode==='play')checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
 }
-function restart(){
- cancelFoldMotion();if(P.moving)return;env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();
- const map=env.getMap();resetRegions();P.player={...map.spawn};resetPrefabState();P.steps=P.teleports=0;P.playHistory=[];
- collectKey();clearSelection();buildPaper();updateLifts();renderPlayer();updateUI();toast('已回到玩家起点');checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
+function deathRecoveryPosition(){
+ const map=configuredMap(),deathTile=map.tiles[P.player.r]?.[P.player.c],deathRegion=env.getCellRegion?.(P.player.r,P.player.c)??regionOf(deathTile);
+ const entry=taggedCells(map,'entry').find(cell=>regionOf(cell.tile)===deathRegion);
+ if(entry)return {r:entry.r,c:entry.c,dir:P.player.dir,region:deathRegion};
+ const previous=P.lastRegionTransition;
+ if(previous?.exit&&previous.exit.r===P.player.r&&previous.exit.c===P.player.c)return {r:previous.exit.r,c:previous.exit.c,dir:P.player.dir,region:previous.fromRegion};
+ if(previous?.toRegion===deathRegion&&previous.exit)return {r:previous.exit.r,c:previous.exit.c,dir:P.player.dir,region:previous.fromRegion};
+ return {r:map.spawn.r,c:map.spawn.c,dir:map.spawn.dir,region:regionOf(map.tiles[map.spawn.r]?.[map.spawn.c])};
 }
-function snapshot(){const map=env.getMap();return {player:{...P.player},moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions(),entityReplacements:world().snapshotReplacements()}:{})};}
+function restart({afterDeath=false}={}){
+ cancelFoldMotion();if(P.moving)return;const retryAfterDeath=afterDeath&&P.mode==='play'&&P.stepLimitHit&&P.terrainState.gameOver,recovery=retryAfterDeath?deathRecoveryPosition():null;env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();
+ const map=env.getMap();if(recovery){P.revealedRegions=new Set(P.revealedRegions);if(recovery.region)P.revealedRegions.add(recovery.region);syncRegionEntities();P.player={r:recovery.r,c:recovery.c,dir:recovery.dir};}else{resetRegions();P.player={...map.spawn};P.lastRegionTransition=null;}resetPrefabState();P.steps=P.teleports=0;P.playHistory=[];
+ if(!recovery)collectKey();clearSelection();buildPaper();updateLifts();renderPlayer();updateUI();toast(recovery?'已按区域坐标复位':'已回到玩家起点');if(!recovery)checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
+}
+function retry(){return restart({afterDeath:true});}
+function snapshot(){const map=env.getMap();return {player:{...P.player},lastRegionTransition:P.lastRegionTransition?clone(P.lastRegionTransition):null,moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions(),entityReplacements:world().snapshotReplacements()}:{})};}
 function restore(previous){
- cancelFoldMotion();P.revealedRegions=new Set(previous.revealedRegions);syncRegionEntities();
+ cancelFoldMotion();P.revealedRegions=new Set(previous.revealedRegions);P.lastRegionTransition=previous.lastRegionTransition?clone(previous.lastRegionTransition):null;syncRegionEntities();
  if(world()){
   world().replaceRuntimeEntities([]);
   const matching={};for(const node of world().serialize()){const states=previous.entityRuntime?.[node.id];if(states){matching[node.id]={};for(const [id,state] of Object.entries(states))if(Object.hasOwn(node.components,id))matching[node.id][id]=state;}}
@@ -794,9 +807,9 @@ function tick(now){    if (P.foldMotion) {
 const map=env.getMap();if(!P.animation)return;const animation=P.animation;if(animation.fromCell&&animation.type!=='drop'&&!animation.fromPosition)animation.from.y=tileTop(animation.fromCell.r,animation.fromCell.c)+.018;if(animation.toCell)animation.to.y=tileTop(animation.toCell.r,animation.toCell.c)+.018;const t=Math.min(1,(now-P.animation.start)/P.animation.duration),smooth=t*t*(3-2*t);updateFragileBreakAnimation(t);if(P.animation.type==='teleport'){if(t<.5){env.getPlayerGroup().position.copy(P.animation.from);env.getPlayerGroup().scale.setScalar(Math.max(.03,1-t*2));}else{env.getPlayerGroup().position.copy(P.animation.to);env.getPlayerGroup().scale.setScalar(Math.max(.03,(t-.5)*2));}}else if(animation.type==='drop'){env.getPlayerGroup().position.lerpVectors(animation.from,animation.to,smooth);env.getPlayerGroup().position.y=animation.from.y+(animation.to.y-animation.from.y)*t*t;}else env.getPlayerGroup().position.lerpVectors(P.animation.from,P.animation.to,smooth);env.getPlayerGroup().rotation.set(0,-P.player.dir*Math.PI/4,0);if(t>=1){finalizeFragileBreaks();P.animation=null;P.moving=false;env.getPlayerGroup().scale.setScalar(1);renderPlayer();checkRunEnd();if(animation.turnId!==undefined)turnManager.complete(animation.turnId);click(P.player.r,P.player.c);updateUI();}}
 function click(r,c){const map=env.getMap();if(P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit )return;if(P.freeTeleport&&(r!==P.player.r||c!==P.player.c)){testTeleport(r,c);return;}if(env.isHidden(r,c))return;if(r===P.player.r&&c===P.player.c){if(env.getSelectionRing().visible)clearSelection();else selectPlayer();return;}if(P.legalMoves.some(t=>t.r===r&&t.c===c)){movePlayer(r,c);return;}if(foldsAt(map,r,c).length){selectFold(r,c);return;}if(P.legalMoves.length){toast(walkable(r,c)?'该方块不在可移动范围内':'黑色或空格方块不可移动',true);}else if(!walkable(r,c)){toast('黑色或空格方块不可移动',true);}clearSelection();}
 function resetPosition(){P.player={...env.getMap().spawn};}
-function resetProgress(){turnManager.reset();P.steps=P.teleports=0;P.playHistory=[];resetRegions();resetPosition();}
+function resetProgress(){P.lastRegionTransition=null;turnManager.reset();P.steps=P.teleports=0;P.playHistory=[];resetRegions();resetPosition();}
 function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150)P.playHistory.shift();}
 function undo(){cancelFoldMotion();if(P.moving||P.mode!=='play')return;const previous=P.playHistory.pop();if(previous)restore(previous);}
-return {firebirdThreat,refreshFirebirdThreat,foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
+return {firebirdThreat,refreshFirebirdThreat,foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,retry,snapshot,restore,tick,click,updateLifts};
 }
 module.exports={playerPrefabDefaults,Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift,rayCells};

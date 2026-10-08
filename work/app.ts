@@ -716,7 +716,7 @@ $('applyPlayerProperties').onclick=()=>{try{controller.setPlayerProperties({r:Nu
 
 $('editMode').onclick=()=>setMode('edit');$('playMode').onclick=()=>setMode('play');$('startBtn').onclick=()=>setMode(P.mode==='edit'?'play':'edit');
 $('restartBtn').onclick=()=>controller.restart();
-$('resultRetry').onclick=()=>{$('restartBtn').click();$('resultOverlay').hidden=true;};$('resultEdit').onclick=()=>{$('resultOverlay').hidden=true;setMode('edit');};
+$('resultRetry').onclick=()=>controller.retry();$('resultEdit').onclick=()=>{$('resultOverlay').hidden=true;setMode('edit');};
 function undo(){if(P.mode==='play'){controller.undo();return;}if(P.moving)return;const previous=editHistory.pop();if(!previous)return;clearSelection();redoHistory.push(editSnapshot());restoreMap(previous.map);editRect=previous.rect;setSelectedCells(previous.directSelectedCells??previous.selectedCells??[]);controller.resetPosition();buildPaper();fitCamera(false);persist();updateUI();}
 $('undoBtn').onclick=undo;
 $('redoBtn').onclick=()=>{if(P.mode!=='edit'||P.moving)return;const next=redoHistory.pop();if(!next)return;editHistory.push(editSnapshot());restoreMap(next.map);editRect=next.rect;setSelectedCells(next.directSelectedCells??next.selectedCells??[]);controller.resetPosition();buildPaper();persist();};

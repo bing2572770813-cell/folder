@@ -341,6 +341,25 @@ test('region arrival commits destination effects once and counts only the origin
 });
 
 
+test('death retry returns to current region entry without checking destination properties',()=>{
+ const f=fixture();f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
+ f.controller.selectPlayer();assert.equal(f.controller.movePlayer(1,1),true);f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.state.player,{r:2,c:3,dir:2});f.state.terrainState.gameOver=true;f.state.stepLimitHit=true;
+ f.map.tiles[2][3].blocked=true;f.add('blocked-entry',2,3,{collision:{blocked:true},fire:{damage:6}});f.controller.retry();
+ assert.deepEqual(f.state.player,{r:2,c:3,dir:2},'retry uses the region entry coordinates directly');
+ assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.overheat,0);assert.equal(f.state.steps,0);
+ f.controller.restart();assert.deepEqual(f.state.player,f.map.spawn,'manual restart still starts the whole map');
+});
+test('death retry falls back to previous region exit when destination has no entry',()=>{
+ const f=fixture();f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';
+ f.controller.selectPlayer();assert.equal(f.controller.movePlayer(1,1),true);f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.state.player,{r:1,c:1,dir:2});
+ const checkpoint=f.controller.snapshot();f.state.lastRegionTransition=null;f.controller.restore(checkpoint);
+ assert.equal(f.state.lastRegionTransition.toRegion,'B');
+ f.state.player={r:2,c:3,dir:2};f.state.terrainState.gameOver=true;f.state.stepLimitHit=true;
+ f.add('blocked-exit',1,1,{collision:{blocked:true}});f.map.tiles[1][1].blocked=true;f.controller.retry();
+ assert.deepEqual(f.state.player,{r:1,c:1,dir:2},'retry uses the previous region exit coordinates directly');
+});
 test('idle render frames keep player selection without rebuilding the scene',()=>{
  const f=fixture([['lift',1,1,{lift:{minHeight:.1,maxHeight:1,initialHeight:.1,turnsPerLeg:3}}]]);
  f.controller.selectPlayer();const rebuilds=f.rebuilds,before=f.controller.snapshot();

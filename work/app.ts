@@ -137,6 +137,7 @@ const hiddenEntities=new Set();
 const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const EMBEDDED_ASSETS = window.__FOLD_FIELD_EXPORT_ASSETS__;
+const COMPLETION_IMAGE = window.__FOLD_FIELD_COMPLETION_IMAGE__ || '/assets/texture/completion-key.png';
 const clone = data => JSON.parse(JSON.stringify(data));
 const previewCache=new Map();let previewRenderer,placementRenderCache=null,paperSurfaceCache=createPaperSurfaceCache();
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
@@ -175,7 +176,11 @@ function defaultMap() {
 function inside(r,c) { return Number.isInteger(r) && Number.isInteger(c) && r>=0 && c>=0 && r<map.height && c<map.width; }
 function cellHidden(r,c){const name=documentModel.cellTags[r+','+c]?.regionTag??'默认区域';return P.mode==='edit'?hiddenRegions.has(name):!P.revealedRegions.has(name);}
 function nodeHidden(node){return P.mode==='edit'&&hiddenEntities.has(node.prefabId);}
-function walkable(r,c) { return inside(r,c)&&!cellHidden(r,c) && map.tiles[r][c] !== null && !blocked(map.tiles[r][c]) && map.tiles[r][c].terrain!=='campfire'; }
+function walkable(r,c) {
+  if(!inside(r,c)||cellHidden(r,c)||map.tiles[r][c]===null||blocked(map.tiles[r][c])||map.tiles[r][c].terrain==='campfire')return false;
+  const nodes=documentModel.world.at(r,c);
+  return nodes.some(node=>Object.hasOwn(node.components,'surface'))&&!nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked||Object.hasOwn(node.components,'campfire')||Object.hasOwn(node.components,'rayEmitter')||Object.hasOwn(node.components,'foldSwitch'));
+}
 
 function coord(r,c) { return columnLabel(c)+(r+1); }
 const voidPlaneTop=(r,c)=>Math.max(tileTop(r,c),sceneryTop);
@@ -753,6 +758,7 @@ function updateUI(){
   renderNameChecklist($('playerKeyChoices'),legalKeyNames(map,documentModel.world),new Set(P.terrainState.collectedKeys),'持有钥匙 ',(name,checked)=>{const keys=new Set(JSON.parse($('playerCollectedKeys').value));if(checked)keys.add(name);else keys.delete(name);$('playerCollectedKeys').value=JSON.stringify([...keys]);},'无可收集钥匙');
   $('playerRow').max=map.height;$('playerColumn').max=map.width;$('applyPlayerProperties').disabled=!playing||P.moving||!!P.foldMotion;if(P.foldMotion)$('teleportBtn').disabled=true;
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
+  $('resultImage').src=COMPLETION_IMAGE;
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块掉落。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&!P.moving&&(P.levelWon||P.stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}folds+=(map.foldCells??[]).length;$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';

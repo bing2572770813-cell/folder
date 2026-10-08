@@ -19,10 +19,10 @@ test('entry rejection prevents all effects and cyclic eruption uses pre-action c
   assert.equal(denied.valid,false);assert.deepEqual(denied.actor,state);assert.deepEqual(denied.runtime,{});
   state.actions=2;assert.equal(registry.dispatch({type:'enter',nodes,actor:state,runtime:{}}).valid,true);
 });
-test('ice and fire preserve existing failure thresholds',()=>{
+test('ice blocks without state effects while fire retains its failure threshold',()=>{
   const registry=defaultComponents();let state=actor();state.frozen=true;
   const ice=registry.dispatch({type:'enter',nodes:[node('a',{ice:{}})],actor:state,runtime:{}});
-  assert.equal(ice.actor.gameOver,true);
+  assert.equal(ice.valid,false);assert.deepEqual(ice.actor,state);assert.deepEqual(ice.runtime,{});
   state=actor();state.overheat=5;
   assert.equal(registry.dispatch({type:'enter',nodes:[node('a',{fire:{}})],actor:state,runtime:{}}).actor.gameOver,true);
 });

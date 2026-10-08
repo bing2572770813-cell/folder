@@ -7,6 +7,7 @@ export class EntityWorld {
   private entities=new Map<string,EntityNode>();
   // Unrevealed map definitions have no runtime instance, index or component state.
   private dormant=new Map<string,EntityNode>();
+  private replacements=new Map<string,EntityNode>();
   private entitiesByTransform=new Map<string,Set<string>>();
   private states=new Map<string,Map<string,JsonObject>>();
   private order=new Map<string,number>();
@@ -31,7 +32,7 @@ export class EntityWorld {
   }
   has(id:string):boolean{return this.entities.has(id);}
   get(id:string):EntityNode {
-    const node=this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
+    const node=this.replacements.get(id)??this.entities.get(id);if(!node)throw new Error('Unknown entity: '+id);
     const cloned=structuredClone(node);freezeJson(cloned.static);return cloned;
   }
   forTransform(id:string):EntityNode[]{
@@ -43,6 +44,7 @@ export class EntityWorld {
     // Stored records are replaced on writes; getters return detached copies.
     result.entities=new Map(this.entities);
     result.dormant=new Map(this.dormant);
+    result.replacements=new Map(this.replacements);
     result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
     result.states=new Map([...this.states].map(([id,states])=>[id,new Map(structuredClone([...states]))]));
     result.order=new Map(this.order);result.nextOrder=this.nextOrder;
@@ -120,7 +122,7 @@ export class EntityWorld {
       this.transforms.release(node.transformId,owner);
       try{this.transforms.remove(node.transformId);}catch(error){this.transforms.retain(node.transformId,owner);throw error;}
     }else this.transforms.release(node.transformId,owner);
-    this.entities.delete(id);this.states.delete(id);this.positions.delete(id);this.order.delete(id);
+    this.entities.delete(id);this.replacements.delete(id);this.states.delete(id);this.positions.delete(id);this.order.delete(id);
     const owners=this.entitiesByTransform.get(node.transformId);owners?.delete(id);if(!owners?.size)this.entitiesByTransform.delete(node.transformId);
     if(this.positions.size)this.rebuildPositionIndex();else{this.displaced.clear();this.positionIndex.clear();}
   }
@@ -131,7 +133,18 @@ export class EntityWorld {
     const node=this.get(id);if(!Object.hasOwn(node.components,component))throw new Error('Unknown entity component');
     const cloned=jsonObject(state);const states=this.states.get(id)??new Map<string,JsonObject>();states.set(component,cloned);this.states.set(id,states);
   }
-  resetRuntime():void{this.states.clear();this.positions.clear();this.displaced.clear();this.positionIndex.clear();}
+  resetRuntime():void{this.states.clear();this.positions.clear();this.displaced.clear();this.positionIndex.clear();this.replacements.clear();}
+  /** Temporary gameplay entities share identity/position, never overwrite map definitions. */
+  replaceRuntimeEntities(nodes:EntityNode[]):void {
+    const next=new Map<string,EntityNode>();
+    for(const input of nodes){
+      const original=this.entities.get(input.id);
+      if(!original||original.transformId!==input.transformId||next.has(input.id))throw new Error('Invalid runtime replacement identity');
+      next.set(input.id,this.validate(input));
+    }
+    this.replacements=next;
+  }
+  snapshotReplacements():EntityNode[]{return structuredClone([...this.replacements.values()]);}
   /** null restores editor instances; otherwise spawn exactly the requested definitions. */
   setSpawnedEntities(ids:Set<string>|null):void {
     const known=new Set([...this.entities.keys(),...this.dormant.keys()]);
@@ -160,7 +173,7 @@ export class EntityWorld {
     for(const [id,components] of Object.entries(jsonObject(snapshot))){
       const node=this.get(id),entries=new Map<string,JsonObject>();
       for(const [component,state] of Object.entries(jsonObject(components))){
-        if(!Object.hasOwn(node.components,component))throw new Error('Unknown entity component');
+        if(!Object.hasOwn(node.components,component)&&!Object.hasOwn(this.entities.get(id)!.components,component))throw new Error('Unknown entity component');
         entries.set(component,jsonObject(state));
       }
       states.set(id,entries);
@@ -168,8 +181,6 @@ export class EntityWorld {
     this.states=states;
   }
   serialize():EntityNode[]{
-    const nodes=structuredClone([...this.entities.values()].sort((a,b)=>this.order.get(a.id)!-this.order.get(b.id)!));
-    for(const node of nodes)freezeJson(node.static);
-    return nodes;
+    return [...this.entities.values()].sort((a,b)=>this.order.get(a.id)!-this.order.get(b.id)!).map(node=>this.get(node.id));
   }
 }

@@ -87,7 +87,7 @@ export function defaultComponents():ComponentRegistry {
   registry.register('tag',{});
   registry.register('collision',{validate:config=>{if(config.blocked!==undefined&&typeof config.blocked!=='boolean')throw new Error('Invalid collision blocked');},canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
-  registry.register('rayEmitter',{validate:rayEmitter.validate,canEnter:()=> '方向喷射方块不可进入'});
+  registry.register('rayEmitter',{validate:rayEmitter.validate,canEnter:()=> '冰冻射线机关不可进入'});
   registry.register('foldSwitch',{validate:config=>{if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
   registry.register('firebird',{validate:config=>{if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
   registry.register('flame',{validate:config=>{if(config.source!==undefined&&typeof config.source!=='boolean')throw new Error('火焰来源标记无效');},canEnter:()=> '火焰覆盖的方格不可进入'});
@@ -101,9 +101,7 @@ export function defaultComponents():ComponentRegistry {
       return {actor:{overheat,...(overheat>=6?{gameOver:true}:{})},messages:overheat>=6?['过热层数达到 6 层，游戏结束']:[]};
     }},
   });
-  registry.register('ice',{effectOrder:10,events:{enter:(context):ComponentEffect=>context.actor.frozen
-    ?{actor:{gameOver:true},messages:['冰冻状态下再次进入冰河，游戏结束']}
-    :{actor:{frozen:true,overheat:0}}}});
+  registry.register('ice',{canEnter:()=> '冰块是阻挡方块'});
   registry.register('key',{
     effectOrder:20,
     validate:config=>{if(config.name!==undefined&&(typeof config.name!=='string'||!config.name.trim()||config.name.trim().length>80))throw new Error('Invalid key name');},

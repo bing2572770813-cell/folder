@@ -1,11 +1,11 @@
 {
   "version": 1,
   "id": "ice_ai",
-  "name": "冰河方块",
+  "name": "冰块",
   "tile": {
     "color": "blue",
     "height": 0.09,
-    "blocked": false,
+    "blocked": true,
     "folds": [],
     "terrain": "ice",
     "terrainConfig": {}
@@ -18,7 +18,8 @@
     true
   ],
   "static": {
-    "entityType": "terrain"
+    "entityType": "terrain",
+    "walkable": false
   },
   "BaseEntity": [
     "paper_ai"

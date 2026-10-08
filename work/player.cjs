@@ -1,4 +1,5 @@
 const defaultPlayerPrefab=require('../assets/prefab/entity/player_ai.json');
+const defaultIcePrefab=require('../assets/prefab/entity/ice_ai.json');
 const rayEmitterConfig=require('./entities/ray-emitter-config.cjs');
 const {isBrokenCell}=require('./entities/fragile-presence.cjs');
 const firebirdRules=require('./mechanics/firebird.cjs');
@@ -155,7 +156,7 @@ function resetPrefabState() {
 let validationWorld=null;
 function world(){return validationWorld??env.getEntityWorld?.();}
 function configuredMap(){return env.getConfiguredMap?.()??env.getMap();}
-function withConfiguredWorld(callback){const previous=validationWorld,tree=world();if(tree?.setSpawnedEntities){validationWorld=tree.clone();validationWorld.setSpawnedEntities(null);}try{return callback();}finally{validationWorld=previous;}}
+function withConfiguredWorld(callback,ignoreReplacements=false){const previous=validationWorld,tree=world();if(tree?.setSpawnedEntities){validationWorld=tree.clone();validationWorld.setSpawnedEntities(null);if(ignoreReplacements)validationWorld.replaceRuntimeEntities?.([]);}try{return callback();}finally{validationWorld=previous;}}
 function syncRegionEntities(){
  const tree=world();if(!tree?.setSpawnedEntities)return;
  if(P.mode!=='play'){tree.setSpawnedEntities(null);return;}
@@ -174,16 +175,32 @@ function updateFoldSwitches(action){
   const state=tree.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState;tree.setRuntime(node.id,'foldSwitch',{state:state===1?0:1});
  }
 }
+function isRayTerrain(node){
+ if(node.static.entityType==='creature'||node.static.entityType==='prop'||node.components.rayEmitter||node.components.firebird||node.configuration?.kind==='player-token')return false;
+ return node.static.entityType==='terrain'||!!node.components.surface||['campfire','ice','fire','eruption','foldSwitch'].some(id=>node.components[id]);
+}
+function iceReplacement(node,prefab,tree){
+ const tile=prefab.tile??{},surface=node.components.surface;
+ // Legacy terrain-only overlays are silenced; their supporting surface becomes the single ice entity.
+ if(!surface)return {...node,prefabId:prefab.id,components:{...(node.components.fold?{fold:clone(node.components.fold)}:{} )},static:{...node.static,transparent:true,walkable:true},configuration:{prefabId:prefab.id}};
+ const height=node.components.lift?(tree.runtime(node.id,'lift').height??node.components.lift.initialHeight):(surface.height??node.configuration?.height??.09);
+ const geometry=Object.fromEntries(['thickness','gradualRate','edgeColor'].filter(key=>surface[key]!==undefined).map(key=>[key,surface[key]]));
+ const components={...clone(prefab.components??{}),surface:{...geometry,height,color:tile.color??'blue',connected:false},collision:{blocked:true},ice:clone(prefab.components?.ice??tile.terrainConfig??{}),physics:{...clone(prefab.components?.physics??{}),followFold:tile.followFold??false},...(node.components.fold?{fold:clone(node.components.fold)}:{}),...(node.components.key?{key:clone(node.components.key)}:{})};
+ return {id:node.id,prefabId:prefab.id,transformId:node.transformId,components,tags:clone(node.tags),static:{...clone(prefab.static??{}),entityType:'terrain',walkable:false},configuration:{...clone(tile),...geometry,height,color:tile.color??'blue',blocked:true,prefabId:prefab.id,...(prefab.visual?{visual:clone(prefab.visual)}:{})}};
+}
 function fireRayEmitters(){
  const tree=world(),map=env.getMap();if(!tree)return;
- for(const node of tree.serialize())if(node.components.rayEmitter){
-  const origin=tree.transforms.worldCells(node.transformId)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
-  const direction=tree.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection;
+ const emitters=tree.serialize().filter(node=>node.components.rayEmitter);if(!emitters.length&&!tree.snapshotReplacements?.().length)return;
+ // Restore all original terrain first, then combine every current beam before replacing.
+ tree.replaceRuntimeEntities([]);const affected=new Map(),prefab=env.getEntityPrefab?.('ice_ai')??defaultIcePrefab;
+ for(const node of emitters){
+  const origin=tree.cells(node.id)[0];if(!origin||!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))continue;
+  const previous=tree.runtime(node.id,'rayEmitter'),direction=previous.fired?rayEmitterConfig.directions[previous.direction??node.components.rayEmitter.initialDirection].opposite:node.components.rayEmitter.initialDirection;
   const lastShot=rayCells(origin,direction,map.width,map.height);
-  tree.setRuntime(node.id,'rayEmitter',{direction:rayEmitterConfig.directions[direction].opposite,lastShot,shotDirection:direction});
-  if(lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被方向喷射射线命中，游戏结束';}
+  tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot,shotDirection:direction});
+  for(const cell of lastShot){if(env.isHidden(cell.r,cell.c))continue;const nodes=activeAt(cell.r,cell.c);if(!nodes.some(owner=>owner.components.surface))continue;for(const owner of nodes)if(isRayTerrain(owner))affected.set(owner.id,owner);}
  }
- env.refreshMechanismSurfaces?.();
+ tree.replaceRuntimeEntities([...affected.values()].map(node=>iceReplacement(node,prefab,tree)));buildPaper();
 }
 // Notification deduplication is presentation-only; threat itself is derived from live entities.
 let previousFirebirdThreat=new Map();
@@ -237,8 +254,9 @@ function structuralEntryCheck(r,c){
  const nodes=world().at(r,c);
  if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked))return {valid:false,reason:'目标是阻挡方块'};
+ if(nodes.some(node=>Object.hasOwn(node.components,'ice')))return {valid:false,reason:'冰块是阻挡方块'};
  if(nodes.some(node=>Object.hasOwn(node.components,'campfire')))return {valid:false,reason:'篝火方块不可进入'};
- if(nodes.some(node=>Object.hasOwn(node.components,'rayEmitter')))return {valid:false,reason:'方向喷射方块不可进入'};
+ if(nodes.some(node=>Object.hasOwn(node.components,'rayEmitter')))return {valid:false,reason:'冰冻射线机关不可进入'};
  if(nodes.some(node=>Object.hasOwn(node.components,'foldSwitch')))return {valid:false,reason:'折线开关方块不可进入'};
  return {valid:true,reason:''};
 }
@@ -279,7 +297,7 @@ function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vert
  const tile=configuredMap().tiles[r]?.[c];if(!tile||(world()?!withConfiguredWorld(()=>treeEntryCheck({r,c},terrainState)).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
  record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.foldDrop={vertical:foldVertical,horizontal:foldHorizontal};P.canDropOnFold=canDropOnFold;P.terrainState=terrainState;revealRegion(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();refreshFirebirdThreat();
 }
-function validateForPlay(){return withConfiguredWorld(validateConfiguredPlay);}
+function validateForPlay(){return withConfiguredWorld(validateConfiguredPlay,true);}
 function validateConfiguredPlay() {const map=configuredMap();
   let regionErrors=validateRegions(map);
   if(world()){
@@ -491,12 +509,13 @@ function restart(){
  const map=env.getMap();resetRegions();P.player={...map.spawn};resetPrefabState();P.steps=P.teleports=0;P.playHistory=[];
  collectKey();clearSelection();buildPaper();updateLifts();renderPlayer();updateUI();toast('已回到玩家起点');checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
 }
-function snapshot(){const map=env.getMap();return {player:{...P.player},moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions()}:{})};}
+function snapshot(){const map=env.getMap();return {player:{...P.player},moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions(),entityReplacements:world().snapshotReplacements()}:{})};}
 function restore(previous){
  cancelFoldMotion();P.revealedRegions=new Set(previous.revealedRegions);syncRegionEntities();
  if(world()){
+  world().replaceRuntimeEntities([]);
   const matching={};for(const node of world().serialize()){const states=previous.entityRuntime?.[node.id];if(states){matching[node.id]={};for(const [id,state] of Object.entries(states))if(Object.hasOwn(node.components,id))matching[node.id][id]=state;}}
-  world().restoreRuntime(matching);world().restorePositions(previous.entityPositions??{});env.resetMapView?.();
+  world().restoreRuntime(matching);world().restorePositions(previous.entityPositions??{});world().replaceRuntimeEntities(previous.entityReplacements??[]);env.resetMapView?.();
  }
  P.player={...previous.player};P.moveHeight={...(previous.moveHeight??{maxUp:1,maxDown:1})};P.foldDrop={...(previous.foldDrop??playerPrefabDefaults().foldDrop)};P.canDropOnFold=previous.canDropOnFold??playerPrefabDefaults().canDropOnFold;
  P.steps=previous.steps;P.teleports=previous.teleports;P.terrainState=clone(previous.terrainState);P.revealedRegions=new Set(previous.revealedRegions);P.levelWon=false;P.stepLimitHit=false;P.animation=null;P.moving=false;turnManager.reset(previous.turn??initialTurn());

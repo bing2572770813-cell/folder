@@ -1,7 +1,7 @@
 import {columnLabel} from '../entities/tile-model.mjs';
 import directionConfig from '../entities/ray-emitter-config.cjs';
 import fragilePresence from '../entities/fragile-presence.cjs';
-const terrainNames={campfire:'篝火',ice:'冰河',fire:'火焰',eruption:'喷发'};
+const terrainNames={campfire:'篝火',ice:'冰块',fire:'火焰',eruption:'喷发'};
 
 export function describeViewportCell(document,r,c,{nameFor=id=>id,nodeHidden=()=>false,runtime=false}={}){
  const nodes=document.world.at(r,c);
@@ -11,7 +11,7 @@ export function describeViewportCell(document,r,c,{nameFor=id=>id,nodeHidden=()=
  const visible=nodes.filter(node=>!nodeHidden(node));
  const labels=[...new Set(visible.map(node=>nameFor(node.prefabId)))];
  for(const node of visible){
-  if(node.components.rayEmitter){const direction=runtime?(document.world.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection):node.components.rayEmitter.initialDirection;labels.push('喷射朝向 '+directionConfig.directions[direction].label,'射程 3 格');}
+  if(node.components.rayEmitter){const direction=runtime?(document.world.runtime(node.id,'rayEmitter').direction??node.components.rayEmitter.initialDirection):node.components.rayEmitter.initialDirection;labels.push('冰冻朝向 '+directionConfig.directions[direction].label,'射程 3 格');}
   if(node.components.foldSwitch){const state=runtime?(document.world.runtime(node.id,'foldSwitch').state??node.components.foldSwitch.initialState):node.components.foldSwitch.initialState;labels.push('开关 '+state+(state===0?'（限制出口）':'（开启）'));}
   if(node.components.fragile)labels.push('成功离开后破碎');
   if(node.components?.lift){

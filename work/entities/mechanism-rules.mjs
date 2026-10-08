@@ -23,6 +23,7 @@ export function eruptionOpen(actionCount) {
 
 export function canEnterTerrain(map, position, state = createTerrainState()) {
   const terrain = map.tiles[position.r]?.[position.c]?.terrain;
+  if (terrain === 'ice') return { valid: false, reason: '冰块是阻挡方块' };
   if (terrain === 'campfire') return { valid: false, reason: '篝火方块不可进入' };
   if (terrain === 'eruption' && !eruptionOpen(state.actions)) return { valid: false, reason: '喷发地形尚未熄火' };
   return { valid: true, reason: '' };
@@ -34,11 +35,6 @@ export function enterTerrain(map, position, state = createTerrainState()) {
   const next = { ...state, message: '', gameOver: false, won: false };
   const terrain = map.tiles[position.r]?.[position.c]?.terrain;
 
-  if (terrain === 'ice') {
-    if (next.frozen) return { state: { ...next, gameOver: true, message: '冰冻状态下再次进入冰河，游戏结束' }, valid: true, gameOver: true, won: false };
-    next.frozen = true;
-    next.overheat = 0;
-  }
   if (terrain === 'fire') {
     next.overheat += 1;
     if (next.overheat >= 6) return { state: { ...next, gameOver: true, message: '过热层数达到 6 层，游戏结束' }, valid: true, gameOver: true, won: false };

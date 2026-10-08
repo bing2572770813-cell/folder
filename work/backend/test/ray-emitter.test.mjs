@@ -35,32 +35,35 @@ test('emitter fires three cells excluding itself in each cardinal direction',()=
  assert.deepEqual(player.rayCells({r:0,c:0},'north',7,7),[]);
 });
 
-test('successful walk fires at the destination then reverses, undo and restart restore runtime',()=>{
- const f=fixture(),before=f.controller.snapshot();
- assert.equal(f.controller.canMoveTo(3,0),false,'emitter itself cannot be entered even without collision');
- assert.equal(f.move(3,1),true);assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.turn.outcome,'terrain');
- assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');
- assert.deepEqual(f.world.runtime('emitter','rayEmitter').lastShot,[{r:3,c:1},{r:3,c:2},{r:3,c:3}]);
- f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
- f.move(2,2);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');
- f.controller.restart();assert.deepEqual(f.world.runtime('emitter','rayEmitter'),{});
+test('first action freezes initial forward terrain, next action restores it and reverses, undo/restart restore',()=>{
+ const f=fixture(),before=f.controller.snapshot(),definitions=f.world.definitions();
+ assert.equal(f.controller.canMoveTo(3,0),false);
+ assert.equal(f.move(3,1),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
+ assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');
+ for(const c of [1,2,3]){assert.equal(f.world.get('3-'+c).prefabId,'ice_ai');assert.equal(f.controller.canMoveTo(3,c),false);}
+ assert.deepEqual(f.world.definitions(),definitions,'temporary ice cannot modify authored terrain');
+ const frozen=f.controller.snapshot();f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,2),false,'temporary ice also blocks test teleport');assert.deepEqual(f.controller.snapshot(),frozen);f.controller.setFreeTeleport(false);assert.equal(f.move(2,1),true,'player may leave a newly frozen support');
+ assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');assert.equal(f.world.get('3-1').prefabId,'test');
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),frozen);assert.equal(f.world.get('3-1').prefabId,'ice_ai');
+ f.controller.restart();assert.deepEqual(f.controller.snapshot(),before);assert.deepEqual(f.world.snapshotReplacements(),[]);
 });
 
-test('teleport hits at the third cell but not the fourth, invalid actions and frames never fire',()=>{
+test('ray never directly kills or freezes the player; invalid actions and idle frames never rotate',()=>{
  const f=fixture(),before=f.controller.snapshot();f.controller.selectPlayer();
  assert.equal(f.controller.movePlayer(99,99),false);f.controller.turn(1);for(let i=0;i<20;i++)f.controller.tick(i*1000);
  assert.deepEqual(f.world.runtime('emitter','rayEmitter'),{});assert.equal(f.state.turn.number,0);
  f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,4),true);assert.equal(f.state.terrainState.gameOver,false);
- assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');f.controller.tick(performance.now()+1000);f.controller.undo();
- assert.equal(f.controller.testTeleport(3,3),true);assert.equal(f.state.terrainState.gameOver,true);
- assert.equal(f.state.turn.number,before.turn.number+1);
+ assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');f.controller.tick(performance.now()+1000);f.controller.undo();
+ assert.equal(f.controller.testTeleport(3,3),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
+ assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.equal(f.state.turn.number,before.turn.number+1);
 });
 
-test('regional teleport fires once at final arrival and obstacles do not shorten the ray',()=>{
+test('regional teleport settles before freezing and the ray crosses obstacles without replacing creatures',()=>{
  const f=fixture();f.map.tiles[2][2].tags.exitTo='B';f.map.tiles[3][3].regionTag='B';f.map.tiles[3][3].tags.entry=true;
  f.add('obstacle',3,2,{collision:{blocked:true}});
  f.move(2,2);assert.equal(f.state.player.r,3);assert.equal(f.state.player.c,3);
- assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');assert.equal(f.state.turn.number,1);
+ assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');assert.equal(f.state.turn.number,1);
+ assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.equal(f.world.has('emitter'),true);
 });
 
 test('invalid emitter direction is rejected by the shared registry',()=>{
@@ -218,4 +221,38 @@ test('test teleport spawns target region before enter and invalid teleport does 
  assert.equal(f.controller.testTeleport(5,5),false);assert.equal(f.state.revealedRegions.has('C'),false);assert.equal(f.world.has('blocked-target'),false);
  assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.has('hidden-key'),true);assert.deepEqual(f.state.terrainState.collectedKeys,['B-key']);
  f.controller.tick(performance.now()+1000);f.controller.undo();assert.equal(f.world.has('hidden-key'),false);
+});
+
+
+test('overlapping emitters create a single temporary ice per terrain and restore across repeated cycles',()=>{
+ const f=fixture('east',{r:3,c:0},()=>0,({add})=>add('second',3,6,{rayEmitter:{initialDirection:'west'}})),before=f.world.definitions();
+ for(let turn=1;turn<=4;turn++){
+  assert.equal(f.move(2,turn%2?2:1),true);
+  assert.equal(f.world.serialize().filter(node=>node.prefabId==='ice_ai').length,turn%2?5:0);
+  assert.equal(f.world.get('3-3').prefabId,turn%2?'ice_ai':'test');
+  assert.deepEqual(f.world.definitions(),before);
+ }
+ f.controller.undo();assert.equal(f.world.get('3-3').prefabId,'ice_ai');
+ f.controller.restart();assert.equal(f.world.get('3-3').prefabId,'test');
+});
+
+test('temporary ice preserves dimensions, tags, props and original mechanism state',()=>{
+ const f=fixture('east',{r:3,c:0},()=>0,({world,add})=>{
+  const ground=world.get('3-2');world.remove(ground.id);ground.components.surface={height:.6,thickness:.1};ground.components.lift={minHeight:.2,maxHeight:.8,initialHeight:.6,turnsPerLeg:3};ground.tags={requiredKeys:['saved-tag']};world.add(ground);
+  add('key',3,2,{key:{name:'saved-key'}});add('token',3,2,{physics:{canDropOnFold:true}});
+ });
+ const definitions=f.world.definitions(),lift=structuredClone(f.world.runtime('3-2','lift'));
+ f.move(2,2);const cold=f.world.get('3-2');assert.equal(cold.prefabId,'ice_ai');assert.equal(cold.components.surface.height,.6);assert.equal(cold.components.surface.thickness,.1);assert.deepEqual(cold.tags,{requiredKeys:['saved-tag']});
+ assert.equal(f.world.get('key').prefabId,'test');assert.equal(f.world.get('token').prefabId,'test');assert.deepEqual(f.world.runtime('3-2','lift'),lift);
+ f.move(2,1);assert.equal(f.world.get('3-2').components.lift.initialHeight,.6);assert.deepEqual(f.world.definitions(),definitions);
+ f.controller.undo();assert.equal(f.world.get('3-2').prefabId,'ice_ai');assert.deepEqual(f.world.runtime('3-2','lift'),lift);
+ f.controller.setMode('edit');assert.equal(f.world.get('3-2').prefabId,'test');assert.deepEqual(f.world.snapshotReplacements(),[]);
+});
+
+test('ray skips hidden regions, void and broken paper while still reaching farther cells',()=>{
+ const f=fixture('east',{r:3,c:0},()=>0,({map,world})=>{map.tiles[3][2].regionTag='B';world.remove('3-1');});
+ assert.equal(f.world.has('3-2'),false);f.move(2,2);
+ assert.equal(f.world.has('3-2'),false);assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.deepEqual(f.world.at(3,1),[]);
+ const broken=fixture();const ground=broken.world.get('3-1');broken.world.remove(ground.id);ground.components.fragile={};broken.world.add(ground);broken.world.setRuntime(ground.id,'fragile',{broken:true});
+ broken.move(2,2);assert.equal(broken.world.get('3-1').prefabId,'test');assert.equal(broken.world.get('3-2').prefabId,'ice_ai');
 });

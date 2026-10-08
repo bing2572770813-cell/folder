@@ -36,6 +36,8 @@ export interface EntityWorld {
   serialize(): EntityNode[];
   definitions(): EntityNode[];
   setSpawnedEntities(ids: Set<string> | null): void;
+  replaceRuntimeEntities(nodes: EntityNode[]): void;
+  snapshotReplacements(): EntityNode[];
   at(r: number, c: number): EntityNode[];
   cells(id: string): Array<{ r: number; c: number }>;
   forTransform(id: string): EntityNode[];

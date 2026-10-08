@@ -233,7 +233,7 @@ test('spawn collects every key without applying hazards or counting an action',(
 
 test('tree ice, adjacent campfire and eruption retain player action semantics',()=>{
  const f=fixture([['ice',1,1,{ice:{}}],['camp',0,2,{campfire:{}}],['eruption',1,2,{eruption:{}}]]);
- assert.equal(f.controller.canMoveTo(1,2),false);f.move(1,1);assert.equal(f.state.terrainState.frozen,false,'adjacent campfire thaws ice');
+ assert.equal(f.controller.canMoveTo(1,2),false);assert.equal(f.controller.canMoveTo(1,1),false,'ice is a blocker');f.move(0,0);
  f.move(1,0);assert.equal(f.state.terrainState.actions,2);assert.equal(f.controller.canMoveTo(1,2),true);
  f.controller.setFreeTeleport(true);f.controller.testTeleport(1,2);assert.equal(f.state.terrainState.actions,3);assert.equal(f.state.player.c,2);
 });
@@ -251,9 +251,9 @@ test('stacked static blockers and missing surfaces reject without mutation',()=>
  assert.equal(f.controller.canMoveTo(1,2),false);assert.deepEqual(f.world.snapshotRuntime(),{});
 });
 
-test('repeated tree ice and six fire entries produce the original terminal states',()=>{
- const frozen=fixture([['ice',1,1,{ice:{}}]]);frozen.move(1,1);assert.equal(frozen.state.terrainState.frozen,true);
- frozen.move(1,0);frozen.move(1,1);assert.equal(frozen.state.terrainState.gameOver,true);assert.equal(frozen.state.stepLimitHit,true);
+test('ice rejects entry without freezing or killing, six fire entries retain their threshold',()=>{
+ const frozen=fixture([['ice',1,1,{ice:{}}]]),before=frozen.controller.snapshot();assert.equal(frozen.controller.canMoveTo(1,1),false);frozen.move(1,1);assert.deepEqual(frozen.controller.snapshot(),before);
+ frozen.controller.setFreeTeleport(true);assert.equal(frozen.controller.testTeleport(1,1),false);assert.equal(frozen.state.terrainState.gameOver,false);
  const hot=fixture([['fire',1,1,{fire:{}}]]);
  for(let i=0;i<6;i++){hot.move(1,1);if(i<5)hot.move(1,0);}
  assert.equal(hot.state.terrainState.overheat,6);assert.equal(hot.state.terrainState.actions,11);assert.equal(hot.state.stepLimitHit,true);

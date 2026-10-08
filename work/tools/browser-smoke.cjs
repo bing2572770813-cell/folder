@@ -195,6 +195,17 @@ async function main() {
       const emitterStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(emitterStart.x,emitterStart.y);
       const emitterNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(emitterNext.x,emitterNext.y);
       await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].prefabId),'ice_ai');
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].blocked),true);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.frozen),false);
+      await capture('desktop-emitter-first-ice');
+      const iceExport=page.waitForEvent('download');await page.locator('#exportMap').click();
+      const originalMap=JSON.parse(fs.readFileSync(await (await iceExport).path(),'utf8'));
+      assert.equal(originalMap.entities.find(node=>node.id==='2-6').prefabId,'paper_ai','map export retains original terrain');
+      const emitterSecond=await page.evaluate(()=>window.foldField.screenPoint(0,2));await page.mouse.click(emitterSecond.x,emitterSecond.y);
+      await page.waitForFunction(()=>window.foldField.getState().steps===2&&!window.foldField.getState().moving);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].prefabId),'paper_ai');
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][4].prefabId),'ice_ai');
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+3*Math.PI/2)<1e-6));
       await page.waitForFunction(()=>{
         const cells=JSON.parse(document.getElementById('viewport').dataset.render).emitterHighlights;
@@ -206,6 +217,10 @@ async function main() {
       await capture('desktop-emitter-model-reversed');
       await page.locator('#undoBtn').click();
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+Math.PI/2)<1e-6));
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].prefabId),'ice_ai');
+      await page.locator('#undoBtn').click();await page.waitForFunction(()=>window.foldField.getState().steps===0);
+      assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].prefabId),'paper_ai');
+      results.push({name:'emitter-ice-replacement-reversal-undo-and-canonical-export',status:'pass'});
       results.push({name:'emitter-fbx-legacy-models-runtime-facing-and-undo',status:'pass'});
       await page.locator('#editMode').click();
       const offlineActors=structuredClone(emitterMap);offlineActors.metadata.name='模型预扫描离线验收';

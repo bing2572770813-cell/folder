@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {mechanismMarker} from './render/directional-mechanisms.mjs';
 import {collectModelDescriptors} from './render/model-descriptors.mjs';
 
 const node={id:'key',configuration:{visual:{model:'model/key_ai.fbx'}},static:{},transformId:'key-transform'};
@@ -33,5 +35,9 @@ assert.deepEqual(enemy.configuration.visual.offset,oldOffset,'legacy origin corr
 
 const bird={...enemy,components:{firebird:{direction:'east'}}};
 const birdDocument={world:{...enemyDocument.world,serialize:()=>[bird],runtime:()=>({replaced:true})}};
-assert.equal(collectModelDescriptors(birdDocument,{getPrefab,runtime:true}).length,0,'replaced bird uses the existing replacement marker instead of the creature model');
+assert.equal(collectModelDescriptors(birdDocument,{getPrefab,runtime:true}).length,1,'a firebird retains its creature model after entering watch range');
+const replacedBirdMarker=mechanismMarker(THREE,bird.components,{firebird:{replaced:true}});
+assert.equal(replacedBirdMarker.userData.firebird,true,'watch-range state must not hide the firebird marker');
+assert.equal(replacedBirdMarker.children[0].material.color.getHexString(),'e05a2a','watch-range state must retain the normal orange marker color');
 assert.equal(collectModelDescriptors(birdDocument,{getPrefab}).length,1,'play state does not hide the configured editor entity');
+assert.equal(replacedBirdMarker.userData.replaced,true,'replacement runtime remains observable without changing firebird appearance');

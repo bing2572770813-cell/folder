@@ -34,6 +34,8 @@ export interface EntityWorld {
   has(id: string): boolean;
   get(id: string): EntityNode;
   serialize(): EntityNode[];
+  definitions(): EntityNode[];
+  setSpawnedEntities(ids: Set<string> | null): void;
   at(r: number, c: number): EntityNode[];
   cells(id: string): Array<{ r: number; c: number }>;
   forTransform(id: string): EntityNode[];

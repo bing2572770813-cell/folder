@@ -43,7 +43,7 @@ export interface TreeSerializationOptions {
 }
 
 export function serializeTreeMap(world:EntityWorld,metadata:JsonObject={},cellTags:Record<string,JsonObject>={},options:TreeSerializationOptions={}):TreeMap {
-  const {nodes}=validateTerrainStacking(world);
+  const {nodes}=validateTerrainStacking(world,world.definitions());
   const entities=nodes.map(node=>{
     const configuration=node.configuration;
     if(!options.projectProperties)return node;

@@ -152,7 +152,18 @@ function resetPrefabState() {
     P.terrainState = { ...createTerrainState(), ...defaults.terrainState };
   }
  resetPrefabState();
-function world(){return env.getEntityWorld?.();}
+let validationWorld=null;
+function world(){return validationWorld??env.getEntityWorld?.();}
+function configuredMap(){return env.getConfiguredMap?.()??env.getMap();}
+function withConfiguredWorld(callback){const previous=validationWorld,tree=world();if(tree?.setSpawnedEntities){validationWorld=tree.clone();validationWorld.setSpawnedEntities(null);}try{return callback();}finally{validationWorld=previous;}}
+function syncRegionEntities(){
+ const tree=world();if(!tree?.setSpawnedEntities)return;
+ if(P.mode!=='play'){tree.setSpawnedEntities(null);return;}
+ const map=env.getCellRegion?null:configuredMap(),regionAt=env.getCellRegion??((r,c)=>regionOf(map.tiles[r]?.[c]));
+ const ids=new Set(tree.definitions().filter(node=>tree.transforms.worldCells(node.transformId).every(cell=>P.revealedRegions.has(regionAt(cell.r,cell.c)))).map(node=>node.id));
+ tree.setSpawnedEntities(ids);
+}
+function revealRegion(name){if(P.revealedRegions.has(name))return;P.revealedRegions.add(name);syncRegionEntities();}
 function activeAt(r,c){const tree=world(),nodes=tree.at(r,c);return isBrokenCell(tree,nodes)?[]:nodes;}
 function switchesOpen(tags={}){const tree=world(),required=tags.requiredSwitches??[];if(!required.length)return true;if(!tree)return false;const nodes=new Map(tree.serialize().map(node=>[node.id,node]));return required.every(id=>{const node=nodes.get(id);return node?.components.foldSwitch&&(tree.runtime(id,'foldSwitch').state??node.components.foldSwitch.initialState)===1;});}
 function updateFoldSwitches(action){
@@ -247,10 +258,11 @@ function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vert
  const terrainState={...P.terrainState,overheat,frozen,actions,collectedKeys:[...new Set(collectedKeys)],hasKey:collectedKeys.length>0,eruptionOpen:actions>0&&actions%3===2};
  if(![foldVertical,foldHorizontal].every(n=>Number.isFinite(n)&&n>0&&n<=16))throw new Error('折纸落点阈值须大于 0 且不超过 16');
  if(typeof canDropOnFold!=='boolean')throw new Error('可在折叠时掉落须为布尔值');
- const tile=env.getMap().tiles[r]?.[c];if(!tile||(world()?!treeEntryCheck({r,c},terrainState).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
- record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.foldDrop={vertical:foldVertical,horizontal:foldHorizontal};P.canDropOnFold=canDropOnFold;P.terrainState=terrainState;P.revealedRegions.add(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
+ const tile=configuredMap().tiles[r]?.[c];if(!tile||(world()?!withConfiguredWorld(()=>treeEntryCheck({r,c},terrainState)).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
+ record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.foldDrop={vertical:foldVertical,horizontal:foldHorizontal};P.canDropOnFold=canDropOnFold;P.terrainState=terrainState;revealRegion(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
 }
-function validateForPlay() {const map=env.getMap();
+function validateForPlay(){return withConfiguredWorld(validateConfiguredPlay);}
+function validateConfiguredPlay() {const map=configuredMap();
   let regionErrors=validateRegions(map);
   if(world()){
     const componentErrors=[];for(const node of world().serialize())try{env.componentRegistry.validate(node);}catch(error){componentErrors.push(error.message);}if(componentErrors.length)return {valid:false,errors:[...regionErrors,...componentErrors]};
@@ -354,7 +366,17 @@ function setFreeTeleport(enabled){P.freeTeleport=!!enabled;clearSelection();upda
 function testTeleport(r,c){return turnManager.execute({trigger:Trigger.Teleport,source:'test',r,c});}
 function setFoldHints(enabled){P.foldHints=!!enabled;const axis=P.chosenFold,selected=env.getSelectionRing().visible;if(axis)selectFold(axis.r,axis.c,axis.type);else if(selected)selectPlayer();updateUI();}
 function animatePlayer(from,to,type,turnId,fromPosition){const map=env.getMap();P.moving=true;P.animation={start:performance.now(),duration:type==='teleport'?480:220,fromCell:{...from},toCell:{...to},from:fromPosition?.clone()??new THREE.Vector3(wx(from.c),tileTop(from.r,from.c)+.018,wz(from.r)),to:new THREE.Vector3(wx(to.c),tileTop(to.r,to.c)+.018,wz(to.r)),type,turnId,checkEnd:true};updateUI();}
-function transitionRegion(){const map=env.getMap();const tile=map.tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;if(!switchesOpen(tile.tags)){P.terrainState.message='出口绑定的开关尚未全部开启';return false;}const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}const entry=taggedCells(map,'entry').find(p=>regionOf(p.tile)===target);if(!entry){P.revealedRegions.add(target);buildPaper();toast('显示区域：'+target);return false;}const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);if(!check.valid){P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}leaveTree(P.player,Trigger.Teleport);P.revealedRegions.add(target);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;}
+function transitionRegion(){
+ const tile=env.getMap().tiles[P.player.r]?.[P.player.c],target=tile?.tags?.exitTo;if(!target)return false;
+ if(!switchesOpen(tile.tags)){P.terrainState.message='出口绑定的开关尚未全部开启';return false;}
+ const missing=(tile.tags.requiredKeys??[]).filter(k=>!P.terrainState.collectedKeys.includes(k));if(missing.length){P.terrainState.message='出口还需要钥匙：'+missing.join('、');return false;}
+ const entry=taggedCells(configuredMap(),'entry').find(p=>regionOf(p.tile)===target);
+ if(!entry){revealRegion(target);buildPaper();toast('显示区域：'+target);return false;}
+ const wasRevealed=P.revealedRegions.has(target);revealRegion(target);
+ const check=entryCheck(entry.r,entry.c,true,Trigger.Teleport);
+ if(!check.valid){if(!wasRevealed){P.revealedRegions.delete(target);syncRegionEntities();}P.terrainState.message='无法进入区域：'+target+'（'+(check.reason||'入口不可通行')+'）';return false;}
+ leaveTree(P.player,Trigger.Teleport);P.player={r:entry.r,c:entry.c,dir:P.player.dir};buildPaper();toast('进入区域：'+target);return true;
+}
 function collectKey(){if(world()){const tree=world(),nodes=tree.at(P.player.r,P.player.c).filter(node=>Object.hasOwn(node.components,'key')&&node.static.walkable!==false&&!node.components.collision?.blocked&&!tree.runtime(node.id,'key').collected).map(node=>({...node,components:{key:node.components.key}}));if(nodes.length)commitTreeEvent('enter',P.player,nodes);return;}const tile=env.getMap().tiles[P.player.r]?.[P.player.c];if(tile?.terrain!=='key'||blocked(tile))return;const name=tile.keyName?.trim()||'钥匙';P.terrainState.collectedKeys=[...new Set([...P.terrainState.collectedKeys,name])];P.terrainState.hasKey=true;P.terrainState.message='获得钥匙：'+name;}
 function arrive(trigger){
  if(world())enterTree(trigger);
@@ -388,8 +410,8 @@ function validateAction(action){
   action.to={r:t.r,c:t.c,dir:(Math.round(Math.atan2(forward.c-t.c,t.r-forward.r)/(Math.PI/4))+8)%8};
  }else if(source==='test'&&trigger===Trigger.Teleport){
   if(!P.freeTeleport||!inside(r,c)||(r===P.player.r&&c===P.player.c))return false;
-  const tile=env.getMap().tiles[r]?.[c];
-  if(!tile||(!world()&&blocked(tile))||!entryCheck(r,c,true,Trigger.Teleport).valid){toast('测试传送需要可通行实体',true);return false;}
+  const tile=configuredMap().tiles[r]?.[c];
+  if(!tile||(!world()&&blocked(tile))||!withConfiguredWorld(()=>entryCheck(r,c,true,Trigger.Teleport)).valid){toast('测试传送需要可通行实体',true);return false;}
   action.to={r,c,dir:P.player.dir};
  }else return false;
  return true;
@@ -416,7 +438,7 @@ const turnManager=createTurnManager({
  act:context=>{
   const {to,trigger,source}=context.action;
   P.player={...to};P.steps++;if(trigger===Trigger.Teleport)P.teleports++;
-  if(source==='test')P.revealedRegions.add(regionOf(env.getMap().tiles[to.r][to.c]));
+  if(source==='test')revealRegion(regionOf(configuredMap().tiles[to.r][to.c]));
  },
  enter:context=>arrive(context.action.trigger),
  settle:context=>{
@@ -435,7 +457,7 @@ const turnManager=createTurnManager({
 function movePlayer(r,c){return turnManager.execute({trigger:Trigger.Walk,source:'move',r,c});}
 function teleport(axis=null){return turnManager.execute({trigger:Trigger.Teleport,source:'fold',axis});}
 function turn(delta){const map=env.getMap();if(P.moving||P.foldMotion)return;record();P.player.dir=(P.player.dir+delta+8)%8;if(P.mode==='edit'){map.spawn.dir=P.player.dir;persist();}renderPlayer();updateUI();}
-function resetRegions(){const map=env.getMap();const spawn=taggedCells(map,'spawn')[0];if(spawn){map.spawn={r:spawn.r,c:spawn.c,dir:map.spawn.dir};P.revealedRegions=new Set([regionOf(spawn.tile)]);}else P.revealedRegions=new Set();}
+function resetRegions(){const map=configuredMap();const spawn=taggedCells(map,'spawn')[0];if(spawn){map.spawn={r:spawn.r,c:spawn.c,dir:map.spawn.dir};P.revealedRegions=new Set([regionOf(spawn.tile)]);}else P.revealedRegions=new Set();syncRegionEntities();}
 function setMode(next){
  cancelFoldMotion();if(P.mode===next)return;
  if(next==='play'){const check=validateForPlay();if(!check.valid){toast(check.errors.join('；'),true);return;}}
@@ -451,7 +473,7 @@ function restart(){
 }
 function snapshot(){const map=env.getMap();return {player:{...P.player},moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions()}:{})};}
 function restore(previous){
- cancelFoldMotion();
+ cancelFoldMotion();P.revealedRegions=new Set(previous.revealedRegions);syncRegionEntities();
  if(world()){
   const matching={};for(const node of world().serialize()){const states=previous.entityRuntime?.[node.id];if(states){matching[node.id]={};for(const [id,state] of Object.entries(states))if(Object.hasOwn(node.components,id))matching[node.id][id]=state;}}
   world().restoreRuntime(matching);world().restorePositions(previous.entityPositions??{});env.resetMapView?.();

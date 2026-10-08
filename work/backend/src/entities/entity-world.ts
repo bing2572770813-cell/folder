@@ -5,6 +5,8 @@ import {jsonObject,freezeJson,validateEntityTags,validateStaticFields,type Entit
 /** Entity identity and state registry with a gameplay-only position overlay on static transforms. */
 export class EntityWorld {
   private entities=new Map<string,EntityNode>();
+  // Unrevealed map definitions have no runtime instance, index or component state.
+  private dormant=new Map<string,EntityNode>();
   private entitiesByTransform=new Map<string,Set<string>>();
   private states=new Map<string,Map<string,JsonObject>>();
   private order=new Map<string,number>();
@@ -40,6 +42,7 @@ export class EntityWorld {
     const result=new EntityWorld(this.transforms.clone());
     // Stored records are replaced on writes; getters return detached copies.
     result.entities=new Map(this.entities);
+    result.dormant=new Map(this.dormant);
     result.entitiesByTransform=new Map([...this.entitiesByTransform].map(([id,entities])=>[id,new Set(entities)]));
     result.states=new Map([...this.states].map(([id,states])=>[id,new Map(structuredClone([...states]))]));
     result.order=new Map(this.order);result.nextOrder=this.nextOrder;
@@ -48,7 +51,7 @@ export class EntityWorld {
     return result;
   }
   add(node:EntityNode):void {
-    if(this.entities.has(node.id))throw new Error('Duplicate entity ID');
+    if(this.entities.has(node.id)||this.dormant.has(node.id))throw new Error('Duplicate entity ID');
     const validated=this.validate(node);this.transforms.retain(node.transformId,'entity:'+node.id);this.entities.set(node.id,validated);
     const ids=this.entitiesByTransform.get(node.transformId)??new Set<string>();ids.add(node.id);this.entitiesByTransform.set(node.transformId,ids);
     this.order.set(node.id,this.nextOrder++);
@@ -129,6 +132,26 @@ export class EntityWorld {
     const cloned=jsonObject(state);const states=this.states.get(id)??new Map<string,JsonObject>();states.set(component,cloned);this.states.set(id,states);
   }
   resetRuntime():void{this.states.clear();this.positions.clear();this.displaced.clear();this.positionIndex.clear();}
+  /** null restores editor instances; otherwise spawn exactly the requested definitions. */
+  setSpawnedEntities(ids:Set<string>|null):void {
+    const known=new Set([...this.entities.keys(),...this.dormant.keys()]);
+    if(ids)for(const id of ids)if(!known.has(id))throw new Error('Unknown entity: '+id);
+    for(const node of [...this.entities.values()])if(ids&&!ids.has(node.id)){
+      const order=this.order.get(node.id)!;
+      this.remove(node.id);this.order.set(node.id,order);this.dormant.set(node.id,node);
+      this.transforms.retain(node.transformId,'dormant:'+node.id);
+    }
+    for(const node of [...this.dormant.values()])if(!ids||ids.has(node.id)){
+      const order=this.order.get(node.id)!;
+      this.dormant.delete(node.id);this.transforms.release(node.transformId,'dormant:'+node.id);this.add(node);
+      this.order.set(node.id,order);
+    }
+  }
+  definitions():EntityNode[]{
+    const nodes=structuredClone([...this.entities.values(),...this.dormant.values()].sort((a,b)=>this.order.get(a.id)!-this.order.get(b.id)!));
+    for(const node of nodes)freezeJson(node.static);
+    return nodes;
+  }
   snapshotRuntime():ComponentRuntime {
     return Object.fromEntries([...this.states].map(([id,states])=>[id,Object.fromEntries([...states].map(([component,state])=>[component,jsonObject(state)]))]));
   }
@@ -145,7 +168,7 @@ export class EntityWorld {
     this.states=states;
   }
   serialize():EntityNode[]{
-    const nodes=structuredClone([...this.entities.values()]);
+    const nodes=structuredClone([...this.entities.values()].sort((a,b)=>this.order.get(a.id)!-this.order.get(b.id)!));
     for(const node of nodes)freezeJson(node.static);
     return nodes;
   }

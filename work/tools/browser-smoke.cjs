@@ -307,12 +307,24 @@ async function main() {
         assert.deepEqual(saved.entities.find(node=>node.id==='0-1').tags.requiredSwitches,['open-switch']);
         await capture('desktop-exit-switch-bindings');
         await page.locator('#playMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='play');
+        await page.evaluate(()=>window.foldField.enableDiagnostics());
+        assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.render).spawnedEntityIds.includes('6-6')),false);
+        assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[6][6]),null);
+        await capture('desktop-hidden-region-unspawned');
         const start=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(start.x,start.y);
         const toFirst=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(toFirst.x,toFirst.y);await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
         assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.state).revealedRegions.includes('B')),true);
         const toSecond=await page.evaluate(()=>window.foldField.screenPoint(0,2));await page.mouse.click(toSecond.x,toSecond.y);await page.waitForFunction(()=>window.foldField.getState().steps===2&&!window.foldField.getState().moving);
         assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.state).revealedRegions.includes('C')),false);
+        assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.render).spawnedEntityIds.includes('6-6')),true);
+        assert.equal(await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.render).spawnedEntityIds.includes('6-5')),false);
         await capture('desktop-exit-independent-switch-gates');
+        await page.locator('#undoBtn').click();await page.locator('#undoBtn').click();
+        await page.waitForFunction(()=>window.foldField.getState().steps===0);
+        await page.waitForFunction(()=>!JSON.parse(document.getElementById('viewport').dataset.render).spawnedEntityIds.includes('6-6'));
+        await page.locator('#editMode').click();await page.waitForFunction(()=>window.foldField.getState().mode==='edit');
+        await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).spawnedEntityIds.includes('6-6'));
+        results.push({name:'region-instances-spawn-on-reveal-and-despawn-on-undo',status:'pass'});
         results.push({name:'exit-switch-checklist-save-and-independent-runtime-gates',status:'pass'});
       }
       await closeContext('desktop');

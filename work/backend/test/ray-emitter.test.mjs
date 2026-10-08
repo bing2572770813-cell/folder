@@ -8,7 +8,7 @@ import {defaultComponents} from '../dist/entities/components.js';
 import {validateTerrainStacking} from '../dist/entities/terrain-stacking.js';
 import {createTerrainState,canEnterTerrain,enterTerrain,finishAction} from '../../special-terrain.mjs';
 
-function fixture(direction='east',origin={r:3,c:0},heightAt=()=>0){
+function fixture(direction='east',origin={r:3,c:0},heightAt=()=>0,configure=()=>{}){
  const map={width:7,height:7,tiles:Array.from({length:7},()=>Array.from({length:7},()=>({height:.09,regionTag:'A',tags:{}}))),spawn:{r:2,c:1,dir:2},exit:null,maxSteps:0};
  map.tiles[2][1].tags.spawn=true;
  const world=new EntityWorld(new TransformManager(7,7));
@@ -24,7 +24,7 @@ function fixture(direction='east',origin={r:3,c:0},heightAt=()=>0){
   foldsAt:()=>[],inFoldRange:()=>true,foldGroupAt:(...args)=>env.resolveFoldGroup?.(...args),getFoldAxes:()=>[],coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,
   record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer:noop,disposableClear:noop,overlay:noop,tileOutline:noop,
   wx:c=>c,wz:r=>r,tileTop:heightAt,getSelectionRing:()=>ring,getPlayerGroup:()=>group,getEffectLayer:()=>group,invalidateAxes:noop};
- controller=player.createPlayerController(env);controller.setMode('play');
+ configure({world,map,add,env});controller=player.createPlayerController(env);controller.setMode('play');
  const move=(r,c)=>{controller.selectPlayer();const ok=controller.movePlayer(r,c);controller.tick(performance.now()+1000);return ok;};
  return {world,map,state,controller,move,add,env};
 }
@@ -184,4 +184,38 @@ test('fragile paper breaks on successful departure; failed moves, previews, undo
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.controller.canMoveTo(2,1),true);
  f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.runtime('fragile','fragile').broken,true);
  f.controller.tick(performance.now()+1000);f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
+});
+
+
+test('hidden region has definitions but no instances, reveal spawns once and undo/restart despawn',()=>{
+ const f=fixture('east',{r:3,c:0},()=>0,({map,add})=>{
+  map.tiles[3][0].regionTag='B';map.tiles[6][6].regionTag='B';
+  map.tiles[2][2].tags.exitTo='B';
+  add('hidden-lift',6,6,{lift:{minHeight:.1,maxHeight:3.1,initialHeight:.1,turnsPerLeg:3}});
+ });
+ assert.equal(f.world.has('emitter'),false);assert.deepEqual(f.world.at(3,0),[]);
+ assert.equal(f.world.has('hidden-lift'),false);assert.throws(()=>f.world.runtime('hidden-lift','lift'),/Unknown entity/);
+ assert.equal(f.world.definitions().some(node=>node.id==='emitter'),true);
+ assert.equal(f.controller.validateForPlay().valid,true,'validation still includes dormant definitions');
+ f.move(2,0);assert.equal(f.state.terrainState.gameOver,false,'hidden emitter cannot shoot');
+ assert.equal(f.world.has('emitter'),false);
+ f.move(2,1);const before=f.controller.snapshot();
+ f.move(2,2);assert.equal(f.world.has('emitter'),true);assert.equal(f.world.has('hidden-lift'),true);
+ assert.equal(f.world.runtime('hidden-lift','lift').height,1.1,'lift starts only on reveal');
+ const count=f.world.serialize().length;f.controller.transitionRegion();assert.equal(f.world.serialize().length,count);
+ f.controller.undo();assert.equal(f.world.has('emitter'),false);assert.deepEqual(f.controller.snapshot(),before);
+ f.move(2,2);assert.equal(f.world.runtime('hidden-lift','lift').height,1.1);
+ f.controller.restart();assert.equal(f.world.has('emitter'),false);assert.equal(f.world.has('hidden-lift'),false);
+ f.controller.setMode('edit');assert.equal(f.world.has('emitter'),true);assert.deepEqual(f.world.runtime('emitter','rayEmitter'),{});
+});
+
+test('test teleport spawns target region before enter and invalid teleport does not reveal',()=>{
+ const f=fixture('east',{r:6,c:0},()=>0,({map,add})=>{
+  map.tiles[4][4].regionTag='B';map.tiles[5][5].regionTag='C';
+  add('hidden-key',4,4,{key:{name:'B-key'}});add('blocked-target',5,5,{collision:{blocked:true}});
+ });
+ f.controller.setFreeTeleport(true);
+ assert.equal(f.controller.testTeleport(5,5),false);assert.equal(f.state.revealedRegions.has('C'),false);assert.equal(f.world.has('blocked-target'),false);
+ assert.equal(f.controller.testTeleport(4,4),true);assert.equal(f.world.has('hidden-key'),true);assert.deepEqual(f.state.terrainState.collectedKeys,['B-key']);
+ f.controller.tick(performance.now()+1000);f.controller.undo();assert.equal(f.world.has('hidden-key'),false);
 });

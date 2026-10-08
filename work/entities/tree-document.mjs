@@ -61,7 +61,7 @@ export class TreeDocument {
     return candidate;
   }
   cleanMetadata(map){const {version,width,height,tiles,foldCells,...metadata}=map;return copy(metadata);}
-  cellNodes(nodes=this.world.serialize()){
+  cellNodes(nodes=this.world.definitions()){
     const byCell=new Map();
     for(const node of nodes)for(const {r,c} of this.world.transforms.worldCells(node.transformId)){
       const key=r+','+c,items=byCell.get(key)??[];items.push(node);byCell.set(key,items);
@@ -84,7 +84,7 @@ export class TreeDocument {
   }
   view({runtime=false}={}){
     const {width,height}=this.world.transforms;
-    const byCell=this.cellNodes();
+    const byCell=this.cellNodes(runtime?this.world.serialize():this.world.definitions());
     const tiles=Array.from({length:height},()=>Array(width).fill(null)),foldCells=[];
     for(let r=0;r<height;r++)for(let c=0;c<width;c++){
       const nodes=byCell.get(r+','+c)??[];
@@ -98,7 +98,7 @@ export class TreeDocument {
   }
   serialize(options){
     // Persistence may filter tags; derive the spawn from canonical owners before filtering.
-    const owners=options?.projectProperties?this.world.serialize():null;
+    const owners=options?.projectProperties?this.world.definitions():null;
     const snapshot=serializeTreeMap(this.world,this.metadata,this.cellTags,options),spawns=new Map();
     for(const node of owners??snapshot.entities)if(node.tags.spawn)for(const {r,c} of this.world.transforms.worldCells(node.transformId))spawns.set(r+','+c,{r,c});
     if(spawns.size===1)snapshot.metadata.spawn={...this.metadata.spawn,...spawns.values().next().value};

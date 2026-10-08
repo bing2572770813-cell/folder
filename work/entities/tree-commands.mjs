@@ -203,5 +203,5 @@ export function placeCategorizedPrefab(document,prefab,tile,r,c,options={}){
   for(const id of ids)deleteTransform(id);
  }
  candidate=instantiateTreePrefab(candidate,prefab,configuration,r,c,{...options,stack:true,baseChecked:true,item:category==='item'||category==='creature',replaceTerrain:category==='terrain',validate:false});
- return validateTreeDocument(candidate);
+ return options.validate===false?candidate:validateTreeDocument(candidate);
 }

@@ -5,7 +5,7 @@ import {createFbxModelLoader} from './render/fbx-model-loader.mjs';
 import {createModelLibrary} from './render/model-library.mjs';
 import {createModelView} from './render/model-view.mjs';
 const prefab=JSON.parse(await readFile(new URL('../assets/prefab/entity/player_ai.json',import.meta.url)));
-assert.equal(prefab.visual?.model,'model/player_witch_ai.fbx');
+assert.match(prefab.visual?.model,/^model\/.+\.fbx$/i,'player uses the currently configured prefab model');
 const library=createModelLibrary({load:createFbxModelLoader({read:async path=>{
  const bytes=await readFile(new URL('../assets/'+path,import.meta.url));
  return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);

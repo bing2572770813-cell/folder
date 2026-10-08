@@ -157,7 +157,8 @@ async function main() {
       assert.equal(await page.locator('#prefabGrid [data-prefab="player_ai"]').isEnabled(),false);
       await page.locator('#prefabGrid [data-prefab="firebird_ai"]').click();
       await page.locator('[data-tool="place"]').click();
-      const birdPoint=await page.evaluate(()=>window.foldField.screenPoint(1,1));
+      // Keep the configured bird model away from the clicked spawn/step while retaining the 12-cell eastward beam.
+      const birdPoint=await page.evaluate(()=>window.foldField.screenPoint(3,1));
       await page.mouse.move(birdPoint.x,birdPoint.y);await page.mouse.click(birdPoint.x,birdPoint.y);
       await capture('desktop-enemy-placement');
       assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles.flat().filter(Boolean).length),49,'enemy retains its paper support');
@@ -324,7 +325,7 @@ async function main() {
       await closeContext('offline-emitter');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());
-      await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model==='model/player_witch_ai.fbx'&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;});
+      await page.waitForFunction(model=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model===model&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;},JSON.parse(fs.readFileSync(path.resolve(cwd,'../assets/prefab/entity/player_ai.json'),'utf8')).visual.model);
       await capture('standalone-builtin-player');
       results.push({name:'player-fbx-renders-from-file-without-asset-server',status:'pass'});
       await closeContext('standalone-player');

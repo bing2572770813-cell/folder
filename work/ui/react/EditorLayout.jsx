@@ -134,10 +134,11 @@ export const EditorLayout = React.memo(function EditorLayout() {
             <div className="result-overlay" id="resultOverlay" hidden={true}>
               <div className="result-card">
                 <h2 id="resultTitle">{"通关"}</h2>
+                <img id="resultImage" className="result-image" src="/assets/texture/completion-key.png" alt="通关插画" />
                 <p id="resultDetail">{"—"}</p>
                 <div className="result-actions">
                   <UiButton className="primary" id="resultRetry">
-                    {"再试一次"}
+                    {"再来一次"}
                   </UiButton>
                   <UiButton id="resultEdit">{"返回编辑"}</UiButton>
                 </div>

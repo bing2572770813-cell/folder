@@ -5,7 +5,7 @@
   "tile": {
     "color": "blue",
     "height": 0.09,
-    "blocked": true,
+    "blocked": false,
     "folds": [],
     "terrain": "ice",
     "terrainConfig": {}
@@ -19,9 +19,16 @@
   ],
   "static": {
     "entityType": "terrain",
-    "walkable": false
+    "walkable": true
   },
   "BaseEntity": [
     "paper_ai"
-  ]
+  ],
+  "visual": {
+    "model": "model/ice.fbx",
+    "scale": [0.006, 0.006, 0.006],
+    "offset": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "textures": {}
+  }
 }

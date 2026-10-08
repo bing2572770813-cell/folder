@@ -103,7 +103,7 @@ export function defaultComponents():ComponentRegistry {
       return {actor:{overheat,...(overheat>=6?{gameOver:true}:{})},messages:overheat>=6?['过热层数达到 6 层，游戏结束']:[]};
     }},
   });
-  registry.register('ice',{canEnter:()=> '冰块是阻挡方块'});
+  registry.register('ice',{});
   registry.register('key',{
     effectOrder:20,
     validate:config=>{if(config.name!==undefined&&(typeof config.name!=='string'||!config.name.trim()||config.name.trim().length>80))throw new Error('Invalid key name');},

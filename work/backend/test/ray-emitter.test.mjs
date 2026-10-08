@@ -40,9 +40,9 @@ test('first action freezes initial forward terrain, next action restores it and 
  assert.equal(f.controller.canMoveTo(3,0),false);
  assert.equal(f.move(2,2),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
  assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');
- for(const c of [1,2,3]){assert.equal(f.world.get('3-'+c).prefabId,'ice_ai');assert.equal(f.controller.canMoveTo(3,c),false);}
+ for(const c of [1,2,3]){assert.equal(f.world.get('3-'+c).prefabId,'ice_ai');assert.equal(f.controller.canMoveTo(3,c),true);}
  assert.deepEqual(f.world.definitions(),definitions,'temporary ice cannot modify authored terrain');
- const frozen=f.controller.snapshot();f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,2),false,'temporary ice also blocks test teleport');assert.deepEqual(f.controller.snapshot(),frozen);f.controller.setFreeTeleport(false);assert.equal(f.move(2,1),true,'moving outside the beam continues normally');
+ const frozen=f.controller.snapshot();assert.equal(f.move(2,1),true,'moving outside the beam continues normally');
  assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');assert.equal(f.world.get('3-1').prefabId,'test');
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),frozen);assert.equal(f.world.get('3-1').prefabId,'ice_ai');
  f.controller.restart();assert.deepEqual(f.controller.snapshot(),before);assert.deepEqual(f.world.snapshotReplacements(),[]);
@@ -104,7 +104,17 @@ test('fragile scene refresh cannot lower the departure animation or shake camera
  f.controller.tick(f.state.animation.start+1000);
  assert.equal(f.world.runtime('fragile','fragile').broken,true);
 });
-test('placed firebird activates once after arrival, with undo/restart restoring its runtime',()=>{
+test('entering a final fragile paper kills the player after the paper breaks',()=>{
+ const f=fixture();f.world.remove('emitter');f.add('fragile',2,2,{fragile:{}});
+ f.controller.selectPlayer();assert.equal(f.controller.movePlayer(2,2),true);
+ assert.equal(f.state.terrainState.gameOver,false,'death waits for the break animation to finish');
+ f.controller.tick(f.state.animation.start+1000);
+ assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ assert.equal(f.state.terrainState.gameOver,true);
+ assert.equal(f.state.terrainState.message,'从易碎方块上掉落，游戏结束');
+ assert.equal(f.state.stepLimitHit,true);
+});
+ test('placed firebird activates once after arrival, with undo/restart restoring its runtime',()=>{
  const f=birdFixture(),before=f.controller.snapshot();
  assert.equal(f.controller.canMoveTo(4,4),false);
  assert.equal(f.controller.movePlayer(99,99),false);assert.deepEqual(f.state.terrainState.flames,[]);

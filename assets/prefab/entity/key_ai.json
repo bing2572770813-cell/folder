@@ -39,5 +39,12 @@
     "obstacle_ai",
     "paper_ai",
     "plain_ai"
-  ]
+  ],
+  "visual": {
+    "model": "model/key.fbx",
+    "scale": [0.006, 0.006, 0.006],
+    "offset": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "textures": {}
+  }
 }

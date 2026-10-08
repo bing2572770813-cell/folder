@@ -138,6 +138,7 @@ const STORAGE_KEY = 'fold-field-map-v1';
 const EMBEDDED_MAP = window.__FOLD_FIELD_EXPORT_MAP__;
 const EMBEDDED_ASSETS = window.__FOLD_FIELD_EXPORT_ASSETS__;
 const COMPLETION_IMAGE = window.__FOLD_FIELD_COMPLETION_IMAGE__ || '/assets/texture/completion-key.png';
+const DEATH_IMAGE = window.__FOLD_FIELD_DEATH_IMAGE__ || '/assets/texture/death.jpg';
 const clone = data => JSON.parse(JSON.stringify(data));
 const previewCache=new Map();let previewRenderer,placementRenderCache=null,paperSurfaceCache=createPaperSurfaceCache();
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
@@ -758,7 +759,9 @@ function updateUI(){
   renderNameChecklist($('playerKeyChoices'),legalKeyNames(map,documentModel.world),new Set(P.terrainState.collectedKeys),'持有钥匙 ',(name,checked)=>{const keys=new Set(JSON.parse($('playerCollectedKeys').value));if(checked)keys.add(name);else keys.delete(name);$('playerCollectedKeys').value=JSON.stringify([...keys]);},'无可收集钥匙');
   $('playerRow').max=map.height;$('playerColumn').max=map.width;$('applyPlayerProperties').disabled=!playing||P.moving||!!P.foldMotion;if(P.foldMotion)$('teleportBtn').disabled=true;
   $('mapWidth').value=map.width;$('mapHeight').value=map.height;$('selectionText').textContent=map.width+' × '+map.height+' TILEMAP';
-  $('resultImage').src=COMPLETION_IMAGE;
+  const resultImage=$('resultImage');
+  resultImage.src=P.terrainState.gameOver?DEATH_IMAGE:COMPLETION_IMAGE;
+  resultImage.alt=P.terrainState.gameOver?'死亡插画':'通关插画';
   $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块掉落。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&!P.moving&&(P.levelWon||P.stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}folds+=(map.foldCells??[]).length;$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';

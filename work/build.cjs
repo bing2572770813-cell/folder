@@ -66,8 +66,9 @@ async function build() {
     .replace("<style>", "<style>" + css + "</style><style>")
     .replace("<!--REACT_MARKUP-->", markup);
   const completionImage='data:image/png;base64,'+fs.readFileSync(path.join(root,'../assets/texture/completion-key.png')).toString('base64');
+  const deathImage='data:image/jpeg;base64,'+fs.readFileSync(path.join(root,'../assets/texture/death.jpg')).toString('base64');
   const code =
-    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';window.__FOLD_FIELD_AUDIO_ASSETS__??='+JSON.stringify(audioAssets)+';window.__FOLD_FIELD_COMPLETION_IMAGE__??='+JSON.stringify(completionImage)+';'+
+    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';window.__FOLD_FIELD_AUDIO_ASSETS__??='+JSON.stringify(audioAssets)+';window.__FOLD_FIELD_COMPLETION_IMAGE__??='+JSON.stringify(completionImage)+';window.__FOLD_FIELD_DEATH_IMAGE__??='+JSON.stringify(deathImage)+';'+
     "window.__FOLD_FIELD_TAGS__??=" +
     JSON.stringify(catalog.tags).replace(/</g, "\\u003c") +
     ";window.__FOLD_FIELD_PREFABS__??=" +

@@ -196,6 +196,13 @@ async function main() {
       const emitterNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(emitterNext.x,emitterNext.y);
       await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+3*Math.PI/2)<1e-6));
+      await page.waitForFunction(()=>{
+        const cells=JSON.parse(document.getElementById('viewport').dataset.render).emitterHighlights;
+        return cells.filter(cell=>['emitter','legacy-emitter'].includes(cell.emitterId)).length===6;
+      });
+      const forwardHighlights=await page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.render).emitterHighlights.filter(cell=>['emitter','legacy-emitter'].includes(cell.emitterId)));
+      assert.ok(forwardHighlights.every(cell=>cell.c<5),'emitter rear/last-shot cells must not be highlighted after reversing');
+      results.push({name:'emitter-highlights-only-current-forward-range',status:'pass'});
       await capture('desktop-emitter-model-reversed');
       await page.locator('#undoBtn').click();
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+Math.PI/2)<1e-6));

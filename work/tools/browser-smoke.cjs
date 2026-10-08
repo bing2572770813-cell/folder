@@ -386,6 +386,10 @@ async function main() {
       await closeContext('offline-emitter');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());
+      await page.waitForFunction(()=>document.body.classList.contains('game-only'));
+      assert.equal(await page.locator('#gameTitle').isVisible(),false,'standalone export must hide the level title');
+      assert.equal(await page.locator('#gameDescription').isVisible(),false,'standalone export must hide the level description');
+      assert.equal(await page.locator('#gameHint').isVisible(),true,'standalone export keeps gameplay instructions');
       await page.waitForFunction(model=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model===model&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;},JSON.parse(fs.readFileSync(path.resolve(cwd,'../assets/prefab/entity/player_ai.json'),'utf8')).visual.model);
       await capture('standalone-builtin-player');
       results.push({name:'player-fbx-renders-from-file-without-asset-server',status:'pass'});
@@ -397,6 +401,9 @@ async function main() {
       await closeContext('mobile-editor');
       await open({width: 390, height: 844}, '/game.html');
       await page.waitForFunction(() => document.body.classList.contains('game-only'));
+      assert.equal(await page.locator('#gameTitle').isVisible(),false,'exported game hides level title');
+      assert.equal(await page.locator('#gameDescription').isVisible(),false,'exported game hides level description');
+      assert.equal(await page.locator('#gameHint').isVisible(),true,'exported game keeps gameplay instructions');
       await capture('mobile-game');
       await closeContext('mobile-game');
     }

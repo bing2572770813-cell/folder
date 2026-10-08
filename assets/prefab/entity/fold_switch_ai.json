@@ -21,7 +21,7 @@
   ],
   "components": {
     "foldSwitch": {
-      "initialState": 0
+      "initialState": 1
     }
   },
   "propertySchema": {

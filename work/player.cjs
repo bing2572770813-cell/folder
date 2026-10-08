@@ -198,6 +198,7 @@ function fireRayEmitters(){
   const previous=tree.runtime(node.id,'rayEmitter'),direction=previous.fired?rayEmitterConfig.directions[previous.direction??node.components.rayEmitter.initialDirection].opposite:node.components.rayEmitter.initialDirection;
   const lastShot=rayCells(origin,direction,map.width,map.height);
   tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot,shotDirection:direction});
+  if(lastShot.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被射线冻死';}
   for(const cell of lastShot){if(env.isHidden(cell.r,cell.c))continue;const nodes=activeAt(cell.r,cell.c);if(!nodes.some(owner=>owner.components.surface))continue;for(const owner of nodes)if(isRayTerrain(owner))affected.set(owner.id,owner);}
  }
  tree.replaceRuntimeEntities([...affected.values()].map(node=>iceReplacement(node,prefab,tree)));buildPaper();
@@ -425,7 +426,7 @@ function settleAction(action){
  if(transitioned)arrive(Trigger.Teleport);
  fireRayEmitters();
  refreshFirebirdThreat();
- updateFirebirds(action);
+ if(!P.terrainState.gameOver)updateFirebirds(action);
  refreshFirebirdThreat(false);
  if(exitIsValid()&&!switchesOpen(env.getMap().tiles[env.getMap().exit.r]?.[env.getMap().exit.c]?.tags)&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='出口绑定的开关尚未全部开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);

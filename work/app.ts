@@ -588,7 +588,7 @@ function inspectSelection(){
     const schema=entity.properties?inspectedPropertySchema(r,c,entity.properties):Object.fromEntries(Object.keys(values).map(key=>[key,{tempEditable:false}]));
     return {values:entity.properties?debugOverrides.values(inspectionKey(r,c,entity.properties),values,schema):values,schema};
   });
-  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰块：蓝色阻挡地形，玩家不可进入；不改变冰冻、过热等状态。',rayEmitter:'冰冻射线：首次成功行动后临时替换初始方向前方三格地形；之后每次行动恢复原地形、反向并重新冻结，保留道具、生物及标签。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
+  const descriptions={key:'钥匙：钥匙是通过区域出口进入下一个区域的可选条件。玩家收集钥匙后，满足出口配置的全部所需钥匙才能传送；未设置所需钥匙的出口无需钥匙。',campfire:'篝火：玩家不能进入篝火方块。玩家进入篝火八向相邻的方格时，解除冰冻状态。',ice:'冰块：蓝色阻挡地形，玩家不可进入；不改变冰冻、过热等状态。',rayEmitter:'冰冻射线：首次成功行动后临时替换初始方向前方三格地形；之后每次行动恢复原地形、反向并重新冻结，保留道具、生物及标签。命中玩家时提示被射线冻死并结束游戏。',fire:'火焰：每次进入增加一层过热；达到六层时游戏结束。',eruption:'喷发：按玩家行动次数周期切换，第 2、5、8……次行动后开放，其余时刻禁止进入。',lift:'升降纸张：每次成功行动推进高度；玩家站在上面时只下降，到最低后保持，离开后恢复往返。'};
   renderMechanismText($('mechanismDescriptions'),[...new Set(cells.map(p=>{const tile=map.tiles[p.r][p.c];return tile?.lift?'lift':tile?.terrain??'none';}))].map(type=>descriptions[type]||(type==='none'?'无机制：该实体没有配置机制类型。':'未登记机制：'+type)));
   inspectedCell=cells[0];
   const cellKeys=new Set(['tags','folds','fold']);

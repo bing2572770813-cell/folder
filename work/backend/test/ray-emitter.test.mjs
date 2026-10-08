@@ -38,23 +38,23 @@ test('emitter fires three cells excluding itself in each cardinal direction',()=
 test('first action freezes initial forward terrain, next action restores it and reverses, undo/restart restore',()=>{
  const f=fixture(),before=f.controller.snapshot(),definitions=f.world.definitions();
  assert.equal(f.controller.canMoveTo(3,0),false);
- assert.equal(f.move(3,1),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
+ assert.equal(f.move(2,2),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
  assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');
  for(const c of [1,2,3]){assert.equal(f.world.get('3-'+c).prefabId,'ice_ai');assert.equal(f.controller.canMoveTo(3,c),false);}
  assert.deepEqual(f.world.definitions(),definitions,'temporary ice cannot modify authored terrain');
- const frozen=f.controller.snapshot();f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,2),false,'temporary ice also blocks test teleport');assert.deepEqual(f.controller.snapshot(),frozen);f.controller.setFreeTeleport(false);assert.equal(f.move(2,1),true,'player may leave a newly frozen support');
+ const frozen=f.controller.snapshot();f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,2),false,'temporary ice also blocks test teleport');assert.deepEqual(f.controller.snapshot(),frozen);f.controller.setFreeTeleport(false);assert.equal(f.move(2,1),true,'moving outside the beam continues normally');
  assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');assert.equal(f.world.get('3-1').prefabId,'test');
  f.controller.undo();assert.deepEqual(f.controller.snapshot(),frozen);assert.equal(f.world.get('3-1').prefabId,'ice_ai');
  f.controller.restart();assert.deepEqual(f.controller.snapshot(),before);assert.deepEqual(f.world.snapshotReplacements(),[]);
 });
 
-test('ray never directly kills or freezes the player; invalid actions and idle frames never rotate',()=>{
+test('ray kills at the third cell, not the fourth; invalid actions and idle frames never rotate',()=>{
  const f=fixture(),before=f.controller.snapshot();f.controller.selectPlayer();
  assert.equal(f.controller.movePlayer(99,99),false);f.controller.turn(1);for(let i=0;i<20;i++)f.controller.tick(i*1000);
  assert.deepEqual(f.world.runtime('emitter','rayEmitter'),{});assert.equal(f.state.turn.number,0);
  f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(3,4),true);assert.equal(f.state.terrainState.gameOver,false);
  assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');f.controller.tick(performance.now()+1000);f.controller.undo();
- assert.equal(f.controller.testTeleport(3,3),true);assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.state.terrainState.frozen,false);
+ assert.equal(f.controller.testTeleport(3,3),true);assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.terrainState.message,'被射线冻死');assert.equal(f.state.stepLimitHit,true);assert.equal(f.state.turn.outcome,'terrain');assert.equal(f.state.terrainState.frozen,false);
  assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.equal(f.state.turn.number,before.turn.number+1);
 });
 
@@ -62,7 +62,7 @@ test('regional teleport settles before freezing and the ray crosses obstacles wi
  const f=fixture();f.map.tiles[2][2].tags.exitTo='B';f.map.tiles[3][3].regionTag='B';f.map.tiles[3][3].tags.entry=true;
  f.add('obstacle',3,2,{collision:{blocked:true}});
  f.move(2,2);assert.equal(f.state.player.r,3);assert.equal(f.state.player.c,3);
- assert.equal(f.state.terrainState.gameOver,false);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');assert.equal(f.state.turn.number,1);
+ assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.terrainState.message,'被射线冻死');assert.equal(f.world.runtime('emitter','rayEmitter').direction,'east');assert.equal(f.state.turn.number,1);
  assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.equal(f.world.has('emitter'),true);
 });
 
@@ -255,4 +255,28 @@ test('ray skips hidden regions, void and broken paper while still reaching farth
  assert.equal(f.world.has('3-2'),false);assert.equal(f.world.get('3-3').prefabId,'ice_ai');assert.deepEqual(f.world.at(3,1),[]);
  const broken=fixture();const ground=broken.world.get('3-1');broken.world.remove(ground.id);ground.components.fragile={};broken.world.add(ground);broken.world.setRuntime(ground.id,'fragile',{broken:true});
  broken.move(2,2);assert.equal(broken.world.get('3-1').prefabId,'test');assert.equal(broken.world.get('3-2').prefabId,'ice_ai');
+});
+
+
+test('walking into an active new beam ends the run, undo and restart remove death and temporary ice',()=>{
+ const f=fixture(),before=f.controller.snapshot();assert.equal(f.move(3,1),true);
+ assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.terrainState.message,'被射线冻死');assert.equal(f.state.stepLimitHit,true);
+ assert.equal(f.controller.movePlayer(2,1),false,'finished game refuses further actions');
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);assert.equal(f.world.get('3-1').prefabId,'test');
+ f.move(3,1);f.controller.restart();assert.deepEqual(f.controller.snapshot(),before);
+});
+
+
+test('reversed beam kills at the new direction after the initial safe action',()=>{
+ const f=fixture('east',{r:3,c:3});assert.equal(f.move(2,2),true);assert.equal(f.state.terrainState.gameOver,false);
+ assert.equal(f.move(3,2),true);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');assert.equal(f.state.terrainState.message,'被射线冻死');assert.equal(f.state.terrainState.gameOver,true);
+});
+
+
+test('ray freeze death is not overwritten by subsequent firebird hazard processing',()=>{
+ const f=fixture('east',{r:3,c:0},()=>0,({world})=>{
+  world.transforms.create({id:'t-bird-priority',parentId:null,local:{r:2,c:4,dir:0},footprint:{width:3,height:3,occupied:Array(9).fill(true)}});
+  world.add({id:'bird-priority',prefabId:'firebird_ai',transformId:'t-bird-priority',components:{firebird:{direction:'west'}},tags:{},static:{entityType:'creature'}});
+ });
+ f.move(3,1);assert.equal(f.state.terrainState.gameOver,true);assert.equal(f.state.terrainState.message,'被射线冻死');assert.deepEqual(f.state.terrainState.flames,[]);
 });

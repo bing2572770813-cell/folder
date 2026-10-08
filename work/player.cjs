@@ -185,6 +185,24 @@ function fireRayEmitters(){
  }
  env.refreshMechanismSurfaces?.();
 }
+// Notification deduplication is presentation-only; threat itself is derived from live entities.
+let previousFirebirdThreat=new Map();
+function firebirdThreat(){
+ const tree=world();if(P.mode!=='play'||!tree)return [];
+ return tree.serialize().filter(node=>node.components.firebird&&!tree.runtime(node.id,'firebird').replaced).flatMap(node=>{
+  const origin=tree.position(node.id);if(!activeAt(origin.r,origin.c).some(owner=>owner.id===node.id))return [];
+  return [{id:node.id,angry:firebirdRules.inWatchRange(origin,P.player,tree.transforms.get(node.transformId).footprint)}];
+ });
+}
+function refreshFirebirdThreat(notify=true){
+ const threats=firebirdThreat(),messages=[];
+ if(notify&&threats.some(node=>!previousFirebirdThreat.has(node.id)))messages.push('火焰鸟的火焰子弹正在追踪你');
+ if(notify&&threats.some(node=>node.angry&&previousFirebirdThreat.get(node.id)!==true))messages.push('火焰鸟发怒了');
+ previousFirebirdThreat=new Map(threats.map(node=>[node.id,node.angry]));
+ env.onFirebirdThreat?.(threats);
+ if(messages.length)toast(messages.join('；'));
+ return threats;
+}
 function updateFirebirds(action){
  const tree=world(),map=env.getMap();if(!tree||!action)return;
  let flames=flameField.spreadFlame(P.terrainState.flames??[],[],map.width,map.height);
@@ -259,7 +277,7 @@ function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vert
  if(![foldVertical,foldHorizontal].every(n=>Number.isFinite(n)&&n>0&&n<=16))throw new Error('折纸落点阈值须大于 0 且不超过 16');
  if(typeof canDropOnFold!=='boolean')throw new Error('可在折叠时掉落须为布尔值');
  const tile=configuredMap().tiles[r]?.[c];if(!tile||(world()?!withConfiguredWorld(()=>treeEntryCheck({r,c},terrainState)).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');
- record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.foldDrop={vertical:foldVertical,horizontal:foldHorizontal};P.canDropOnFold=canDropOnFold;P.terrainState=terrainState;revealRegion(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();
+ record();P.player={r,c,dir};P.moveHeight={maxUp,maxDown};P.foldDrop={vertical:foldVertical,horizontal:foldHorizontal};P.canDropOnFold=canDropOnFold;P.terrainState=terrainState;revealRegion(regionOf(tile));clearSelection();buildPaper();renderPlayer();updateUI();refreshFirebirdThreat();
 }
 function validateForPlay(){return withConfiguredWorld(validateConfiguredPlay);}
 function validateConfiguredPlay() {const map=configuredMap();
@@ -388,7 +406,9 @@ function settleAction(action){
  const transitioned=!P.terrainState.gameOver&&transitionRegion();
  if(transitioned)arrive(Trigger.Teleport);
  fireRayEmitters();
+ refreshFirebirdThreat();
  updateFirebirds(action);
+ refreshFirebirdThreat(false);
  if(exitIsValid()&&!switchesOpen(env.getMap().tiles[env.getMap().exit.r]?.[env.getMap().exit.c]?.tags)&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='出口绑定的开关尚未全部开启';
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;
@@ -464,12 +484,12 @@ function setMode(next){
  env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();
  const map=env.getMap();env.getPlayerGroup().scale.setScalar(1);P.mode=next;if(next==='edit')P.freeTeleport=false;
  resetRegions();P.steps=0;P.teleports=0;P.playHistory=[];P.player={...map.spawn};resetPrefabState();
- if(P.mode==='play')collectKey();clearSelection();buildPaper();if(P.mode==='play')updateLifts();renderPlayer();updateUI();if(P.mode==='play')checkRunEnd();
+ if(P.mode==='play')collectKey();clearSelection();buildPaper();if(P.mode==='play')updateLifts();renderPlayer();updateUI();if(P.mode==='play')checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
 }
 function restart(){
  cancelFoldMotion();if(P.moving)return;env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();
  const map=env.getMap();resetRegions();P.player={...map.spawn};resetPrefabState();P.steps=P.teleports=0;P.playHistory=[];
- collectKey();clearSelection();buildPaper();updateLifts();renderPlayer();updateUI();toast('已回到玩家起点');checkRunEnd();
+ collectKey();clearSelection();buildPaper();updateLifts();renderPlayer();updateUI();toast('已回到玩家起点');checkRunEnd();previousFirebirdThreat.clear();refreshFirebirdThreat();
 }
 function snapshot(){const map=env.getMap();return {player:{...P.player},moveHeight:{...P.moveHeight},foldDrop:{...P.foldDrop},canDropOnFold:P.canDropOnFold,steps:P.steps,teleports:P.teleports,turn:clone(P.turn),terrainState:clone(P.terrainState),revealedRegions:[...P.revealedRegions],...(world()?{entityRuntime:world().snapshotRuntime(),entityPositions:world().snapshotPositions()}:{})};}
 function restore(previous){
@@ -480,7 +500,7 @@ function restore(previous){
  }
  P.player={...previous.player};P.moveHeight={...(previous.moveHeight??{maxUp:1,maxDown:1})};P.foldDrop={...(previous.foldDrop??playerPrefabDefaults().foldDrop)};P.canDropOnFold=previous.canDropOnFold??playerPrefabDefaults().canDropOnFold;
  P.steps=previous.steps;P.teleports=previous.teleports;P.terrainState=clone(previous.terrainState);P.revealedRegions=new Set(previous.revealedRegions);P.levelWon=false;P.stepLimitHit=false;P.animation=null;P.moving=false;turnManager.reset(previous.turn??initialTurn());
- env.getPlayerGroup().scale.setScalar(1);syncLiftHeights();clearSelection();buildPaper();renderPlayer();updateUI();checkRunEnd();
+ env.getPlayerGroup().scale.setScalar(1);syncLiftHeights();clearSelection();buildPaper();renderPlayer();updateUI();checkRunEnd();refreshFirebirdThreat(false);
 }
 function cancelFoldMotion() {
     if (!P.foldMotion) return;
@@ -732,6 +752,6 @@ function resetPosition(){P.player={...env.getMap().spawn};}
 function resetProgress(){turnManager.reset();P.steps=P.teleports=0;P.playHistory=[];resetRegions();resetPosition();}
 function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150)P.playHistory.shift();}
 function undo(){cancelFoldMotion();if(P.moving||P.mode!=='play')return;const previous=P.playHistory.pop();if(previous)restore(previous);}
-return {foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
+return {firebirdThreat,refreshFirebirdThreat,foldHighlightRegions,prepareFoldMotion,beginFoldDrag,updateFoldDrag,endFoldDrag,cancelFoldMotion,turnManager,setPlayerProperties,interact,setFreeTeleport,testTeleport,setFoldHints,recordPlay,undo,resetPosition,resetProgress,canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode,restart,snapshot,restore,tick,click,updateLifts};
 }
 module.exports={playerPrefabDefaults,Trigger,TurnPhase,createTurnManager,createPlayerState,createPlayerController,initialLiftState:liftInitial,advanceLift,rayCells};

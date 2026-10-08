@@ -333,3 +333,24 @@ test('idle render frames keep player selection without rebuilding the scene',()=
  assert.equal(f.rebuilds,rebuilds);assert.ok(f.state.legalMoves.length>0);
  assert.deepEqual(f.controller.snapshot(),before);
 });
+
+
+test('firebird spawn warns once, highlights player, rages in 9x9 and restores on undo',()=>{
+ const messages=[],highlights=[];
+ const f=fixture([['bird',0,3,{firebird:{direction:'north'}}]],env=>{
+  env.toast=message=>messages.push(message);env.onFirebirdThreat=nodes=>highlights.push(nodes.length>0);
+ });
+ assert.ok(messages.some(message=>message.includes('火焰子弹正在追踪你')&&message.includes('火焰鸟发怒了')));
+ assert.equal(highlights.at(-1),true);
+ const count=messages.length;f.controller.refreshFirebirdThreat();assert.equal(messages.length,count,'no repeated notification');
+ f.move(1,1);assert.equal(f.world.runtime('bird','firebird').replaced,true);assert.equal(highlights.at(-1),false);
+ f.controller.undo();assert.equal(highlights.at(-1),true);assert.equal(f.world.runtime('bird','firebird').replaced,undefined);
+ f.controller.setMode('edit');assert.equal(highlights.at(-1),false);
+ f.controller.setMode('play');assert.equal(highlights.at(-1),true);
+ f.controller.restart();assert.ok(messages.at(-1).includes('火焰子弹正在追踪你'));
+ // Range uses the existing center +/-4 rule, not proximity to footprint edges.
+ f.state.player={r:0,c:8,dir:2};f.controller.refreshFirebirdThreat(false);
+ f.state.player.c=7;f.controller.refreshFirebirdThreat();assert.equal(messages.at(-1),'火焰鸟发怒了');
+ f.controller.refreshFirebirdThreat();assert.equal(messages.at(-1),'火焰鸟发怒了');
+ f.world.remove('bird');f.controller.refreshFirebirdThreat();assert.equal(highlights.at(-1),false);
+});

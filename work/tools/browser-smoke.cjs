@@ -214,6 +214,10 @@ async function main() {
       await page.locator('#mapFile').setInputFiles({name:'offline-actors.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(offlineActors))});
       await page.waitForFunction(()=>window.foldField.getState().map.name==='模型预扫描离线验收');
       await page.locator('#playMode').click();
+      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).firebirdTrackingHighlight===true);
+      assert.match(await page.locator('#toast').textContent(),/火焰子弹正在追踪你.*火焰鸟发怒了/);
+      await capture('desktop-firebird-tracking');
+      results.push({name:'firebird-spawn-warning-player-halo-and-nine-cell-rage',status:'pass'});
       const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportGame').click()]);
       const exportedEmitter=path.join(directory,'emitter-offline-game.html');await download.saveAs(exportedEmitter);
       await page.locator('#editMode').click();
@@ -339,6 +343,7 @@ async function main() {
       await page.evaluate(()=>window.foldField.enableDiagnostics());
       await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected));},currentEmitterModel);
       if(currentBirdModel)await page.waitForFunction(model=>JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
+      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).firebirdTrackingHighlight===true);
       await capture('offline-current-emitter-model');
       results.push({name:'exported-game-resolves-current-prefab-model-without-server',status:'pass'});
       await closeContext('offline-emitter');

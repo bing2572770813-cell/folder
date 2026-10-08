@@ -13,8 +13,8 @@
     "scriptId": "player-controller",
     "parameters": {
       "moveHeight": {
-        "maxUp": 1,
-        "maxDown": 1
+        "maxUp": 0.4,
+        "maxDown": 0.4
       },
       "foldDrop": {
         "vertical": 1,
@@ -50,7 +50,7 @@
     "model": "model/newwitch.fbx",
     "scale": [0.01, 0.01, 0.01],
     "offset": [0, 0, 0],
-    "rotation": [0, 0, 0],
+    "rotation": [0, 180, 0],
     "textures": {}
   }
 }

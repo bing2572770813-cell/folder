@@ -180,8 +180,8 @@ async function main() {
       const next=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(next.x,next.y);
       await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),12);
-      await page.waitForFunction(()=>{const render=JSON.parse(document.getElementById('viewport').dataset.render);return render.flameMarkers===12&&render.replacedFirebirds===1;});
-      if(currentBirdModel)await page.waitForFunction(model=>!JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
+      await page.waitForFunction(()=>{const render=JSON.parse(document.getElementById('viewport').dataset.render);return render.flameMarkers===12&&render.replacedFirebirds===1&&render.firebirdRangeLines===1;});
+      if(currentBirdModel)await page.waitForFunction(model=>JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
       await capture('desktop-firebird-flames');
       await page.locator('#undoBtn').click();
       assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.flames.length),0);

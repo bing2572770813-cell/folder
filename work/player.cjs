@@ -187,7 +187,7 @@ function iceReplacement(node,prefab,tree){
  const height=node.components.lift?(tree.runtime(node.id,'lift').height??node.components.lift.initialHeight):(surface.height??node.configuration?.height??.09);
  const geometry=Object.fromEntries(['thickness','gradualRate','edgeColor'].filter(key=>surface[key]!==undefined).map(key=>[key,surface[key]]));
  const components={...clone(prefab.components??{}),surface:{...geometry,height,color:tile.color??'blue',connected:false},collision:{blocked:tile.blocked??false},ice:clone(prefab.components?.ice??tile.terrainConfig??{}),physics:{...clone(prefab.components?.physics??{}),followFold:tile.followFold??false},...(node.components.fold?{fold:clone(node.components.fold)}:{}),...(node.components.key?{key:clone(node.components.key)}:{})};
- return {id:node.id,prefabId:prefab.id,transformId:node.transformId,components,tags:clone(node.tags),static:{...clone(prefab.static??{}),entityType:'terrain',walkable:prefab.static?.walkable??true},configuration:{...clone(tile),...geometry,height,color:tile.color??'blue',blocked:true,prefabId:prefab.id,...(prefab.visual?{visual:clone(prefab.visual)}:{})}};
+ return {id:node.id,prefabId:prefab.id,transformId:node.transformId,components,tags:clone(node.tags),static:{...clone(prefab.static??{}),entityType:'terrain',walkable:prefab.static?.walkable??true},configuration:{...clone(tile),...geometry,height,color:tile.color??'blue',blocked:tile.blocked??false,prefabId:prefab.id,...(prefab.visual?{visual:clone(prefab.visual)}:{})}};
 }
 function fireRayEmitters(){
  const tree=world(),map=env.getMap();if(!tree)return;
@@ -258,7 +258,6 @@ function structuralEntryCheck(r,c){
  const nodes=world().at(r,c);
  if(!nodes.some(node=>Object.hasOwn(node.components,'surface')))return {valid:false,reason:'目标为空格'};
  if(nodes.some(node=>node.static.walkable===false||node.components.collision?.blocked))return {valid:false,reason:'目标是阻挡方块'};
- if(nodes.some(node=>Object.hasOwn(node.components,'ice')))return {valid:false,reason:'冰块是阻挡方块'};
  if(nodes.some(node=>Object.hasOwn(node.components,'campfire')))return {valid:false,reason:'篝火方块不可进入'};
  if(nodes.some(node=>Object.hasOwn(node.components,'rayEmitter')))return {valid:false,reason:'冰冻射线机关不可进入'};
  if(nodes.some(node=>Object.hasOwn(node.components,'foldSwitch')))return {valid:false,reason:'折线开关方块不可进入'};
@@ -447,11 +446,12 @@ function settleAction(action={trigger:P.turn.trigger??Trigger.Walk}){
  refreshFirebirdThreat();
  if(!P.terrainState.gameOver)updateFirebirds(action);
  refreshFirebirdThreat(false);
- if(transition){
-  if(transition.entry){revealRegion(transition.target);buildPaper();toast('进入区域：'+transition.target);if(transitioned&&!P.terrainState.gameOver)arrive(Trigger.Teleport);}
-  else commitRegionTransition(transition);
- }
- if(exitIsValid()&&!switchesOpen(env.getMap().tiles[env.getMap().exit.r]?.[env.getMap().exit.c]?.tags)&&P.player.r===env.getMap().exit.r&&P.player.c===env.getMap().exit.c&&!P.terrainState.gameOver)P.terrainState.message='出口绑定的开关尚未全部开启';
+  if(transition){
+   if(transition.entry){revealRegion(transition.target);buildPaper();toast('进入区域：'+transition.target);if(transitioned&&!P.terrainState.gameOver)arrive(Trigger.Teleport);}
+   else commitRegionTransition(transition);
+   // Region entities are spawned by the transition; refresh firebird tracking after arrival so destination birds can see the player immediately.
+   refreshFirebirdThreat(false);
+  }
  if(P.terrainState.message)toast(P.terrainState.message,P.terrainState.gameOver);
  updateLifts(true);return transitioned;
 }
@@ -792,7 +792,7 @@ function tick(now){    if (P.foldMotion) {
       return;
     }
 const map=env.getMap();if(!P.animation)return;const animation=P.animation;if(animation.fromCell&&animation.type!=='drop'&&!animation.fromPosition)animation.from.y=tileTop(animation.fromCell.r,animation.fromCell.c)+.018;if(animation.toCell)animation.to.y=tileTop(animation.toCell.r,animation.toCell.c)+.018;const t=Math.min(1,(now-P.animation.start)/P.animation.duration),smooth=t*t*(3-2*t);updateFragileBreakAnimation(t);if(P.animation.type==='teleport'){if(t<.5){env.getPlayerGroup().position.copy(P.animation.from);env.getPlayerGroup().scale.setScalar(Math.max(.03,1-t*2));}else{env.getPlayerGroup().position.copy(P.animation.to);env.getPlayerGroup().scale.setScalar(Math.max(.03,(t-.5)*2));}}else if(animation.type==='drop'){env.getPlayerGroup().position.lerpVectors(animation.from,animation.to,smooth);env.getPlayerGroup().position.y=animation.from.y+(animation.to.y-animation.from.y)*t*t;}else env.getPlayerGroup().position.lerpVectors(P.animation.from,P.animation.to,smooth);env.getPlayerGroup().rotation.set(0,-P.player.dir*Math.PI/4,0);if(t>=1){finalizeFragileBreaks();P.animation=null;P.moving=false;env.getPlayerGroup().scale.setScalar(1);renderPlayer();checkRunEnd();if(animation.turnId!==undefined)turnManager.complete(animation.turnId);click(P.player.r,P.player.c);updateUI();}}
-function click(r,c){const map=env.getMap();if(P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit )return;if(P.freeTeleport&&(r!==P.player.r||c!==P.player.c)){testTeleport(r,c);return;}if(env.isHidden(r,c))return;if(P.chosenFold){const target=foldTarget(P.chosenFold);if(target.valid&&target.r===r&&target.c===c){teleport();return;}}if(r===P.player.r&&c===P.player.c){if(env.getSelectionRing().visible)clearSelection();else selectPlayer();return;}if(P.legalMoves.some(t=>t.r===r&&t.c===c)){movePlayer(r,c);return;}const foldMove=P.legalFoldMoves.find(t=>t.r===r&&t.c===c);if(foldMove){teleport(foldMove.axis);return;}if(foldsAt(map,r,c).length){selectFold(r,c);return;}if(P.legalMoves.length){toast(walkable(r,c)?'该方块不在可移动范围内':'黑色或空格方块不可移动',true);}else if(!walkable(r,c)){toast('黑色或空格方块不可移动',true);}clearSelection();}
+function click(r,c){const map=env.getMap();if(P.mode!=='play'||P.moving||P.foldMotion||P.levelWon||P.stepLimitHit )return;if(P.freeTeleport&&(r!==P.player.r||c!==P.player.c)){testTeleport(r,c);return;}if(env.isHidden(r,c))return;if(r===P.player.r&&c===P.player.c){if(env.getSelectionRing().visible)clearSelection();else selectPlayer();return;}if(P.legalMoves.some(t=>t.r===r&&t.c===c)){movePlayer(r,c);return;}if(foldsAt(map,r,c).length){selectFold(r,c);return;}if(P.legalMoves.length){toast(walkable(r,c)?'该方块不在可移动范围内':'黑色或空格方块不可移动',true);}else if(!walkable(r,c)){toast('黑色或空格方块不可移动',true);}clearSelection();}
 function resetPosition(){P.player={...env.getMap().spawn};}
 function resetProgress(){turnManager.reset();P.steps=P.teleports=0;P.playHistory=[];resetRegions();resetPosition();}
 function recordPlay(){P.playHistory.push(snapshot());if(P.playHistory.length>150)P.playHistory.shift();}

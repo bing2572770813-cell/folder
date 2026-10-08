@@ -60,7 +60,28 @@ const names = {
   damage: "过热增量",
   name: "名称",
   tag: "标签组件",
+  triggers: "触发方式",
+  mechanism: "机制触发",
 };
+const DEFAULT_TRIGGER_CHOICES=[{value:'walk',label:'行走触发'},{value:'teleport',label:'传送触发'}];
+function TriggerChoices({value,path,access,definition,onChange,onError}) {
+  const [draft,setDraft]=useState(value);
+  useEffect(()=>setDraft(value),[JSON.stringify(value)]);
+  const title=definition.label||names[path.at(-1)]||path.at(-1),prefix=path[0]==='mechanism'?'':(names[path[1]]?names[path[1]]+' · ':'');
+  const dedicated=path[0]==='mechanism';
+  return <div className={dedicated?'trigger-editor':'inspector-list'}>
+    {dedicated&&<div className="trigger-editor-title">触发条件</div>}
+    {!dedicated&&<span>{title}</span>}
+    {DEFAULT_TRIGGER_CHOICES.map(choice=><label className={dedicated?'trigger-editor-row':'inspector-list-row'} data-trigger={choice.value} key={choice.value}>
+      {dedicated&&<span><span className="trigger-editor-label">{choice.label}</span><small>{choice.value==='walk'?'玩家行走进入该方块时生效':'玩家通过传送落到该方块时生效'}</small></span>}
+      <UiCheckbox aria-label={`${prefix}${title} · ${choice.label}`} checked={draft.includes(choice.value)} disabled={!access.tempEditable} onChange={event=>{
+        const next=event.currentTarget.checked?[...new Set([...draft,choice.value])]:draft.filter(item=>item!==choice.value);
+        try{if(!next.length)throw new Error('至少保留一种触发方式');onChange(path,next);setDraft(next);}catch(error){setDraft([...draft]);onError(error);}
+      }} />
+    </label>)}
+    {dedicated&&<small className="trigger-editor-help">至少保留一种触发方式</small>}
+  </div>;
+}
 function PrimitiveList({ value, path, access, definition, onChange, onError }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState('');
@@ -218,6 +239,8 @@ function PropertyNode({
   );
   if (!access.readable || (options.hideReadOnly && !access.tempEditable)) return null;
   const objectValue = value && typeof value === "object" && !Array.isArray(value);
+  if (Array.isArray(value) && path.at(-1)==='triggers')
+    return <TriggerChoices value={value} path={path} access={access} definition={definition} onChange={onChange} onError={onError} />;
   if (objectValue && !Object.entries(value).some(([key, item]) => hasVisibleField(item, definition.children?.[key] ?? {}, [...path, key], access, options))) return null;
   if (objectValue)
     return (

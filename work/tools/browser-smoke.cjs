@@ -324,7 +324,7 @@ async function main() {
       await closeContext('offline-emitter');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
       await page.evaluate(()=>window.foldField.enableDiagnostics());
-      await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model==='model/player_witch_ai.fbx'&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;});
+      await page.waitForFunction(()=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model==='model/newwitch.fbx'&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;});
       await capture('standalone-builtin-player');
       results.push({name:'player-fbx-renders-from-file-without-asset-server',status:'pass'});
       await closeContext('standalone-player');

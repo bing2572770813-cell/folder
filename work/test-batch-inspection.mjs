@@ -18,6 +18,10 @@ console.log('PASS: whole-instance selection expansion, shared fields/types, mixe
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
 const {updateProperty,mergeSerializableProperties,debugChanges}=await import('./core/property-model.mjs');
 const source=readFileSync(new URL('./app.ts',import.meta.url),'utf8');
+assert.match(source,/const MECHANISM_COMPONENTS=\[\s*'lift',[\s\S]*?'fragile'\s*\];/,'fragile must be a selectable mechanism');
+assert.match(source,/if\(type==='fragile'\)[\s\S]*?count:Number\(node\.components\.fragile\.count\?\?1\)/,'fragile inspection exposes its editable count');
+assert.match(source,/type==='fragile'\?\{type:\{label:'机制类型',[\s\S]*?count:\{label:'触发次数',tempEditable:true\}/,'fragile inspector exposes count editing');
+assert.match(source,/if\(type==='fragile'\)[\s\S]*?path\[1\]!=='count'[\s\S]*?components\.fragile=/,'fragile count edits use the canonical component transaction');
 const body=source.slice(source.indexOf('function applyInspectedProperty('),source.indexOf('\ndocument',source.indexOf('function applyInspectedProperty(')));
 function transactionFixture(readonly){
  const baseline={height:1,width:2,tiles:[[{height:.1},{height:.2,...(readonly?{propertySchema:{height:{tempEditable:false}}}:{})}]]};let records=0;

@@ -1,7 +1,8 @@
 import {jsonObject,type JsonObject,type EntityNode,type ComponentRuntime} from './entity-model.js';
 import rayEmitter from '../../../entities/ray-emitter-config.cjs';
+import {normalizeComponentTriggers} from '../../../mechanics/trigger-list.cjs';
 
-export type EntityEvent='enter'|'leave'|'interact';
+export type EntityEvent='enter'|'leave'|'interact'|'action';
 /** Exclusive cause of an arrival/departure; omitted for initialization or interaction. */
 export type ArrivalTrigger='walk'|'teleport';
 export interface EventContext {type:EntityEvent;trigger?:ArrivalTrigger;nodes:EntityNode[];actor:JsonObject;runtime:ComponentRuntime}
@@ -34,7 +35,7 @@ export class ComponentRegistry {
     return this.evaluate({...input,type:'enter'},false);
   }
   private evaluate(input:EventContext,applyEffects:boolean):EventResult {
-    if(!['enter','leave','interact'].includes(input.type))throw new Error('Unknown entity event');
+    if(!['enter','leave','interact','action'].includes(input.type))throw new Error('Unknown entity event');
     if(input.trigger!==undefined&&!['walk','teleport'].includes(input.trigger))throw new Error('Unknown arrival trigger');
     const nodes=structuredClone(input.nodes).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
     for(const node of nodes)this.validate(node);
@@ -65,6 +66,7 @@ export class ComponentRegistry {
 
 export function defaultComponents():ComponentRegistry {
   const registry=new ComponentRegistry();
+  const validateTriggers=(config:JsonObject)=>{if(config.triggers!==undefined)normalizeComponentTriggers(config.triggers);};
   registry.register('physics',{validate:config=>{
     for(const field of ['followFold','canDropOnFold'])if(config[field]!==undefined&&typeof config[field]!=='boolean')throw new Error('Invalid physics '+field);
   }});
@@ -73,7 +75,7 @@ export function defaultComponents():ComponentRegistry {
     for(const [key,min,max] of [['height',.01,16],['thickness',.001,16],['gradualRate',0,100]] as const){const value=config[key];if(value!==undefined&&(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max))throw new Error('Invalid surface '+key);}
     if(config.color!==undefined&&!['white','red','yellow','blue','green','purple','black'].includes(String(config.color)))throw new Error('Invalid surface color');
   }});
-  registry.register('lift',{validate:config=>{
+  registry.register('lift',{validate:config=>{validateTriggers(config);
     const values=['minHeight','maxHeight','initialHeight'];
     for(const key of values){const value=config[key];if(typeof value!=='number'||!Number.isFinite(value))throw new Error('Invalid lift '+key);}
     const min=Number(config.minHeight),max=Number(config.maxHeight),initial=Number(config.initialHeight);
@@ -87,11 +89,11 @@ export function defaultComponents():ComponentRegistry {
   registry.register('tag',{});
   registry.register('collision',{validate:config=>{if(config.blocked!==undefined&&typeof config.blocked!=='boolean')throw new Error('Invalid collision blocked');},canEnter:(_context,config)=>config.blocked?'目标是阻挡方块':undefined});
   registry.register('campfire',{canEnter:()=> '篝火方块不可进入'});
-  registry.register('rayEmitter',{validate:rayEmitter.validate,canEnter:()=> '方向喷射方块不可进入'});
-  registry.register('foldSwitch',{validate:config=>{if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
-  registry.register('firebird',{validate:config=>{if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
+  registry.register('rayEmitter',{validate:config=>{validateTriggers(config);rayEmitter.validate(config);},canEnter:()=> '方向喷射方块不可进入'});
+  registry.register('foldSwitch',{validate:config=>{validateTriggers(config);if(config.initialState!==0&&config.initialState!==1)throw new Error('折线开关初始状态只能为 0 或 1');},canEnter:()=> '折线开关方块不可进入'});
+  registry.register('firebird',{validate:config=>{validateTriggers(config);if(!['north','east','south','west'].includes(String(config.direction)))throw new Error('火焰鸟方向无效');},canEnter:()=> '火焰鸟方块不可进入'});
   registry.register('flame',{validate:config=>{if(config.source!==undefined&&typeof config.source!=='boolean')throw new Error('火焰来源标记无效');},canEnter:()=> '火焰覆盖的方格不可进入'});
-  registry.register('fragile',{canEnter:(_context,_config,state)=>state.broken?'易碎方块已破碎':undefined,events:{leave:context=>context.trigger==='walk'||context.trigger==='teleport'?{state:{broken:true}}:{}}});
+  registry.register('fragile',{validate:config=>{const count=Number(config.count??1);if(!Number.isSafeInteger(count)||count<1||count>100)throw new Error('Invalid fragile count');},canEnter:(_context,_config,state)=>state.broken||state.breaking?'易碎方块已破碎':undefined,events:{action:(_context,config,state):ComponentEffect=>{if(state.broken)return {};const remaining=Number(state.remaining??config.count??1)-1;return remaining<=0?{state:{remaining:0,breaking:true}}:{state:{remaining}};}}});
   registry.register('eruption',{canEnter:context=>Number(context.actor.actions)>0&&Number(context.actor.actions)%3===2?undefined:'喷发地形尚未熄火'});
   registry.register('fire',{
     effectOrder:10,

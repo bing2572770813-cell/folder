@@ -31,3 +31,19 @@ assert.equal(root.userData.cell.nodeId,'key');
 view.update([]);assert.equal(layer.children.length,0,'hidden or removed entities release their view');
 view.dispose();viewLibrary.dispose();
 console.log('PASS: stale async completion is discarded; safe updates attach, move and hide independent model views.');
+
+let instances=0;
+const emitterLayer=new THREE.Group();
+const emitterView=createModelView({layer:emitterLayer,library:{instantiate:async()=>{instances++;return new THREE.Group();}}});
+const emitter={id:'emitter',nodeId:'emitter',visual,cell:{r:2,c:2},position:[2,.1,2],dir:2};
+emitterView.update([emitter]);await new Promise(done=>setImmediate(done));emitterView.update([emitter]);
+const emitterHost=emitterLayer.children[0],emitterInstance=emitterHost.children[0];
+for(const dir of [6,2,6,2]){
+ emitterView.update([{...emitter,dir}]);
+ assert.equal(emitterLayer.children[0],emitterHost,'trigger/undo retains the model host');
+ assert.equal(emitterHost.children[0],emitterInstance,'direction changes retain the loaded instance');
+ assert.equal(emitterHost.rotation.y,-dir*Math.PI/4);
+ assert.equal(instances,1,'direction changes never instantiate another model');
+}
+emitterView.dispose();
+console.log('PASS: emitter direction updates rotate existing hosts and model instances.');

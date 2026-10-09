@@ -201,6 +201,8 @@ async function main() {
       await page.locator('#playMode').click();
       await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected&&Math.abs(model.rotation+Math.PI/2)<1e-6));},currentEmitterModel);
       await capture('desktop-emitter-model');
+      const emitterIdentity=()=>page.evaluate(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).map(({nodeId,uuid,instanceUuid})=>({nodeId,uuid,instanceUuid})).sort((a,b)=>a.nodeId.localeCompare(b.nodeId)));
+      const originalEmitterIdentity=await emitterIdentity();
       const emitterStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(emitterStart.x,emitterStart.y);
       const emitterNext=await page.evaluate(()=>window.foldField.screenPoint(0,1));await page.mouse.click(emitterNext.x,emitterNext.y);
       await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
@@ -216,6 +218,7 @@ async function main() {
       assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][6].prefabId),'paper_ai');
       assert.equal(await page.evaluate(()=>window.foldField.getState().map.tiles[2][4].prefabId),'paper_ai');
       await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).models.filter(model=>['emitter','legacy-emitter'].includes(model.nodeId)).every(model=>Math.abs(model.rotation+3*Math.PI/2)<1e-6));
+      assert.deepEqual(await emitterIdentity(),originalEmitterIdentity,'emitter rotates the existing host and model instance after triggering');
       await page.waitForFunction(()=>{
         const cells=JSON.parse(document.getElementById('viewport').dataset.render).emitterHighlights;
         return cells.filter(cell=>['emitter','legacy-emitter'].includes(cell.emitterId)).length===6;

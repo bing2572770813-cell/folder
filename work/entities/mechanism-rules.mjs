@@ -16,16 +16,10 @@ function adjacentTo(map, r, c, terrain) {
   return false;
 }
 
-// The eruption cycle is: action 2 open, action 3 closed, action 5 open, ...
-export function eruptionOpen(actionCount) {
-  return actionCount > 0 && actionCount % 3 === 2;
-}
-
 export function canEnterTerrain(map, position, state = createTerrainState()) {
   const terrain = map.tiles[position.r]?.[position.c]?.terrain;
   if (terrain === 'ice') return { valid: false, reason: '冰块是阻挡方块' };
   if (terrain === 'campfire') return { valid: false, reason: '篝火方块不可进入' };
-  if (terrain === 'eruption' && !eruptionOpen(state.actions)) return { valid: false, reason: '喷发地形尚未熄火' };
   return { valid: true, reason: '' };
 }
 
@@ -52,7 +46,7 @@ export function enterTerrain(map, position, state = createTerrainState()) {
 
 export function finishAction(state = createTerrainState()) {
   const actions = state.actions + 1;
-  return { ...state, actions, eruptionOpen: eruptionOpen(actions) };
+  return { ...state, actions };
 }
 
 export function validateTerrains(map) {

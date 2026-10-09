@@ -157,6 +157,28 @@ async function main() {
         enemyMap.transforms.push({id:'t-'+id,parentId:null,local:{r,c,dir:0},footprint:{width:1,height:1,occupied:[true]}});
         enemyMap.entities.push({id,prefabId:'paper_ai',transformId:'t-'+id,components:{surface:{height:.09,color:'white'},collision:{blocked:false}},tags:r===0&&c===0?{spawn:true}:{},static:{entityType:'terrain'}});
       }
+      const decorationMap=structuredClone(enemyMap);decorationMap.metadata.name='喷发装饰验收';
+      for(const c of [1,2]){
+        const decoration=decorationMap.entities.find(node=>node.id==='0-'+c);
+        // Use a model-free legacy eruption component to isolate gameplay from asset picking.
+        decoration.components.eruption={};
+      }
+      await page.locator('#mapFile').setInputFiles({name:'decoration.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(decorationMap))});
+      await page.waitForFunction(()=>window.foldField.getState().map.name==='喷发装饰验收');
+      await page.evaluate(()=>window.foldField.enableDiagnostics());await page.locator('#playMode').click();
+      const decorationStart=await page.evaluate(()=>window.foldField.screenPoint(0,0));await page.mouse.click(decorationStart.x,decorationStart.y);
+      for(const c of [1,2]){
+        const target=await page.evaluate(c=>window.foldField.screenPoint(0,c),c);await page.mouse.click(target.x,target.y);
+        await page.waitForFunction(c=>window.foldField.getState().steps===c&&!window.foldField.getState().moving,c);
+        assert.equal(await page.evaluate(()=>window.foldField.getState().player.r),0);
+        assert.equal(await page.evaluate(()=>window.foldField.getState().player.c),c);
+        assert.equal(await page.evaluate(()=>window.foldField.getState().terrainState.gameOver),false);
+      }
+      await capture('desktop-eruption-decoration');
+      await page.locator('#undoBtn').click();await page.waitForFunction(()=>window.foldField.getState().steps===1&&window.foldField.getState().player.c===1);
+      await page.locator('#restartBtn').click();await page.waitForFunction(()=>window.foldField.getState().steps===0&&window.foldField.getState().player.c===0);
+      results.push({name:'eruption-decoration-walks-at-zero-and-one-actions-undo-restart',status:'pass'});
+      await page.locator('#editMode').click();
       await page.locator('#mapFile').setInputFiles({name:'enemy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(enemyMap))});
       await page.waitForFunction(()=>window.foldField.getState().map.name==='敌人机关验收');
       await page.evaluate(()=>window.foldField.enableDiagnostics());

@@ -243,9 +243,20 @@ test('spawn collects every key without applying hazards or counting an action',(
  f.move(1,1);f.controller.restart();assert.deepEqual(f.state.terrainState.collectedKeys,['甲','乙']);assert.equal(f.state.terrainState.actions,0);
 });
 
+test('eruption decoration permits walking, folding, undo and restart without a cycle',()=>{
+ const f=fixture([['decoration',1,1,{eruption:{}}],['fold-decoration',1,2,{eruption:{}}]]);
+ const initial=f.controller.snapshot();
+ f.move(1,1);assert.deepEqual(f.state.player,{r:1,c:1,dir:2});assert.equal(f.state.steps,1);
+ assert.equal(f.state.terrainState.overheat,0);assert.equal(f.state.terrainState.gameOver,false);
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),initial);
+ assert.equal(f.controller.teleport({r:1,c:1,type:'v'}),true);f.controller.tick(performance.now()+1000);
+ assert.equal(f.state.player.c,2);assert.equal(f.state.teleports,1);
+ f.controller.restart();assert.deepEqual(f.controller.snapshot(),initial);
+});
+
 test('tree ice, adjacent campfire and eruption retain player action semantics',()=>{
  const f=fixture([['ice',1,1,{ice:{}}],['camp',0,2,{campfire:{}}],['eruption',1,2,{eruption:{}}]]);
- assert.equal(f.controller.canMoveTo(1,2),false);assert.equal(f.controller.canMoveTo(1,1),false,'ice is a blocker');f.move(0,0);
+ assert.equal(f.controller.canMoveTo(1,2),true);assert.equal(f.controller.canMoveTo(1,1),false,'ice is a blocker');f.move(0,0);
  f.move(1,0);assert.equal(f.state.terrainState.actions,2);assert.equal(f.controller.canMoveTo(1,2),true);
  f.controller.setFreeTeleport(true);f.controller.testTeleport(1,2);assert.equal(f.state.terrainState.actions,3);assert.equal(f.state.player.c,2);
 });
@@ -317,13 +328,14 @@ test('play preflight rejects every structural region entry blocker before starti
  }
 });
 
-test('closed eruption entry stays structurally valid and reports an atomic runtime refusal',()=>{
+test('blocked region entry stays structurally valid and reports an atomic runtime refusal',()=>{
  const f=fixture([['cycle',2,3,{eruption:{}}],['destination-key',2,3,{key:{name:'铜'}}]]);
  f.map.tiles[1][1].tags.exitTo='B';f.map.tiles[2][3].regionTag='B';f.map.tiles[2][3].tags.entry=true;
- assert.equal(f.controller.validateForPlay().valid,true,'temporary eruption closure must not invalidate the map');
+ assert.equal(f.controller.validateForPlay().valid,true,'decorative eruption permits region entry');
+ f.registry.register('entryGate',{canEnter:context=>context.actor.actions===0?'测试入口关闭':undefined});f.add('gate',2,3,{entryGate:{}});
  f.registry.register('departure',{events:{leave:()=>({actor:{overheat:5}})}});f.add('departure',1,1,{departure:{}});
  f.state.player={r:1,c:1,dir:2};const before=f.controller.snapshot();
- assert.equal(f.controller.transitionRegion(),false);assert.match(f.state.terrainState.message,/喷发/);
+ assert.equal(f.controller.transitionRegion(),false);assert.match(f.state.terrainState.message,/测试入口关闭/);
  assert.deepEqual({...f.controller.snapshot(),terrainState:{...f.state.terrainState,message:before.terrainState.message}},before);
  f.state.terrainState.actions=2;assert.equal(f.controller.transitionRegion(),true);
  assert.deepEqual(f.state.player,{r:2,c:3,dir:2});assert.ok(f.state.revealedRegions.has('B'));

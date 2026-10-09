@@ -43,7 +43,7 @@ export function describeViewportGuidance(document,r,c,{nameFor=id=>id,runtime=tr
   if(components.fire)details.push(`火焰。进入增加 ${components.fire.damage??1} 层过热，累计 6 层会死亡。`);
   if(components.ice)details.push('冰块。阻挡属性开启时无法进入。');
   if(components.campfire)details.push('篝火。不可进入；走到八方向相邻格可解除冰冻。');
-  if(components.eruption)details.push('喷发。第 2、5、8……次行动后开放，其余时刻无法进入。');
+  if(components.eruption)details.push('喷发装饰方块。与纸张一样可通行，没有特殊行动效果。');
   if(components.foldSwitch){const current=state(node,'foldSwitch').state??components.foldSwitch.initialState;details.push(`折线开关。当前${current===1?'开启':'关闭'}；折线经过时可切换，控制关联的区域出口。`);}
   if(components.rayEmitter){const direction=state(node,'rayEmitter').direction??components.rayEmitter.initialDirection;details.push(`冰冻射线机关。当前朝${directionConfig.directions[direction].label}，射程 3 格；不可进入，射线会冰冻玩家。`);}
   if(components.firebird)details.push('火焰鸟。不可进入，会追踪玩家并喷出火焰；靠近会使它发怒。');

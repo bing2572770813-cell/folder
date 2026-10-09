@@ -12,12 +12,14 @@ test('same-cell components combine in stable order and keep input state independ
   assert.deepEqual(initial,actor());assert.deepEqual(nodes[0].components.key,{name:'铜钥匙'});
   assert.deepEqual(result.runtime.z.key,{collected:true});
 });
-test('entry rejection prevents all effects and cyclic eruption uses pre-action count',()=>{
+test('eruption decoration permits entry and preserves co-located key effects at every action count',()=>{
   const registry=defaultComponents();const state=actor();
   const nodes=[node('a',{key:{name:'K'}}),node('b',{eruption:{}})];
-  const denied=registry.dispatch({type:'enter',nodes,actor:state,runtime:{}});
-  assert.equal(denied.valid,false);assert.deepEqual(denied.actor,state);assert.deepEqual(denied.runtime,{});
-  state.actions=2;assert.equal(registry.dispatch({type:'enter',nodes,actor:state,runtime:{}}).valid,true);
+  for(const actions of [0,1,2,3,5,8]){
+    const result=registry.dispatch({type:'enter',nodes,actor:{...state,actions},runtime:{}});
+    assert.equal(result.valid,true);assert.deepEqual(result.actor.collectedKeys,['K']);assert.equal(result.actor.actions,actions);
+    assert.deepEqual(registry.dispatch({type:'enter',nodes:[node('b',{eruption:{}})],actor:{...state,actions},runtime:{}}).actor,{...state,actions});
+  }
 });
 
 test('fragile components consume one count from global action events',()=>{

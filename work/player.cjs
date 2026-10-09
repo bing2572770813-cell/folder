@@ -60,7 +60,6 @@ function playerPrefabDefaults(prefab = defaultPlayerPrefab) {
       actions: state.actions,
       collectedKeys: [...new Set(state.collectedKeys)],
       hasKey: state.collectedKeys.length > 0,
-      eruptionOpen: state.actions > 0 && state.actions % 3 === 2,
     },
   };
 }
@@ -237,7 +236,7 @@ function updateLifts(advance=false){const tree=world(),map=env.getMap();if(!tree
  if(changed){env.refreshLiftSurfaces?.();if(!P.animation)renderPlayer();}
  return changed;
 }
-// Structural checks ignore temporary mechanisms such as the eruption cycle.
+// Structural checks validate support and permanent blockers.
 function structuralEntryCheck(r,c){
  if(!inside(r,c))return {valid:false,reason:'目标超出地图'};
  const nodes=world().at(r,c);
@@ -282,7 +281,7 @@ function setPlayerProperties({r,c,dir,maxUp,maxDown,foldVertical=P.foldDrop.vert
  if(!Number.isSafeInteger(overheat)||overheat<0||!Number.isSafeInteger(actions)||actions<0||typeof frozen!=='boolean')throw new Error('过热与机制行动次数须为非负整数，冰冻须为布尔值');
  const keys=new Set(env.legalKeyNames?.(env.getMap(),world())??env.getMap().tiles.flat().filter(t=>t?.terrain==='key'&&!blocked(t)).map(t=>t.keyName?.trim()||'钥匙'));
  if(!Array.isArray(collectedKeys)||collectedKeys.some(k=>typeof k!=='string'||!keys.has(k)))throw new Error('已收集钥匙须为地图中合法钥匙名的 JSON 数组');
- const terrainState={...P.terrainState,overheat,frozen,actions,collectedKeys:[...new Set(collectedKeys)],hasKey:collectedKeys.length>0,eruptionOpen:actions>0&&actions%3===2};
+ const terrainState={...P.terrainState,overheat,frozen,actions,collectedKeys:[...new Set(collectedKeys)],hasKey:collectedKeys.length>0};
  if(![foldVertical,foldHorizontal].every(n=>Number.isFinite(n)&&n>0&&n<=16))throw new Error('折纸落点阈值须大于 0 且不超过 16');
  if(typeof canDropOnFold!=='boolean')throw new Error('可在折叠时掉落须为布尔值');
  const tile=configuredMap().tiles[r]?.[c];if(!tile||(world()?!withConfiguredWorld(()=>treeEntryCheck({r,c},terrainState)).valid:blocked(tile)||((r!==P.player.r||c!==P.player.c)&&!canEnterTerrain(env.getMap(),{r,c},terrainState).valid)))throw new Error('玩家坐标需要可通行实体');

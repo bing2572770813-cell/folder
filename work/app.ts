@@ -25,7 +25,7 @@ import {entityCategory,isPlaceableEntity} from './entities/entity-category.mjs';
 import {withEmitterDirection} from './entities/emitter-placement.mjs';
 import {createTagMarkerBatches,updateTagMarkerBatch} from './render/tag-markers.mjs';
 import {createSpatialInstances,createSurfaceBatchCollector} from './render/spatial-batches.mjs';
-import {refreshFlatPaperPlacement} from './render/flat-placement.mjs';
+import {createCellRefresh,placementRefreshCells} from './render/cell-refresh.mjs';
 import {entityEdgeSegments} from './render/entity-edges.mjs';
 import {squareViewSpan,followTarget,boundedFollowTarget} from './render/follow-camera.mjs';
 import {lightingDefaults,lightingFields,applyLighting} from './render/lighting.mjs';
@@ -293,7 +293,7 @@ let fragileRefresh=null;const fragileMarkers=new Map();
 
 const visibility={coords:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
-function disposableClear(group) { for(const child of [...group.children]) { child.traverse(o=>{if(o.userData.ownedTexture)o.userData.ownedTexture.dispose();if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}}); group.remove(child); } }
+function disposableClear(group,retainedMaterials=new Set()) { for(const child of [...group.children]) { child.traverse(o=>{if(o.userData.ownedTexture)o.userData.ownedTexture.dispose();if(o.isInstancedMesh)o.dispose();if(o.geometry&&!sharedGeometries.has(o.geometry))o.geometry.dispose(); if(o.material&&!sharedMaterials.has(o.material)){for(const m of Array.isArray(o.material)?o.material:[o.material])if(!retainedMaterials.has(m))m.dispose();}}); group.remove(child); } }
 
 function canvasTexture(draw,size=256) { const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t; }
 const terrainTextures=Object.fromEntries(Object.entries(TERRAIN_MARKERS).map(([type,marker])=>{
@@ -343,29 +343,39 @@ function makeToken(color){
  const g=new THREE.Group(),body=new THREE.Mesh(new THREE.DodecahedronGeometry(.36,0),new THREE.MeshStandardMaterial({color:COLORS[color]??COLORS.white,roughness:.8}));body.position.y=.42;g.add(body);
  for(const x of [-.11,.11]){const eye=new THREE.Mesh(new THREE.SphereGeometry(.065,12,8),new THREE.MeshBasicMaterial({color:'#ffffff'}));eye.position.set(x,.5,-.29);g.add(eye);const pupil=new THREE.Mesh(new THREE.SphereGeometry(.029,10,8),new THREE.MeshBasicMaterial({color:'#182721'}));pupil.position.set(x,.5,-.346);g.add(pupil);}g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
-let liftLineRanges=[],dynamicSurfaceEntries=[];
+let liftLineRanges=[],dynamicSurfaceEntries=[],cellRefresh=null;
+const sceneRefreshStats={full:0,local:0,cells:0};
 const editRefresh=createEditRefresh({rebuild:rebuildPaper,notify:notifyMapChanged,requestFrame:callback=>requestAnimationFrame(callback),cancelFrame:handle=>cancelAnimationFrame(handle)});
 function buildPaper(){editRefresh.request({scene:true},!!gestureBefore);}
-function rebuildPaper() {
+function rebuildPaper(patchCells=null,foldsChanged=false) {
+  const partial=Array.isArray(patchCells),patchKeys=partial?new Set(patchCells.map(cell=>cell.r+','+cell.c)):null;
+  if(diagnosticsEnabled){sceneRefreshStats[partial?'local':'full']++;sceneRefreshStats.cells=partial?patchCells.length:map.width*map.height;}
+  const cellLayers=[tileLayer,entityEdgeLayer,gridLayer,terrainLayer,staticTokenLayer,tagLayer,foldLayer,mechanismLayer,rayLayer];
+  if(partial)cellRefresh.remove(patchCells);
+  const existing=partial?new Set(cellLayers.flatMap(layer=>layer.children)):new Set();
   if(P.mode==='play')map=documentModel.view({runtime:true});
   hoverDescriptionKey=null;
   if(P.foldMotion)controller.cancelFoldMotion();
   foldMotionView.invalidatePrepared();
-  foldableCells.clear();
-  placementTagCells=[];
-  for(const node of documentModel.world.serialize()){
-   const cells=documentModel.world.cells(node.id);
+  if(!partial){foldableCells.clear();placementTagCells=[];}
+  else{for(const key of patchKeys)foldableCells.delete(key);placementTagCells=placementTagCells.filter(cell=>!patchKeys.has(cell.r+','+cell.c));}
+  const changedNodes=partial?[...new Map(patchCells.flatMap(cell=>documentModel.world.at(cell.r,cell.c)).map(node=>[node.id,node])).values()]:documentModel.world.serialize();
+  for(const node of changedNodes){
+   const cells=documentModel.world.cells(node.id).filter(cell=>!partial||patchKeys.has(cell.r+','+cell.c));
    if(node.tags.spawn||node.tags.entry)placementTagCells.push(...cells);
    if(nodeFollowsFold(node))for(const cell of cells)foldableCells.add(cell.r+','+cell.c);
   }
-  updateLighting();
+  if(!partial)updateLighting();
   cancelPlacementPreview();
-  liftLineRanges=[];dynamicSurfaceEntries=[];
-  disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
+  if(partial){liftLineRanges=liftLineRanges.filter(cell=>!patchKeys.has(cell.r+','+cell.c));dynamicSurfaceEntries=dynamicSurfaceEntries.filter(cell=>!patchKeys.has(cell.r+','+cell.c));}
+  else{liftLineRanges=[];dynamicSurfaceEntries=[];}
+  const newLiftRanges=[],newSurfaceEntries=[];
+  if(!partial){disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);}
+  clearSelection();hovered=null;hoverOutline.visible=false;
   const gridRanges=[];
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
-	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
-  refreshModels(true);
+	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play',cells:partial?patchCells:undefined}),baseProjection=map,surfaceMaps=new Map();
+  if(!partial)refreshModels(true);
   paperSurfaceCache.begin();
   for(const projection of treeCells.surfaceCells){
     const {r,c,tile,nodeId}=projection;
@@ -379,7 +389,7 @@ function rebuildPaper() {
         for(let i=0;i<surface.positions.length;i+=3)positions.push(surface.positions[i]+wx(c),surface.positions[i+1],surface.positions[i+2]+wz(r));
         geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.computeVertexNormals();
         const mesh=new THREE.Mesh(geometry,materials[tile.color??'white']);mesh.userData.triangleCells=Array.from({length:positions.length/9},()=>cell);mesh.userData.surfaceCells=[cell];tileLayer.add(mesh);
-        dynamicEntry={r,c,nodeId,primary:projection.primary,cell,mesh};dynamicSurfaceEntries.push(dynamicEntry);
+        dynamicEntry={r,c,nodeId,primary:projection.primary,cell,mesh};newSurfaceEntries.push(dynamicEntry);
         if(tile.lift){const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:liftTexture,transparent:true,depthWrite:false,depthTest:true,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-3}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(c),tileHeight(tile)+.035,wz(r));marker.scale.setScalar(.58);marker.raycast=()=>{};marker.userData.cell=cell;marker.userData.dynamicLiftMarker=true;tileLayer.add(marker);dynamicEntry.marker=marker;}
       }else surfaces.add(cell,surface);
     }else if(tile.lift){
@@ -403,12 +413,12 @@ function rebuildPaper() {
     gridRanges.push({cell,start:edgeStart,end:edges.length});
     if(dynamicEntry){dynamicEntry.gridStart=edgeStart;dynamicEntry.gridEnd=edges.length;dynamicEntry.style=entityEdgeColor(tile);dynamicEntry.styleStart=styleStart;dynamicEntry.styleEnd=dynamicEntry.style?styleEdges.get(dynamicEntry.style).length:styleStart;}
     if(documentModel.world.get(nodeId).components.lift&&!dynamicEntry){
-      liftLineRanges.push({r,c,height:y,start:edgeStart,end:edges.length,style:null});
-      const style=entityEdgeColor(tile);if(style)liftLineRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
+      newLiftRanges.push({r,c,height:y,start:edgeStart,end:edges.length,style:null});
+      const style=entityEdgeColor(tile);if(style)newLiftRanges.push({r,c,height:y,start:styleStart,end:styleEdges.get(style)?.length??styleStart,style});
     }
   }
   paperSurfaceCache.end();
-  refreshMechanismMarkers(treeCells);
+  refreshMechanismMarkers(treeCells,partial?patchCells:null);
   for(const cell of treeCells.tokenCells){const token=makeToken(cell.tile.color);token.rotation.y=-Math.PI/2;token.position.set(wx(cell.c),Math.max(cell.surfaceTop,cell.tile.height??0),wz(cell.r));token.userData.cell=cell;staticTokenLayer.add(token);}
   for(const marker of treeCells.terrainCells){if(!terrains.has(marker.type))terrains.set(marker.type,[]);terrains.get(marker.type).push(marker);}
   for(const mesh of surfaces.meshes(THREE,color=>materials[color]))tileLayer.add(mesh);
@@ -422,17 +432,24 @@ function rebuildPaper() {
     for(const mesh of createSpatialInstances(THREE,{cells,geometry:markerGeo,material,matrixFor:({r,c,index,total,surfaceTop})=>{position.set(wx(c)+(total>1?(index-(total-1)/2)*.22:0),Math.max(tileTop(r,c),surfaceTop)+.025+index*.005,wz(r));return matrix.compose(position,tilt,new THREE.Vector3(total>1?.4:.72,total>1?.4:.72,1));}}))terrainLayer.add(mesh);
   }
   for(const mesh of createTagMarkerBatches(THREE,treeCells.tagCells,{geometry:markerGeo,textures:tagTextures,wx,wz,top:cell=>Math.max(tileTop(cell.r,cell.c),cell.surfaceTop)}))tagLayer.add(mesh);
-  if(map.exit&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
+  if(map.exit&&(!partial||patchKeys.has(map.exit.r+','+map.exit.c))&&map.tiles[map.exit.r]?.[map.exit.c]&&!cellHidden(map.exit.r,map.exit.c)){
     const marker=new THREE.Mesh(markerGeo,new THREE.MeshBasicMaterial({map:exitTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));marker.rotation.x=-Math.PI/2;marker.position.set(wx(map.exit.c),tileTop(map.exit.r,map.exit.c)+.012,wz(map.exit.r));marker.userData.exitCell={...map.exit};foldLayer.add(marker);
   }
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;outline.userData.edgeColor=edgeColor;outline.userData.segmentCells=styleCells.get(edgeColor);entityEdgeLayer.add(outline);}
-  for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z+.5,x+.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z-.5);}
-  const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
-  fragileRefresh=createFragileRefresh(THREE,[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldLayer],{gridRanges:gridRanges.map(range=>({...range,attribute:grid.geometry.attributes.position})),voidHeight:voidY(.002),targets:documentModel.world.serialize().filter(node=>node.components.fragile).flatMap(node=>documentModel.world.cells(node.id))});
-  for(const range of liftLineRanges){range.attribute=range.style===null?grid.geometry.attributes.position:entityEdgeLayer.children.find(line=>line.userData.edgeColor===range.style)?.geometry.attributes.position;}
-  for(const entry of dynamicSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?entityEdgeLayer.children.find(line=>line.userData.edgeColor===entry.style)?.geometry.attributes.position:null;}
-  rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
-  for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
+  const voidCells=partial?patchCells:Array.from({length:map.width*map.height},(_,i)=>({r:Math.floor(i/map.width),c:i%map.width}));
+  for(const {r,c} of voidCells)if(!map.tiles[r][c]||cellHidden(r,c)){const start=edges.length,x=wx(c),z=wz(r);edges.push(x-.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z+.5,x+.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z-.5);gridRanges.push({cell:{r,c},start,end:edges.length});}
+  const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);grid.userData.segmentCells=gridRanges.flatMap(range=>Array.from({length:(range.end-range.start)/6},()=>range.cell));gridLayer.add(grid);
+  if(!partial)fragileRefresh=createFragileRefresh(THREE,[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldLayer],{gridRanges:gridRanges.map(range=>({...range,attribute:grid.geometry.attributes.position})),voidHeight:voidY(.002),targets:documentModel.world.serialize().filter(node=>node.components.fragile).flatMap(node=>documentModel.world.cells(node.id))});
+  const patchStyle=style=>entityEdgeLayer.children.find(line=>line.userData.edgeColor===style&&!existing.has(line))?.geometry.attributes.position;
+  for(const range of newLiftRanges){range.attribute=range.style===null?grid.geometry.attributes.position:patchStyle(range.style);}
+  for(const entry of newSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?patchStyle(entry.style):null;}
+  liftLineRanges.push(...newLiftRanges);dynamicSurfaceEntries.push(...newSurfaceEntries);
+  if(!partial)cellRefresh=createCellRefresh(THREE,{dispose:(object,retainedMaterials)=>{const holder=new THREE.Group();holder.add(object);disposableClear(holder,retainedMaterials);}});
+  cellRefresh.add(cellLayers.flatMap(layer=>layer.children).filter(object=>!existing.has(object)));
+  if(!partial||foldsChanged){rebuildFoldAxes();buildCreaseGuides();buildFoldSelection();}
+  else buildCreaseGuides(patchCells);
+  layoutScenery();
+  for(const object of cellLayers.flatMap(layer=>layer.children).filter(object=>!existing.has(object)))object.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
   if(!GAME_ONLY){renderRegionControls();renderEntityVisibility();refreshTreePanel();}
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();scheduleFoldPreparation();
 }
@@ -509,10 +526,13 @@ function refreshModels(force=false){
  if(!force&&key===modelDescriptorKey)return;
  modelDescriptorKey=key;return modelView.update(descriptors);
 }
-function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
- disposableClear(mechanismLayer);disposableClear(rayLayer);fragileMarkers.clear();
+function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),patchCells=null){
+ if(!patchCells){disposableClear(mechanismLayer);disposableClear(rayLayer);fragileMarkers.clear();}
  brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
- const enemyCells=documentModel.world.serialize().filter(node=>node.static.entityType==='creature'&&(node.components.rayEmitter||node.components.firebird)&&!nodeHidden(node)).flatMap(node=>{
+ const patchKeys=patchCells&&new Set(patchCells.map(cell=>cell.r+','+cell.c));
+ const renderedEmitters=patchCells?mechanismLayer.children.map(marker=>marker.userData.cell?.nodeId).filter(id=>id&&documentModel.world.has(id)).map(id=>documentModel.world.get(id)).filter(node=>node.components.rayEmitter&&playerRuntime.rayCells(documentModel.world.position(node.id),node.components.rayEmitter.initialDirection,map.width,map.height).some(cell=>patchKeys.has(cell.r+','+cell.c))):[];
+ const markerNodes=patchCells?[...new Map([...patchCells.flatMap(cell=>documentModel.world.at(cell.r,cell.c)),...renderedEmitters].map(node=>[node.id,node])).values()]:documentModel.world.serialize();
+ const enemyCells=markerNodes.filter(node=>node.static.entityType==='creature'&&(node.components.rayEmitter||node.components.firebird)&&!nodeHidden(node)).flatMap(node=>{
   const occupied=documentModel.world.cells(node.id),cell=occupied[Math.floor(occupied.length/2)];
   return cell&&!cellHidden(cell.r,cell.c)?[{...cell,nodeId:node.id,tile:map.tiles[cell.r]?.[cell.c]??{height:.09}}]:[];
  });
@@ -520,18 +540,21 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
   const node=documentModel.world.get(cell.nodeId),components=node.components;
   if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile&&!components.firebird)continue;
   const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),fragile:documentModel.world.runtime(node.id,'fragile'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
+  if(!patchKeys||patchKeys.has(cell.r+','+cell.c)){
   const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
   if(components.fragile){const markers=fragileMarkers.get(node.id)??[];markers.push(marker);fragileMarkers.set(node.id,markers);}
+  }
   if(components.rayEmitter){
    const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
    for(const shot of playerRuntime.rayCells(cell,direction,map.width,map.height)){
+    if(patchKeys&&!patchKeys.has(shot.r+','+shot.c))continue;
     if(cellHidden(shot.r,shot.c)||!map.tiles[shot.r]?.[shot.c])continue;const mesh=shotMarker(THREE,{iceTexture:terrainTextures.ice});mesh.userData.cell={r:shot.r,c:shot.c};mesh.userData.emitterId=node.id;mesh.position.set(wx(shot.c),tileTop(shot.r,shot.c)+.025,wz(shot.r));rayLayer.add(mesh);
    }
   }
  }
  if(P.mode==='play')for(const cell of P.terrainState.flames??[]){
   if(cellHidden(cell.r,cell.c))continue;
-  const marker=mechanismMarker(THREE,{flame:{}});marker.position.set(wx(cell.c),tileTop(cell.r,cell.c)+.045,wz(cell.r));mechanismLayer.add(marker);
+  const marker=mechanismMarker(THREE,{flame:{}});marker.position.set(wx(cell.c),tileTop(cell.r,cell.c)+.045,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
  }
 }
 function addAxisLabels(maxHeight){
@@ -919,7 +942,7 @@ const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{
 let renderedFrames=0,lastZoomLabel=null,diagnosticsEnabled=false;
 function syncState(){if(GAME_ONLY)return;viewport.dataset.state=JSON.stringify({cameraFollowEnabled,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,showTable,showCreaseDashes,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState,turn:P.turn});}
 function screenPoints(){
-  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({firebirdThreat:controller.firebirdThreat(),firebirdTrackingHighlight:firebirdHalo.visible,spawnedEntityIds:documentModel.world.serialize().map(node=>node.id),flameMarkers:mechanismLayer.children.filter(marker=>marker.userData.flame).length,replacedFirebirds:mechanismLayer.children.filter(marker=>marker.userData.replaced).length,firebirdRangeLines:firebirdRangeLayer.children.filter(line=>line.userData.firebirdRange).length,foldStart:foldMotionView.stats(),foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.isInstancedMesh?o.count:(o.userData.surfaceCells?.length??0)),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,creaseSegments:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?o.geometry.attributes.position.count/2:0),0),creaseDots:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?0:o.geometry.attributes.position.count/3),0),emitterHighlights:rayLayer.children.map(mesh=>({emitterId:mesh.userData.emitterId,...mesh.userData.cell})),models:modelLayer.children.map(host=>({nodeId:host.userData.cell?.nodeId,model:host.userData.model,rotation:host.rotation.y,position:host.position.toArray()})),playerVisual:playerVisual.status(),tokenShape:activeTokenHost.children[0]?.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play'&&cameraFollowEnabled,defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
+  viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({sceneRefresh:sceneRefreshStats,firebirdThreat:controller.firebirdThreat(),firebirdTrackingHighlight:firebirdHalo.visible,spawnedEntityIds:documentModel.world.serialize().map(node=>node.id),flameMarkers:mechanismLayer.children.filter(marker=>marker.userData.flame).length,replacedFirebirds:mechanismLayer.children.filter(marker=>marker.userData.replaced).length,firebirdRangeLines:firebirdRangeLayer.children.filter(line=>line.userData.firebirdRange).length,foldStart:foldMotionView.stats(),foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.isInstancedMesh?o.count-(o.userData.removedInstances?.size??0):(o.userData.surfaceCells?.length??0)),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,creaseSegments:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?o.geometry.attributes.position.count/2:0),0),creaseDots:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?0:o.geometry.attributes.position.count/3),0),emitterHighlights:rayLayer.children.map(mesh=>({emitterId:mesh.userData.emitterId,...mesh.userData.cell})),models:modelLayer.children.map(host=>({nodeId:host.userData.cell?.nodeId,model:host.userData.model,rotation:host.rotation.y,position:host.position.toArray()})),playerVisual:playerVisual.status(),tokenShape:activeTokenHost.children[0]?.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play'&&cameraFollowEnabled,defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
 }
 	function tick(now){requestAnimationFrame(tick);controls.update();const cameraBusy=cameraInteraction.active;if(!cameraBusy)updateFoldAxes();
@@ -985,9 +1008,11 @@ function rebuildFoldAxes(){
  disposableClear(foldAxisLayer);foldAxes=uniqueFoldAxes({...map,tiles:map.tiles.map((row,r)=>row.map((t,c)=>cellHidden(r,c)?null:t)),foldCells:map.foldCells.filter(p=>!cellHidden(p.r,p.c))});axisViewKey=null;
 }
 // Dash/dot hints ride the crease surface and fold together with the paper.
-function buildCreaseGuides(){
- disposableClear(creaseGuideLayer);
- const guides=creaseGuides(map,foldAxes,{hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>voidPlaneTop(r,c),selected:selectedFold()});
+let guideRefresh=null;
+function buildCreaseGuides(patchCells=null){
+ if(patchCells)guideRefresh?.remove(patchCells);else{disposableClear(creaseGuideLayer);guideRefresh=createCellRefresh(THREE,{dispose:(object,retainedMaterials)=>{const holder=new THREE.Group();holder.add(object);disposableClear(holder,retainedMaterials);}});}
+ const existing=new Set(creaseGuideLayer.children);
+ const guides=creaseGuides(map,foldAxes,{cells:patchCells,hidden:cellHidden,showFolds:P.mode!=='edit'||visibility.folds,creaseDepth:lighting.creaseDepth,voidPlane:(r,c)=>voidPlaneTop(r,c),selected:selectedFold()});
  if(guides.positions.length){
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute(guides.positions,3));
@@ -1001,6 +1026,7 @@ function buildCreaseGuides(){
   const mesh=new THREE.Mesh(geometry,creaseDotMaterial);
   mesh.userData.triangleCells=cells;mesh.renderOrder=8;creaseGuideLayer.add(mesh);
  }
+ guideRefresh.add(creaseGuideLayer.children.filter(object=>!existing.has(object)));
 }
 // Selected crease and outlined halves stay attached to their paper surfaces.
 function selectedFold(){return P.mode==='play'&&P.chosenFold&&P.chosenFold.type?{r:P.chosenFold.r,c:P.chosenFold.c,type:P.chosenFold.type}:null;}
@@ -1138,17 +1164,20 @@ $('showAllEntities').onclick=()=>{hiddenEntities.clear();refreshEntityVisibility
 $('hideAllEntities').onclick=()=>{for(const prefab of treeEntityChoices())hiddenEntities.add(prefab.id);refreshEntityVisibility();};
 
 function assertTreeVisibility(next,before=documentModel){const signature=(doc,kind)=>doc.world.serialize().filter(node=>kind==='fold'?node.components.fold:Object.keys(node.tags).length).map(node=>({id:node.id,values:kind==='fold'?node.components.fold:node.tags,cells:doc.world.transforms.worldCells(node.transformId)}));if(!visibility.folds&&JSON.stringify(signature(before,'fold'))!==JSON.stringify(signature(next,'fold')))throw new Error('隐藏折线禁止编辑');if(!visibility.player&&JSON.stringify(signature(before,'tags'))!==JSON.stringify(signature(next,'tags')))throw new Error('隐藏标签禁止编辑');}
-function placementMap(previousMap,next,{r,c}){
+function placementMap(previousMap,next,cells){
  const local={...previousMap,tiles:previousMap.tiles.slice()};
- const cells=[];for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const rr=r+dr,cc=c+dc;if(rr>=0&&rr<previousMap.height&&cc>=0&&cc<previousMap.width)cells.push({r:rr,c:cc});}
- const changes=next.viewCells(cells);for(const p of cells){if(!local.tiles[p.r])local.tiles[p.r]=previousMap.tiles[p.r].slice();else local.tiles[p.r]=local.tiles[p.r].slice();local.tiles[p.r][p.c]=changes.get(p.r+','+p.c)??null;}
+ const changes=next.viewCells(cells),rows=new Set();for(const p of cells){if(!rows.has(p.r)){local.tiles[p.r]=previousMap.tiles[p.r].slice();rows.add(p.r);}local.tiles[p.r][p.c]=changes.get(p.r+','+p.c)??null;}
+ const keys=new Set(cells.map(cell=>cell.r+','+cell.c));local.foldCells=previousMap.foldCells.filter(cell=>!keys.has(cell.r+','+cell.c));
+ for(const cell of cells)if(!local.tiles[cell.r][cell.c])for(const node of next.world.at(cell.r,cell.c))for(const type of node.components.fold?.directions??[])local.foldCells.push({...cell,type});
  return local;
 }
 function commitTree(next,{placement=false,cell}={}){assertTreeVisibility(next);const before=placement&&gestureBefore?null:documentModel.serialize();if(!placement&&JSON.stringify(next.serialize())===JSON.stringify(before)){refreshTreePanel();return;}record({snapshot:before,refresh:false});const previousDocument=documentModel,previousMap=map;documentModel=next;
- const localMap=placement&&cell?placementMap(previousMap,next,cell):null;
+ const footprint=placement&&cell?previewFootprint(prefabs.find(prefab=>prefab.id===selectedPrefabId),cell.r,cell.c,id=>prefabs.find(prefab=>prefab.id===id)):null;
+ const rayDependencies=footprint?footprint.flatMap(cell=>[...previousDocument.world.at(cell.r,cell.c),...next.world.at(cell.r,cell.c)]).filter(node=>node.components.rayEmitter).flatMap(node=>playerRuntime.rayCells((next.world.has(node.id)?next.world:previousDocument.world).position(node.id),node.components.rayEmitter.initialDirection,map.width,map.height)):[];
+ const patchCells=footprint?placementRefreshCells(previousMap,next,footprint,rayDependencies):null;
+ const localMap=patchCells?placementMap(previousMap,next,patchCells):null;
  map=localMap??next.view();if(selectedNodeId&&!next.world.has(selectedNodeId))selectedNodeId=null;controller.resetPosition();
- if(placement&&cell&&localMap&&refreshFlatPaperPlacement(THREE,{before:previousDocument.world,after:next.world,beforeMap:previousMap,afterMap:localMap,...cell,layer:tileLayer,materialFor:color=>materials[color],wx,wz,hidden:cellHidden})){cancelPlacementPreview();clearSelection();foldMotionView.invalidatePrepared();renderer.shadowMap.needsUpdate=true;refreshTreePanel();applyVisibility();updateUI();scheduleFoldPreparation();}
- else {if(localMap)map=next.view();buildPaper();}persist();}
+ if(patchCells&&cellRefresh){const foldsChanged=patchCells.some(({r,c})=>JSON.stringify(previousMap.tiles[r]?.[c]?.folds??[])!==JSON.stringify(map.tiles[r]?.[c]?.folds??[]));rebuildPaper(patchCells,foldsChanged);}else buildPaper();persist();}
 function refreshTreePanel(){
  const panel=$('treeNodes');if(!panel||!panel.closest('details')?.open)return;const nodes=documentModel.world.serialize();const point=lastClickTile??selectedCells[0];
  renderTreeNodes(panel,entityTreeContext(documentModel.world,selectedNodeId,point).map(node=>{const world=documentModel.world.transforms.world(node.transformId);return {id:node.id,depth:node.depth,label:node.prefabId+' · '+coord(world.r,world.c)+(node.colocated?' · 同格':''),disabled:nodeHidden(node)||documentModel.world.transforms.worldCells(node.transformId).some(p=>cellHidden(p.r,p.c)),selected:selectedNodeId===node.id};}),id=>{selectedNodeId=id;refreshTreePanel();});

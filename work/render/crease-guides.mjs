@@ -178,6 +178,7 @@ function strokeBreaks(a, b, r, c, cellSurface) {
  * Render data only; fold placement and range are unchanged.
  */
 export function creaseGuides(map, groups, {
+  cells = null,
   hidden = () => false,
   lift = .002,
   flatLift = .018,
@@ -195,6 +196,7 @@ export function creaseGuides(map, groups, {
     showFolds,
     creaseDepth,
   });
+  const allowed=cells&&new Set(cells.map(cell=>cell.r+','+cell.c));
   const positions = [], lineCells = [], dots = [];
 
   function addLine(a, b, r, c) {
@@ -221,7 +223,7 @@ export function creaseGuides(map, groups, {
     const box = cellBounds(polygon, width, height);
     for (let r = box.r0; r <= box.r1; r++)
       for (let c = box.c0; c <= box.c1; c++) {
-        if (hidden(r, c)) continue;
+        if (hidden(r, c)||(allowed&&!allowed.has(r+','+c))) continue;
         let part = polygon.map((point) => [point[0] - c, point[1] - r]);
         for (const distance of [
           (p) => p[0] + .5,
@@ -293,7 +295,7 @@ export function creaseGuides(map, groups, {
     const box = cellBounds([a, b], width, height);
     for (let r = box.r0; r <= box.r1; r++)
       for (let c = box.c0; c <= box.c1; c++) {
-        if (hidden(r, c)) continue;
+        if (hidden(r, c)||(allowed&&!allowed.has(r+','+c))) continue;
         const segment = segmentInCell(a, b, r, c);
         if (segment) addLine(segment[0], segment[1], r, c);
       }

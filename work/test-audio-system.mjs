@@ -36,9 +36,11 @@ test('audio system plays effects and keeps one looping music track',()=>{
     audio.play('footstep');
     assert.equal(FakeAudio.instances.length,1);
     assert.equal(FakeAudio.instances[0].src,assets.footstep);
+    assert.equal(FakeAudio.instances[0].volume,.35);
     audio.playMusic('opening-bgm');
     const opening=FakeAudio.instances[1];
     assert.equal(opening.loop,true);
+    assert.equal(opening.volume,.7);
     audio.playMusic('ending-bgm');
     const ending=FakeAudio.instances[2];
     assert.equal(opening.paused,true);
@@ -61,11 +63,15 @@ test('audio system applies mute and clamped volume to music',()=>{
     audio.playMusic('opening-bgm');
     const music=FakeAudio.instances[0];
     assert.equal(music.volume,1);
+    audio.play('footstep');
+    assert.equal(FakeAudio.instances.at(-1).volume,.5);
     audio.setMuted(true);
     assert.equal(audio.isMuted(),true);
     assert.equal(music.volume,0);
     audio.setMuted(false);
     assert.equal(music.volume,1);
+    audio.play('footstep');
+    assert.equal(FakeAudio.instances.at(-1).volume,.5);
     audio.setVolume(-1);
     assert.equal(music.volume,0);
   } finally {

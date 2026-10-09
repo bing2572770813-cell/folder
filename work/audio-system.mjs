@@ -13,7 +13,7 @@ export function createAudioSystem(assets = {}) {
     const item = new Audio(uri);
     item.preload = 'auto';
     item.loop = loop;
-    item.volume = muted ? 0 : volume;
+    item.volume = muted ? 0 : volume * (MUSIC.has(name) ? 1 : .5);
     return item;
   }
   function play(name) {

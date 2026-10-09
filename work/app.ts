@@ -227,7 +227,7 @@ controls.addEventListener('start',()=>{cameraInteraction.active=true;cameraInter
 controls.addEventListener('change',()=>{cameraInteraction.revision++;});
 controls.addEventListener('end',()=>{cameraInteraction.active=false;cameraInteraction.kind=null;if(latestPointerEvent)hoverTask.request(latestPointerEvent);});
 let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
-let cameraMode='edit',editorCameraSnapshot=null,cameraFollowEnabled=true;
+let cameraMode='edit',editorCameraSnapshot=null,cameraFollowEnabled=false;
 const cameraFollowTarget=new THREE.Vector3();
 const lastFollowPosition=new THREE.Vector3();let lastFollowSteps=0;
 // Follow the support plane, not the crumbling surface animation.

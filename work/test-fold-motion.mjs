@@ -30,7 +30,7 @@ function fixture(type='h'){
 // The rendered angle eases toward the pointer under a bounded angular speed,
 // so tests advance the clock instead of expecting an instantaneous pose.
 const settle=(f,seconds=1)=>{const start=performance.now();for(let elapsed=0;elapsed<=seconds*1000;elapsed+=16)f.controller.tick(start+elapsed);};
-assert.equal(lightingDefaults.foldMaxAngle,179);
+assert.equal(lightingDefaults.foldMaxAngle,170);
 for(const invalid of [-1,181,NaN])assert.throws(()=>validateLighting({...lightingDefaults,foldMaxAngle:invalid}),/折叠最大旋转角/);
 for(const type of ['h','v','d1','d2'])for(const degrees of [0,45,179,180]){
  const f=fixture(type),settings={...lightingDefaults,foldMaxAngle:degrees};
@@ -45,8 +45,8 @@ for(const type of ['h','v','d1','d2'])for(const degrees of [0,45,179,180]){
  f.controller.cancelFoldMotion();
 }
 const defaultAngle=fixture();defaultAngle.controller.beginFoldDrag(2,3,300);defaultAngle.controller.updateFoldDrag(-1000);settle(defaultAngle);
-assert.ok(Math.abs(defaultAngle.P.foldMotion.angle-179*Math.PI/180)<1e-9,'missing settings use the 179 degree default');defaultAngle.controller.cancelFoldMotion();
-console.log('PASS: fold angle limits support 0–180 degrees, default to 179 and update during dragging.');
+assert.ok(Math.abs(defaultAngle.P.foldMotion.angle-170*Math.PI/180)<1e-9,'missing settings use the 170 degree default');defaultAngle.controller.cancelFoldMotion();
+console.log('PASS: fold angle limits support 0–180 degrees, default to 170 and update during dragging.');
 for(const type of ['h','v','d1','d2']){
  const f=fixture(type),before=JSON.stringify(f.map),source={...f.P.player};
  assert.deepEqual(f.selectionChanges.at(-1),{r:3,c:3,type},'selection notifies rendering immediately');
@@ -81,7 +81,7 @@ const blockedTarget=fixture();blockedTarget.controller.beginFoldDrag(2,3,300);bl
 assert.equal(blockedTarget.controller.endFoldDrag(),false,'release rechecks changed target');assert.equal(blockedTarget.P.steps,0);
 blockedTarget.controller.setMode('edit');assert.equal(blockedTarget.view.active(),false);assert.equal(blockedTarget.P.foldMotion,null);
 const cancelled=fixture();cancelled.controller.beginFoldDrag(2,3,300);cancelled.controller.updateFoldDrag(73);cancelled.controller.endFoldDrag(true);assert.equal(cancelled.P.foldMotion.phase,'return');assert.equal(cancelled.P.steps,0);
-const full=fixture();full.controller.beginFoldDrag(2,3,300);full.controller.updateFoldDrag(60);settle(full);assert.equal(full.P.foldMotion.ready,false,'feet below the tabletop cannot drop');full.controller.cancelFoldMotion();
+const full=fixture();full.env.getLighting=()=>({...lightingDefaults,foldMaxAngle:180});full.controller.beginFoldDrag(2,3,300);full.controller.updateFoldDrag(60);settle(full);assert.equal(full.P.foldMotion.ready,false,'feet below the tabletop cannot drop');full.controller.cancelFoldMotion();
 const debug=fixture();debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:.25,foldHorizontal:.1});assert.deepEqual(debug.P.foldDrop,{vertical:.25,horizontal:.1});debug.controller.undo();assert.deepEqual(debug.P.foldDrop,{vertical:1,horizontal:.35});assert.throws(()=>debug.controller.setPlayerProperties({r:2,c:3,dir:0,maxUp:1,maxDown:1,foldVertical:0}),/阈值/);
 const polygon=[{position:[-1,0,0],uv:[0,0]},{position:[1,0,0],uv:[1,0]},{position:[0,0,1],uv:[.5,1]}];
 for(const positive of [false,true]){const half=clipFoldPolygon(polygon,v=>v.position[0],positive);assert.ok(half.length>=3);assert.ok(half.every(v=>positive?v.position[0]>=0:v.position[0]<=0));}

@@ -681,8 +681,8 @@ function refreshFoldTarget(motion){
     env.syncFoldState?.();
   }
 function maxFoldAngle(){
-    const value=env.getLighting?.()?.foldMaxAngle??179;
-    return Math.max(0,Math.min(180,Number.isFinite(value)?value:179))*Math.PI/180;
+    const value=env.getLighting?.()?.foldMaxAngle??170;
+    return Math.max(0,Math.min(180,Number.isFinite(value)?value:170))*Math.PI/180;
   }
 function updateFoldMotion(now){
     const motion=P.foldMotion;

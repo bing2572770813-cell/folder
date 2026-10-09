@@ -201,6 +201,17 @@ test('fragile paper consumes global actions; failed moves, previews, undo and re
  f.controller.restart();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
 });
 
+test('fragile animation and completion notify only the breaking entity',()=>{
+ const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
+ const calls=[];f.env.refreshFragileSurfaces=(ids,broken)=>calls.push({ids:[...ids],broken});
+ f.controller.selectPlayer();f.controller.movePlayer(2,2);
+ f.controller.tick(f.state.animation.start+f.state.animation.duration/2);
+ assert.deepEqual(calls,[{ids:['fragile'],broken:false}]);
+ f.controller.tick(performance.now()+1000);
+ assert.deepEqual(calls.at(-1),{ids:['fragile'],broken:true});
+ assert.equal(f.world.runtime('fragile','fragile').broken,true);
+ f.controller.undo();assert.deepEqual(f.world.runtime('fragile','fragile'),{});
+});
 test('broken fragile paper ignores later global actions',()=>{
  const f=fixture();f.world.remove('emitter');f.add('fragile',2,1,{fragile:{}});
  f.move(2,2);assert.equal(f.world.runtime('fragile','fragile').broken,true);

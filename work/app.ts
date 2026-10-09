@@ -1,4 +1,5 @@
 // @ts-nocheck
+import {createFragileRefresh} from './render/fragile-refresh.mjs';
 // Composition boundary: app.ts wires the typed entry point to focused domain modules.
 // Narrowing this file is a later migration step; do not add new domain rules here.
 
@@ -167,7 +168,7 @@ window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersisten
 const foldableCells=new Set();
 let placementTagCells=[];
 const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,playSound:audio.play,playMusic:audio.playMusic,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;refreshFirebirdRangeLines();},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,playSound:audio.play,playMusic:audio.playMusic,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,refreshFragileSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;refreshFirebirdRangeLines();},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
 try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
@@ -284,6 +285,7 @@ const modelLibrary=createModelLibrary({load:createFbxModelLoader(visualAssetSour
 let modelErrorKey='';
 const modelView=createModelView({layer:modelLayer,library:modelLibrary,onChange:()=>buildPaper(),onError:(descriptor,error)=>{const key=descriptor.id+':'+error.message;if(key!==modelErrorKey){modelErrorKey=key;console.warn('模型加载失败',descriptor.id,error);}}});
 let brokenViewKey='',replacedFirebirdViewKey='';
+let fragileRefresh=null;const fragileMarkers=new Map();
 
 const visibility={coords:true,folds:true,player:true};
 const wx=c=>c-(map.width-1)/2, wz=r=>r-(map.height-1)/2;
@@ -356,6 +358,7 @@ function rebuildPaper() {
   cancelPlacementPreview();
   liftLineRanges=[];dynamicSurfaceEntries=[];
   disposableClear(placementLayer);disposableClear(staticTokenLayer);disposableClear(tagLayer);disposableClear(terrainLayer);disposableClear(tileLayer);disposableClear(foldLayer);disposableClear(gridLayer);disposableClear(entityEdgeLayer);clearSelection();hovered=null;hoverOutline.visible=false;
+  const gridRanges=[];
   const surfaces=createSurfaceBatchCollector({wx,wz}),buckets=new Map(),edges=[],styleEdges=new Map(),styleCells=new Map(),terrains=new Map();
 	 const treeCells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'}),baseProjection=map,surfaceMaps=new Map();
   refreshModels(true);
@@ -393,6 +396,7 @@ function rebuildPaper() {
 
     if(edgeColor){if(!styleCells.has(edgeColor))styleCells.set(edgeColor,[]);const count=((styleEdges.get(edgeColor)?.length??0)-styleStart)/6;for(let i=0;i<count;i++)styleCells.get(edgeColor).push(cell);}
     if(surface){for(const segment of surface.boundarySegments)for(const p of segment)edges.push(x+p[0],p[1]+.002,z+p[2]);}else edges.push(x-.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z-.5,x+.5,y+.002,z+.5,x+.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z+.5,x-.5,y+.002,z-.5);
+    gridRanges.push({cell,start:edgeStart,end:edges.length});
     if(dynamicEntry){dynamicEntry.gridStart=edgeStart;dynamicEntry.gridEnd=edges.length;dynamicEntry.style=entityEdgeColor(tile);dynamicEntry.styleStart=styleStart;dynamicEntry.styleEnd=dynamicEntry.style?styleEdges.get(dynamicEntry.style).length:styleStart;}
     if(documentModel.world.get(nodeId).components.lift&&!dynamicEntry){
       liftLineRanges.push({r,c,height:y,start:edgeStart,end:edges.length,style:null});
@@ -420,6 +424,7 @@ function rebuildPaper() {
   for(const [edgeColor,positions] of styleEdges){const outline=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color:edgeColor,toneMapped:false}));outline.renderOrder=4;outline.userData.edgeColor=edgeColor;outline.userData.segmentCells=styleCells.get(edgeColor);entityEdgeLayer.add(outline);}
   for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++)if(!map.tiles[r][c]||cellHidden(r,c)){const x=wx(c),z=wz(r);edges.push(x-.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z-.5,x+.5,voidY(.002),z+.5,x+.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z+.5,x-.5,voidY(.002),z-.5);}
   const grid=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(edges,3)),gridMaterial);gridLayer.add(grid);
+  fragileRefresh=createFragileRefresh(THREE,[tileLayer,entityEdgeLayer,terrainLayer,staticTokenLayer,tagLayer,foldLayer],{gridRanges:gridRanges.map(range=>({...range,attribute:grid.geometry.attributes.position})),voidHeight:voidY(.002),targets:documentModel.world.serialize().filter(node=>node.components.fragile).flatMap(node=>documentModel.world.cells(node.id))});
   for(const range of liftLineRanges){range.attribute=range.style===null?grid.geometry.attributes.position:entityEdgeLayer.children.find(line=>line.userData.edgeColor===range.style)?.geometry.attributes.position;}
   for(const entry of dynamicSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?entityEdgeLayer.children.find(line=>line.userData.edgeColor===entry.style)?.geometry.attributes.position:null;}
   rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
@@ -465,6 +470,28 @@ function refreshLiftSurfaces(){
  if(dynamicSurfaceEntries.length){foldMotionView.invalidatePrepared();scheduleFoldPreparation();}
  if(hovered&&hoverOutline.visible)hoverOutline.position.y=tileTop(hovered.r,hovered.c)+.035;
  refreshMechanismMarkers();
+ // Lift/tag batch updates must not restore instances removed by an earlier break.
+ for(const node of documentModel.world.serialize())if(node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken)for(const cell of documentModel.world.cells(node.id))fragileRefresh?.remove(cell);
+}
+function refreshFragileSurfaces(ids,broken){
+ const tree=documentModel.world;
+ for(const id of ids){
+  const state=tree.runtime(id,'fragile');
+  for(const marker of fragileMarkers.get(id)??[]){
+   if(broken)marker.visible=false;
+   else marker.scale.setScalar(1+Math.sin(Number(state.progress??0)*Math.PI*6)*.08);
+  }
+  if(!broken)continue;
+  for(const cell of tree.cells(id)){
+   map.tiles[cell.r][cell.c]=null;fragileRefresh?.remove(cell);
+   for(const layer of [mechanismLayer,rayLayer,modelLayer])for(const object of layer.children){const owner=object.userData.cell;if(owner?.r===cell.r&&owner?.c===cell.c)object.visible=false;}
+  }
+ }
+ if(broken){
+  brokenViewKey=tree.serialize().filter(node=>node.components.fragile&&tree.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|');
+  hoverDescriptionKey=null;renderer.shadowMap.needsUpdate=true;
+  foldMotionView.invalidatePrepared();axisViewKey=null;
+ }
 }
 function refreshMechanismSurfaces(){
   const nodes=documentModel.world.serialize(),key=nodes.filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'),firebirdKey=nodes.filter(node=>node.components.firebird&&documentModel.world.runtime(node.id,'firebird').replaced).map(node=>node.id).sort().join('|');
@@ -479,7 +506,7 @@ function refreshModels(force=false){
  modelDescriptorKey=key;return modelView.update(descriptors);
 }
 function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden,cellHidden,runtime:P.mode==='play'})){
- disposableClear(mechanismLayer);disposableClear(rayLayer);
+ disposableClear(mechanismLayer);disposableClear(rayLayer);fragileMarkers.clear();
  brokenViewKey=P.mode==='play'?documentModel.world.serialize().filter(node=>node.components.fragile&&documentModel.world.runtime(node.id,'fragile').broken).map(node=>node.id).sort().join('|'):'';
  const enemyCells=documentModel.world.serialize().filter(node=>node.static.entityType==='creature'&&(node.components.rayEmitter||node.components.firebird)&&!nodeHidden(node)).flatMap(node=>{
   const occupied=documentModel.world.cells(node.id),cell=occupied[Math.floor(occupied.length/2)];
@@ -490,6 +517,7 @@ function refreshMechanismMarkers(cells=renderTreeCells(documentModel,{nodeHidden
   if(!components.rayEmitter&&!components.foldSwitch&&!components.fragile&&!components.firebird)continue;
   const runtime=P.mode==='play'?{rayEmitter:documentModel.world.runtime(node.id,'rayEmitter'),foldSwitch:documentModel.world.runtime(node.id,'foldSwitch'),fragile:documentModel.world.runtime(node.id,'fragile'),firebird:documentModel.world.runtime(node.id,'firebird')}:{};
   const marker=mechanismMarker(THREE,components,runtime);marker.position.set(wx(cell.c),tileHeight(cell.tile)+.04,wz(cell.r));marker.userData.cell=cell;mechanismLayer.add(marker);
+  if(components.fragile){const markers=fragileMarkers.get(node.id)??[];markers.push(marker);fragileMarkers.set(node.id,markers);}
   if(components.rayEmitter){
    const direction=runtime.rayEmitter?.direction??components.rayEmitter.initialDirection;
    for(const shot of playerRuntime.rayCells(cell,direction,map.width,map.height)){

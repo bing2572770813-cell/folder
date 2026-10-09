@@ -18,6 +18,35 @@ async function verifyExportGuidance(browser,url,directory){
   }
   await page.locator('#mapFile').setInputFiles({name:'export-guide.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(map))});
   await page.waitForFunction(()=>document.getElementById('mapName').value==='导出引导测试');
+  // Check the on-block counter through real movement, undo and break settlement.
+  await page.evaluate(()=>window.foldField.enableDiagnostics());
+  await page.locator('#playMode').click();
+  await page.screenshot({path:path.join(directory,'fragile-counter-isometric.png')});
+  await page.locator('#topView').click();
+  const cellPoint=async(r,c)=>page.evaluate(({r,c})=>window.foldField.screenPoint(r,c),{r,c});
+  const capture=async name=>{await page.mouse.move(10,10);await page.screenshot({path:path.join(directory,name+'.png')});};
+  await capture('fragile-counter-4');
+  let from=await cellPoint(1,1),to=await cellPoint(0,1);
+  await page.mouse.click(from.x,from.y);await page.mouse.click(to.x,to.y);
+  await page.waitForFunction(()=>window.foldField.getState().steps===1&&!window.foldField.getState().moving);
+  let fragilePoint=await cellPoint(1,2);await page.mouse.move(fragilePoint.x,fragilePoint.y);
+  await page.waitForFunction(()=>document.getElementById('gameHint').textContent.includes('3 次'));
+  await capture('fragile-counter-3');
+  await page.locator('#undoBtn').click();await page.waitForFunction(()=>window.foldField.getState().steps===0);
+  fragilePoint=await cellPoint(1,2);await page.mouse.move(fragilePoint.x,fragilePoint.y);
+  await page.waitForFunction(()=>document.getElementById('gameHint').textContent.includes('4 次'));
+  await capture('fragile-counter-undo-4');
+  for(let step=1;step<=4;step++){
+   from=await cellPoint(step%2===1?1:0,1);to=await cellPoint(step%2===1?0:1,1);
+   if(step===1)await page.mouse.click(from.x,from.y);
+   await page.mouse.click(to.x,to.y);
+   await page.waitForFunction(step=>window.foldField.getState().steps===step&&!window.foldField.getState().moving,step);
+  }
+  await page.waitForFunction(()=>window.foldField.getState().map.tiles[1][2]===null);
+  await capture('fragile-counter-broken');
+  await page.locator('#restartBtn').click();await page.waitForFunction(()=>window.foldField.getState().steps===0);
+  await capture('fragile-counter-restart-4');
+  await page.locator('#editMode').click();
   // Export from a dirty inspection UI, verifying that selected/editor state is never copied.
   await page.locator('#tabInspect').click();
   const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportGame').click()]);
@@ -41,7 +70,7 @@ async function verifyExportGuidance(browser,url,directory){
   await page.screenshot({path:path.join(directory,'export-guide-restart.png')});
   assert.deepEqual(requests,[],'all prefab logic, models, textures and audio must work without a server');
   assert.deepEqual(errors,[],'export and gameplay must have no runtime errors');
-  return [{name:'offline-game-no-editor-or-reflection-and-live-fragile-guidance',status:'pass'}];
+  return [{name:'fragile-counter-move-undo-break-restart',status:'pass'},{name:'offline-game-no-editor-or-reflection-and-live-fragile-guidance',status:'pass'}];
  }catch(error){await page.screenshot({path:path.join(directory,'export-guide-failure.png')}).catch(()=>{});throw error;}finally{await context.close();}
 }
 module.exports={verifyExportGuidance};

@@ -3,6 +3,7 @@
   "id": "obstacle_ai",
   "name": "阻挡方块",
   "tile": {
+    "followFold": true,
     "color": "black",
     "height": 0.25,
     "blocked": true,

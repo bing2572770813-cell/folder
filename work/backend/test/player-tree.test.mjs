@@ -377,7 +377,7 @@ test('firebird spawn warns once, highlights player, rages in 9x9 and restores on
  assert.ok(messages.some(message=>message.includes('火焰子弹正在追踪你')&&message.includes('火焰鸟发怒了')));
  assert.equal(highlights.at(-1),true);
  const count=messages.length;f.controller.refreshFirebirdThreat();assert.equal(messages.length,count,'no repeated notification');
- f.move(1,1);assert.equal(f.world.runtime('bird','firebird').replaced,true);assert.equal(highlights.at(-1),false);
+ f.move(1,1);assert.equal(f.world.runtime('bird','firebird').replaced,true);assert.equal(highlights.at(-1),true,'one-shot attack does not stop tracking');
  f.controller.undo();assert.equal(highlights.at(-1),true);assert.equal(f.world.runtime('bird','firebird').replaced,undefined);
  f.controller.setMode('edit');assert.equal(highlights.at(-1),false);
  f.controller.setMode('play');assert.equal(highlights.at(-1),true);
@@ -387,4 +387,21 @@ test('firebird spawn warns once, highlights player, rages in 9x9 and restores on
  f.state.player.c=7;f.controller.refreshFirebirdThreat();assert.equal(messages.at(-1),'火焰鸟发怒了');
  f.controller.refreshFirebirdThreat();assert.equal(messages.at(-1),'火焰鸟发怒了');
  f.world.remove('bird');f.controller.refreshFirebirdThreat();assert.equal(highlights.at(-1),false);
+});
+
+test('firebird keeps tracking the player after a physical fold drop and undo',()=>{
+ const f=physicalFixture();
+ f.add('bird',0,3,{firebird:{direction:'north'}});
+ f.controller.refreshFirebirdThreat(false);
+ const before=f.controller.snapshot();
+ assert.equal(f.controller.beginFoldDrag(1,0,300),true);
+ f.controller.updateFoldDrag(70);
+ assert.equal(f.controller.endFoldDrag(),true);
+ assert.deepEqual({r:f.state.player.r,c:f.state.player.c},{r:1,c:2});
+ assert.equal(f.world.runtime('bird','firebird').replaced,true);
+ assert.deepEqual(f.controller.firebirdThreat(),[{id:'bird',angry:true}]);
+ f.controller.tick(performance.now()+1000);
+ assert.deepEqual(f.controller.firebirdThreat(),[{id:'bird',angry:true}]);
+ f.controller.undo();assert.deepEqual(f.controller.snapshot(),before);
+ assert.deepEqual(f.controller.firebirdThreat(),[{id:'bird',angry:true}]);
 });

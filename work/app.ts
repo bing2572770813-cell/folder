@@ -1049,8 +1049,7 @@ function placementCandidate(r,c,{preview=false}={}){
  if(entityHidden(tile,hiddenEntities))throw new Error('请先显示该实体类型');
  if(blocked(tile)&&r===map.spawn.r&&c===map.spawn.c)throw new Error('玩家起点不能设为阻挡方块');
  if(blocked(tile)&&map.exit?.r===r&&map.exit?.c===c)throw new Error('出口不能设为阻挡方块，请先移动出口');
- const key=placementKey(r,c),cached=!preview&&placementCheckCache?.document===documentModel&&placementCheckCache.prefab===basePrefab&&placementCheckCache.key===key&&placementCheckCache.candidate;
- if(cached)return placementCheckCache.candidate;
+ // Hover candidates contain a local snapshot only; commit against the full document.
  const options={isHidden:cellHidden,nodeHidden,resolve:id=>prefabs.find(p=>p.id===id)},result=preview?previewPlacement(documentModel,prefab,tile,r,c,{...options,tagCells:placementTagCells}):null;
  const candidate=preview?result.candidate:placeCategorizedPrefab(documentModel,prefab,tile,r,c,{...options,validate:false});
  if(!preview&&(!visibility.folds||!visibility.player))assertHiddenContentUnchanged(documentModel.view(),candidate.view(),visibility);

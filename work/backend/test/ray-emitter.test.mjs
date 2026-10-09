@@ -322,8 +322,8 @@ test('trigger settings preserve hint heading until the next matching action and 
  assert.equal(fired.direction,'east');assert.equal(f.world.get('3-1').prefabId,'test');
  f.controller.setFreeTeleport(true);assert.equal(f.controller.testTeleport(1,1),true);f.controller.tick(performance.now()+1000);
  assert.deepEqual(f.world.runtime('emitter','rayEmitter'),fired);assert.equal(f.world.get('3-1').prefabId,'test');
- assert.equal(sounds.filter(name=>name==='fire-spit').length,1);
+ assert.equal(sounds.filter(name=>name==='fire-spit').length,0);
  assert.equal(f.move(1,2),true);assert.equal(f.world.runtime('emitter','rayEmitter').direction,'west');
- assert.equal(f.world.get('3-1').prefabId,'test');assert.equal(sounds.filter(name=>name==='fire-spit').length,2);
+ assert.equal(f.world.get('3-1').prefabId,'test');assert.equal(sounds.filter(name=>name==='fire-spit').length,0);
  f.controller.undo();assert.deepEqual(f.world.runtime('emitter','rayEmitter'),fired);assert.equal(f.world.get('3-1').prefabId,'test');
 });

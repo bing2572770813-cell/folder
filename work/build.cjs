@@ -16,11 +16,10 @@ async function build() {
   ]));
   console.log('Prescanned visual assets: '+Object.keys(builtinAssets).length+' files across '+catalog.prefabs.length+' entity prefabs');
   const audioDir=path.join(root,'../assets/audio/音乐素材');
-  const foldSound=fs.existsSync(path.join(audioDir,'flip_sound_whenfoldstart.wav'))?'flip_sound_whenfoldstart.wav':'flip_sound.wav';
   const audioNames={
     'opening-bgm':'openinglevel1_bgm.mp3','level23-bgm':'level23_bgm.mp3','level45-bgm':'level45_bgm.mp3','level67-bgm':'level67_bgm.mp3','ending-bgm':'Ending_BGM.mp3',
-    'level-complete':'level_complete.mp3','game-over':'GameOver.mp3','footstep':'footstep.mp3','flip':foldSound,'paper-fracture':'paper_fracture.mp3',
-    'fire-spit':'fire_spit(1).mp3','phoenix-roar':'phoenix_roar.mp3','switch-open':'switch_open.mp3','switch-close':'switch_close.mp3','fire-environment':'fire_environment.wav',
+    'level-complete':'level_complete.mp3','game-over':'GameOver.mp3','footstep':'footstep.mp3','flip':'flip_sound_whenfoldstart.wav','paper-fracture':'paper_fracture.mp3',
+    'phoenix-roar':'phoenix_roar.mp3','switch-open':'switch_open.mp3','switch-close':'switch_close.mp3','fire-environment':'fire_environment.wav',
   };
   const audioAssets=Object.fromEntries(Object.entries(audioNames).map(([name,file])=>{
     const ext=path.extname(file).toLowerCase();

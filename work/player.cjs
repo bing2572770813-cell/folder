@@ -187,7 +187,7 @@ function fireRayEmitters(){
   const direction=triggered&&previous.fired?rayEmitterConfig.directions[previous.direction??node.components.rayEmitter.initialDirection].opposite:(previous.direction??node.components.rayEmitter.initialDirection);
   const danger=rayCells(origin,previous.direction??node.components.rayEmitter.initialDirection,map.width,map.height);
   if(triggered&&!env.isHidden(P.player.r,P.player.c)&&activeAt(P.player.r,P.player.c).some(owner=>owner.components.surface)&&danger.some(cell=>cell.r===P.player.r&&cell.c===P.player.c)){P.terrainState.gameOver=true;P.terrainState.message='被射线冻死';}
-  if(triggered){tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot:rayCells(origin,direction,map.width,map.height),shotDirection:direction});playSound?.('fire-spit');changed=true;}
+  if(triggered){tree.setRuntime(node.id,'rayEmitter',{direction,fired:true,lastShot:rayCells(origin,direction,map.width,map.height),shotDirection:direction});changed=true;}
  }
  if(changed){if(env.refreshMechanismSurfaces)env.refreshMechanismSurfaces();else buildPaper();}
 }
@@ -487,7 +487,7 @@ const turnManager=createTurnManager({
  act:context=>{
   const {to,trigger,source}=context.action;
   P.player={...to};P.steps++;if(trigger===Trigger.Teleport)P.teleports++;
-  playSound?.(trigger===Trigger.Teleport?'flip':'footstep');
+  if(trigger===Trigger.Walk)playSound?.('footstep');
   if(source==='test')revealRegion(regionOf(configuredMap().tiles[to.r][to.c]));
  },
  enter:context=>arrive(context.action.trigger),
@@ -571,7 +571,7 @@ function foldDragPlan(r, c) {
       P.chosenFold.c,
       P.chosenFold.type,
     );
-    if (!group || !inFoldRange(group, P.player)||!canFoldCell(P.player.r,P.player.c)) return false;
+    if (!group || !canFoldCell(P.player.r,P.player.c)) return false;
     const direction =
       group.type === "h"
         ? { r: 0, c: 1 }
@@ -637,6 +637,7 @@ function beginFoldDrag(r,c,startY){
     P.legalFoldMoves = [];
     env.getSelectionRing().visible = false;
     env.foldView.begin(cells, hinge, creaseCells);
+    playSound?.('flip');
     P.foldMotion = {
       axis,
       cells,

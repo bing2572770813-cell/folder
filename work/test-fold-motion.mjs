@@ -22,9 +22,10 @@ function fixture(type='h'){
  const renderPlayer=()=>{player.position.set(P.player.c-3,.108,P.player.r-3);player.rotation.y=-P.player.dir*Math.PI/4;};
  let controller;
  const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>player,getSelectionRing:()=>ring,getEffectLayer:()=>paper,getFoldHinge:g=>hingeFor(map,g,c=>c-3,r=>r-3),foldView:view,invalidateAxes:noop,isHidden:()=>false,blocked,inside,walkable:(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c]),canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c-3,wz:r=>r-3,tileTop:(r,c)=>map.tiles[r]?.[c]?.height??0};
+ const sounds=[];env.playSound=name=>sounds.push(name);
  const selectionChanges=[];env.onSelectionChanged=()=>selectionChanges.push(P.chosenFold?{...P.chosenFold}:null);
  controller=runtime.createPlayerController(env);controller.setMode('play');renderPlayer();controller.selectFold(3,3,type);
- return {P,map,controller,view,layer,player,mesh,env,selectionChanges};
+ return {P,map,controller,view,layer,player,mesh,env,selectionChanges,sounds};
 }
 // The rendered angle eases toward the pointer under a bounded angular speed,
 // so tests advance the clock instead of expecting an instantaneous pose.
@@ -173,3 +174,26 @@ for(const indexed of [false,true]){
  view.reset();view.invalidatePrepared();geometry.dispose();mesh.material.dispose();
 }
 console.log('PASS: idle preparation is inert, eligibility reads are bounded per entity, cached buffers reuse/dispose/invalidate, and indexed triangle attributes preserve clipping.');
+
+for(const reason of ['blocked','void','disabled','range']){
+ const f=fixture(),source={...f.P.player};
+ if(reason==='blocked')f.map.tiles[4][3].blocked=true;
+ if(reason==='void')f.map.tiles[4][3]=null;
+ if(reason==='disabled')f.P.canDropOnFold=false;
+ if(reason==='range'){f.map.tiles[3][0].folds=[];f.map.tiles[3][6].folds=[];f.P.player={r:0,c:3,dir:0};}
+ const before=f.controller.snapshot();
+ assert.equal(f.controller.foldTarget(f.P.chosenFold).valid,false);
+ assert.equal(f.controller.beginFoldDrag(2,3,300),true,reason+' still permits a fold attempt');
+ assert.deepEqual(f.sounds,['flip'],'sound fires at fold start');
+ f.controller.updateFoldDrag(300-240*170/180);settle(f);
+ assert.equal(f.controller.endFoldDrag(),false);
+ f.controller.tick(performance.now()+2000);
+ assert.deepEqual(f.controller.snapshot(),before,'failed attempt preserves game state');
+ assert.deepEqual(f.sounds,['flip'],'rebound does not replay sound');
+ assert.equal(f.P.playHistory.length,0);
+}
+const soundFold=fixture();soundFold.controller.beginFoldDrag(2,3,300);
+soundFold.controller.updateFoldDrag(300-240*170/180);settle(soundFold);
+assert.equal(soundFold.controller.endFoldDrag(),true);
+assert.deepEqual(soundFold.sounds,['flip'],'successful drop does not replay fold sound');
+console.log('PASS: invalid fold attempts rebound atomically and fold sound plays only at start.');

@@ -51,13 +51,24 @@ async function verifyExportGuidance(browser,url,directory){
   await page.locator('#tabInspect').click();
   const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportGame').click()]);
   const file=path.join(directory,'export-guide.html');await download.saveAs(file);
+  await page.addInitScript(()=>{
+    const NativeAudio=window.Audio;window.__exportAudio=[];
+    window.Audio=function(src){
+      const item=new NativeAudio(src),play=item.play.bind(item);let first=true;
+      item.play=()=>{if(item.loop&&first){first=false;return Promise.reject(new DOMException('Autoplay blocked','NotAllowedError'));}return play();};
+      window.__exportAudio.push(item);return item;
+    };
+  });
   const requests=[];page.on('request',request=>{if(/^https?:/.test(request.url()))requests.push(request.url());});
   await page.goto(pathToFileURL(file).href,{waitUntil:'networkidle'});
   await page.locator('#gameHud').waitFor({state:'visible'});
   for(const selector of ['.sidebar','#editMode','#mapName','#resultEdit','#startBtn'])assert.equal(await page.locator(selector).count(),0,selector+' must not exist in the playable DOM');
   assert.equal(await page.evaluate(()=>typeof window.foldField),'undefined');
   assert.equal(await page.evaluate(()=>window.__FOLD_FIELD_PREFABS__),undefined);
+  assert.equal(await page.evaluate(()=>window.__exportAudio.filter(item=>item.loop).length),1,'export includes a BGM track');
+  assert.equal(await page.evaluate(()=>window.__exportAudio.find(item=>item.loop).paused),true,'blocked autoplay keeps music pending');
   await page.locator('#topView').click();
+  await page.waitForFunction(()=>{const music=window.__exportAudio.find(item=>item.loop);return music&&!music.paused&&music.currentTime>0;});
   const bounds=await page.locator('#viewport canvas').boundingBox(),center={x:bounds.x+bounds.width/2,y:bounds.y+bounds.height/2},target={x:center.x+bounds.height/9,y:center.y};
   await page.mouse.move(target.x,target.y);
   await page.waitForFunction(()=>document.getElementById('gameHint').textContent.includes('C2:')&&document.getElementById('gameHint').textContent.includes('4 次'));
@@ -69,6 +80,7 @@ async function verifyExportGuidance(browser,url,directory){
   await page.waitForFunction(()=>document.getElementById('gameHint').textContent.includes('4 次'));
   await page.screenshot({path:path.join(directory,'export-guide-restart.png')});
   assert.deepEqual(requests,[],'all prefab logic, models, textures and audio must work without a server');
+  assert.equal(await page.evaluate(()=>window.__exportAudio.filter(item=>item.loop).length),1,'later input never replaces the BGM instance');
   assert.deepEqual(errors,[],'export and gameplay must have no runtime errors');
   return [{name:'fragile-counter-move-undo-break-restart',status:'pass'},{name:'offline-game-no-editor-or-reflection-and-live-fragile-guidance',status:'pass'}];
  }catch(error){await page.screenshot({path:path.join(directory,'export-guide-failure.png')}).catch(()=>{});throw error;}finally{await context.close();}

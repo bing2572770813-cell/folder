@@ -152,6 +152,8 @@ let tagCatalog=GAME_ONLY?(window.__FOLD_FIELD_TAGS__||[]):(window.__FOLD_FIELD_T
 let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs.find(isPlaceableEntity)?.id??null;
 const getPlayerPrefab=()=>prefabs.find(p=>p.id==='player_ai');
 const audio=createAudioSystem(window.__FOLD_FIELD_AUDIO_ASSETS__||{});
+window.addEventListener('pointerdown',audio.resumeMusic);
+window.addEventListener('keydown',audio.resumeMusic);
 function brushTile(){const selected=prefabs.find(p=>p.id===selectedPrefabId);if(selected&&!selected.tile)return {prefabId:selected.id};const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,...(prefab.tile.lift?{lift:{...prefab.tile.lift,initialHeight:brushHeight}}:{}),thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let documentModel=new TreeDocument(defaultMap());
 let map=documentModel.view(),tool='place',color='white',foldType='h';

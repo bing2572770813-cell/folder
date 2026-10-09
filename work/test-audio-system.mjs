@@ -78,3 +78,22 @@ test('audio system applies mute and clamped volume to music',()=>{
     if(previous)globalThis.Audio=previous;else delete globalThis.Audio;
   }
 });
+
+
+test('blocked autoplay resumes on interaction without restarting active or muted music',async()=>{
+ const previous=globalThis.Audio;let blocked=true;
+ class BlockedAudio extends FakeAudio {
+  play(){if(blocked){this.playCount++;return Promise.reject(new Error('autoplay blocked'));}return super.play();}
+ }
+ FakeAudio.instances=[];globalThis.Audio=BlockedAudio;
+ try{
+  const audio=createAudioSystem(assets);audio.playMusic('opening-bgm');await Promise.resolve();
+  const music=FakeAudio.instances[0];assert.equal(music.paused,true);assert.equal(music.playCount,1);
+  blocked=false;audio.resumeMusic();assert.equal(music.paused,false);assert.equal(music.playCount,2);
+  audio.resumeMusic();assert.equal(music.playCount,2,'later interaction does not restart playing music');
+  music.pause();audio.setMuted(true);audio.resumeMusic();assert.equal(music.playCount,2);
+  audio.setMuted(false);assert.equal(music.paused,false);assert.equal(music.playCount,3);
+  assert.equal(FakeAudio.instances.length,1,'retry reuses the embedded track');
+  audio.stopMusic();audio.resumeMusic();assert.equal(music.playCount,3);
+ }finally{if(previous)globalThis.Audio=previous;else delete globalThis.Audio;}
+});

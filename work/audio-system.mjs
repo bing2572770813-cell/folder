@@ -31,6 +31,9 @@ export function createAudioSystem(assets = {}) {
     if (!muted) music.play().catch(() => {});
   }
   function stopMusic() { music?.pause(); music = null; musicName = null; }
+  function resumeMusic() {
+    if (!muted && music?.paused) music.play().catch(() => {});
+  }
   function setMuted(next) {
     muted = !!next;
     if (music) { music.volume = muted ? 0 : volume; if (!muted) music.play().catch(() => {}); }
@@ -39,5 +42,5 @@ export function createAudioSystem(assets = {}) {
     volume = Math.max(0, Math.min(1, Number(next) || 0));
     if (music) music.volume = muted ? 0 : volume;
   }
-  return { play, playMusic, stopMusic, setMuted, setVolume, isMuted: () => muted };
+  return { play, playMusic, stopMusic, resumeMusic, setMuted, setVolume, isMuted: () => muted };
 }

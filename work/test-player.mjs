@@ -13,6 +13,13 @@ const isHidden=(r,c)=>P.mode==='play'&&map.tiles[r]?.[c]&&!P.revealedRegions.has
 const walkable=(r,c)=>inside(r,c)&&!!map.tiles[r][c]&&!blocked(map.tiles[r][c])&&!isHidden(r,c)&&map.tiles[r][c].terrain!=='campfire';
 let controller;
 const env={state:P,THREE,$:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},getMap:()=>map,getFoldAxes:()=>uniqueFoldAxes(map),getPlayerGroup:()=>group,getSelectionRing:()=>ring,getEffectLayer:()=>new THREE.Group(),invalidateAxes:noop,isHidden,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord:(r,c)=>`${r},${c}`,FOLD_NAMES:{},clone:structuredClone,persist:noop,toast:noop,record:()=>controller.recordPlay(),updateUI:noop,buildPaper:noop,renderPlayer:noop,disposableClear:noop,overlay:noop,tileOutline:noop,wx:c=>c,wz:r=>r,tileTop:()=>.09};
+{
+ const state=runtime.createPlayerState(map.spawn),standalone=runtime.createPlayerController({...env,state,gameOnly:true});
+ standalone.setMode('play');const snapshot=standalone.snapshot();
+ assert.equal(standalone.setMode('edit'),false);assert.equal(state.mode,'play');
+ assert.deepEqual(standalone.snapshot(),snapshot,'blocked mode changes must not reset gameplay');
+ console.log('PASS: standalone player starts through normal play initialization and cannot return to edit mode.');
+}
 controller=runtime.createPlayerController(env);controller.resetRegions();assert.equal(controller.validateForPlay().valid,true);
 controller.setMode('play');assert.equal(P.terrainState.hasKey,false);assert.deepEqual([...P.revealedRegions],['A']);assert.equal(controller.canMoveTo(3,3),false);
 controller.click(3,4);assert.deepEqual(P.player,{r:0,c:0,dir:2});assert.equal(P.legalMoves.length,0);

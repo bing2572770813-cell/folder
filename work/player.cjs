@@ -510,6 +510,7 @@ function teleport(axis=null){return turnManager.execute({trigger:Trigger.Telepor
 function turn(delta){const map=env.getMap();if(P.moving||P.foldMotion)return;record();P.player.dir=(P.player.dir+delta+8)%8;if(P.mode==='edit'){map.spawn.dir=P.player.dir;persist();}renderPlayer();updateUI();}
 function resetRegions(){const map=configuredMap();const spawn=taggedCells(map,'spawn')[0];if(spawn){map.spawn={r:spawn.r,c:spawn.c,dir:map.spawn.dir};P.revealedRegions=new Set([regionOf(spawn.tile)]);}else P.revealedRegions=new Set();syncRegionEntities();}
 function setMode(next){
+ if(env.gameOnly&&next!=='play')return false;
  cancelFoldMotion();if(P.mode===next)return;
  if(next==='play'){const check=validateForPlay();if(!check.valid){toast(check.errors.join('；'),true);return;}}
  env.resetDebugState?.();P.animation=null;P.moving=false;P.levelWon=false;P.stepLimitHit=false;P.terrainState=createTerrainState();turnManager.reset();world()?.resetRuntime();env.resetMapView?.();

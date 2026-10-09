@@ -5,6 +5,7 @@ const esbuild = require("esbuild");
 const root = __dirname,
   outputs = path.join(root, "../outputs");
 async function build() {
+  const {gameHtml}=await import('./core/game-export.mjs');
   const catalog = await require("./prefab-catalog.cjs").readCatalog();
   if (catalog.errors.length) console.warn("Prefab warnings:", catalog.errors);
   const {visualAssetPaths}=await import('./resources/visual-assets.mjs');
@@ -15,9 +16,10 @@ async function build() {
   ]));
   console.log('Prescanned visual assets: '+Object.keys(builtinAssets).length+' files across '+catalog.prefabs.length+' entity prefabs');
   const audioDir=path.join(root,'../assets/audio/音乐素材');
+  const foldSound=fs.existsSync(path.join(audioDir,'flip_sound_whenfoldstart.wav'))?'flip_sound_whenfoldstart.wav':'flip_sound.wav';
   const audioNames={
     'opening-bgm':'openinglevel1_bgm.mp3','level23-bgm':'level23_bgm.mp3','level45-bgm':'level45_bgm.mp3','level67-bgm':'level67_bgm.mp3','ending-bgm':'Ending_BGM.mp3',
-    'level-complete':'level_complete.mp3','game-over':'GameOver.mp3','footstep':'footstep.mp3','flip':'flip_sound.wav','paper-fracture':'paper_fracture.mp3',
+    'level-complete':'level_complete.mp3','game-over':'GameOver.mp3','footstep':'footstep.mp3','flip':foldSound,'paper-fracture':'paper_fracture.mp3',
     'fire-spit':'fire_spit(1).mp3','phoenix-roar':'phoenix_roar.mp3','switch-open':'switch_open.mp3','switch-close':'switch_close.mp3','fire-environment':'fire_environment.wav',
   };
   const audioAssets=Object.fromEntries(Object.entries(audioNames).map(([name,file])=>{
@@ -68,31 +70,25 @@ async function build() {
   const completionImage='data:image/png;base64,'+fs.readFileSync(path.join(root,'../assets/texture/completion-key.png')).toString('base64');
   const deathImage='data:image/jpeg;base64,'+fs.readFileSync(path.join(root,'../assets/texture/death.jpg')).toString('base64');
   const code =
-    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';window.__FOLD_FIELD_AUDIO_ASSETS__??='+JSON.stringify(audioAssets)+';window.__FOLD_FIELD_COMPLETION_IMAGE__??='+JSON.stringify(completionImage)+';window.__FOLD_FIELD_DEATH_IMAGE__??='+JSON.stringify(deathImage)+';'+
+    'window.__FOLD_FIELD_STANDALONE_SHELL__??='+JSON.stringify(template).replace(/</g,'\\u003c')+';'+
+    'window.__FOLD_FIELD_BUILTIN_ASSETS__??='+JSON.stringify(builtinAssets)+';'+
     "window.__FOLD_FIELD_TAGS__??=" +
     JSON.stringify(catalog.tags).replace(/</g, "\\u003c") +
     ";window.__FOLD_FIELD_PREFABS__??=" +
     JSON.stringify(catalog.prefabs).replace(/</g, "\\u003c") +
-    ";" +
+    ';\n/*FOLD_FIELD_PLAY_RUNTIME*/\nwindow.__FOLD_FIELD_AUDIO_ASSETS__??='+JSON.stringify(audioAssets)+';window.__FOLD_FIELD_COMPLETION_IMAGE__??='+JSON.stringify(completionImage)+';window.__FOLD_FIELD_DEATH_IMAGE__??='+JSON.stringify(deathImage)+';' +
     js.replace(/<\/script/gi, "<\\/script");
   fs.mkdirSync(outputs, { recursive: true });
   const html = template.replace(
     "<!--APP_SCRIPT-->",
-    () => "<script>" + code + "</script>",
+    () => '<script id="fold-field-runtime">' + code + "</script>",
   );
   fs.writeFileSync(path.join(outputs, "index.html"), html);
   const demoMap = JSON.parse(
     fs.readFileSync(path.join(outputs, "fold-field-demo.json"), "utf8"),
   );
-  const boot =
-    "<script>window.__FOLD_FIELD_EXPORT_MAP__=" +
-    JSON.stringify(demoMap).replace(/</g, "\\u003c") +
-    ";window.__FOLD_FIELD_GAME_ONLY__=true;</script>";
-  const gameHtml = template.replace(
-    "<!--APP_SCRIPT-->",
-    () => boot + "<script>" + code + "</script>",
-  );
-  fs.writeFileSync(path.join(outputs, "game.html"), gameHtml);
+  const standalone = gameHtml(template,code,{map:demoMap,prefabs:catalog.prefabs,tags:catalog.tags,assets:builtinAssets});
+  fs.writeFileSync(path.join(outputs, "game.html"), standalone);
   console.log(
     "Built React editor HTML: " +
       Buffer.byteLength(html).toLocaleString() +
@@ -100,7 +96,7 @@ async function build() {
   );
   console.log(
     "Built standalone game HTML: " +
-      Buffer.byteLength(gameHtml).toLocaleString() +
+      Buffer.byteLength(standalone).toLocaleString() +
       " bytes",
   );
 }

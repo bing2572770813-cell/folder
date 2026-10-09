@@ -22,7 +22,7 @@ const {default:catalogModule}=await import('./prefab-catalog.cjs');
 const catalog=await catalogModule.readCatalog(),paths=visualAssetPaths(catalog.prefabs.map(prefab=>prefab.visual));
 for(const name of ['index.html','game.html']){
  const html=await readFile(new URL('../outputs/'+name,import.meta.url),'utf8');
- const match=html.match(/window\.__FOLD_FIELD_BUILTIN_ASSETS__\?\?=(\{.*?\});/);
+ const match=name==='index.html'?html.match(/window\.__FOLD_FIELD_BUILTIN_ASSETS__\?\?=(\{.*?\});/):html.match(/window\.__FOLD_FIELD_EXPORT_ASSETS__=(\{.*?\});/);
  assert.ok(match,'built '+name+' must contain prescanned visual assets');
  const assets=JSON.parse(match[1]);
  assert.deepEqual(Object.keys(assets).sort(),[...paths].sort(),'all prefab visuals must be bundled, without an entity ID whitelist');

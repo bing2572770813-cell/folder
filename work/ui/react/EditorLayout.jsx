@@ -14,7 +14,7 @@ export const EditorLayout = React.memo(function EditorLayout() {
           <main className="main">
             <Viewport />
             <div className="canvas-top">
-              <div>
+              <div className="scene-info">
                 <div className="scene-title">
                   <span id="sceneMapName">{"未命名关卡"}</span>
                   {" / "}
@@ -52,10 +52,11 @@ export const EditorLayout = React.memo(function EditorLayout() {
                 </div>
               </div>
             </div>
-            <div className="game-hud" id="gameHud" hidden={true}>
+            <div className="game-hud" id="gameHud" hidden={true} role="status" aria-label="方块引导">
+              <b className="guide-heading">操作引导</b>
               <strong id="gameTitle">{"关卡"}</strong>
               <span id="gameDescription">{"—"}</span>
-              <small id="gameHint">
+              <small id="gameHint" aria-live="polite">
                 {
                   "点击玩家查看移动范围；点击折纸线高亮目标，再次点击目标方块掉落。"
                 }
@@ -134,7 +135,7 @@ export const EditorLayout = React.memo(function EditorLayout() {
             <div className="result-overlay" id="resultOverlay" hidden={true}>
               <div className="result-card">
                 <h2 id="resultTitle">{"通关"}</h2>
-                <img id="resultImage" className="result-image" src="/assets/texture/completion-key.png" alt="通关插画" />
+                <img id="resultImage" className="result-image" alt="通关插画" />
                 <p id="resultDetail">{"—"}</p>
                 <div className="result-actions">
                   <UiButton className="primary" id="resultRetry">

@@ -1,4 +1,5 @@
 interface Window {
+  __FOLD_FIELD_STANDALONE_SHELL__?: string;
   __FOLD_FIELD_GAME_ONLY__?: boolean;
   __FOLD_FIELD_EXPORT_MAP__?: unknown;
   __FOLD_FIELD_EXPORT_ASSETS__?: unknown;

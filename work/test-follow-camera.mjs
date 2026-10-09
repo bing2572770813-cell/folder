@@ -16,9 +16,9 @@ assert.deepEqual(boundedFollowTarget(new Vector3(2,1,-2),5,5).toArray(),[0,1,0])
 assert.deepEqual(boundedFollowTarget(new Vector3(6,1,4),14,10,4.5).toArray(),[4.75,1,2.75]);
 console.log('PASS: boundary clamping, small-map centering and zoom-aware follow limits.');
 const {readFileSync}=await import('node:fs');const {runInNewContext}=await import('node:vm');
-const appSource=readFileSync(new URL('./app.ts',import.meta.url),'utf8');const tickSource=appSource.slice(appSource.indexOf('function tick(now)'),appSource.indexOf('\nresetRegions();',appSource.indexOf('function tick(now)')));
+const appSource=readFileSync(new URL('./app.ts',import.meta.url),'utf8');const tickSource=appSource.slice(appSource.indexOf('function tick(now)'),appSource.indexOf('\n// Scene startup',appSource.indexOf('function tick(now)')));
 let corrections=0;const position=new Vector3(1,1,1),context={requestAnimationFrame:()=>{},controls:{update:()=>{}},updateFoldAxes:()=>{},controller:{tick:()=>{}},P:{mode:'play',moving:false,steps:0,player:{r:0,c:0}},manualPan:false,playerGroup:{getWorldPosition:t=>t.copy(position)},cameraFollowTarget:new Vector3(),lastFollowPosition:position.clone(),lastFollowSteps:0,correctFollowCamera:()=>corrections++,$:()=>({}),camera:{zoom:1},renderer:{render:()=>{}},scene:{},renderedFrames:0,screenPoints:()=>{}};
-Object.assign(context,{cameraInteraction:{active:false},lastZoomLabel:null,diagnosticsEnabled:false});
+Object.assign(context,{cameraInteraction:{active:false},lastZoomLabel:null,diagnosticsEnabled:false,cameraFollowEnabled:true});
 context.renderer.shadowMap={needsUpdate:false};
 context.documentModel={world:{at:()=>[]}};context.paper={position:{y:0}};
 const followPositionSource=appSource.slice(appSource.indexOf('function getCameraFollowPosition('),appSource.indexOf('function correctFollowCamera('));

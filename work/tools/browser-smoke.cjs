@@ -7,6 +7,7 @@ const {randomUUID} = require('node:crypto');
 const {chromium} = require('playwright-core');
 const {openPreview} = require('./preview-session.cjs');
 const {assertBrowserEvidence} = require('./browser-evidence.cjs');
+const {verifyExportGuidance}=require('./browser-export-guidance.cjs');
 
 function parseScenario(args = process.argv.slice(2)) {
   if (args.length === 0) return 'all';
@@ -375,23 +376,27 @@ async function main() {
       }
       await closeContext('desktop');
       await open({width:1280,height:800},pathToFileURL(exportedEmitter).href,{offlineAssets:true});
-      await page.evaluate(()=>window.foldField.enableDiagnostics());
-      await page.waitForFunction(expected=>{const models=JSON.parse(document.getElementById('viewport').dataset.render).models;return ['emitter','legacy-emitter'].every(id=>models.some(model=>model.nodeId===id&&model.model===expected));},currentEmitterModel);
-      if(currentBirdModel)await page.waitForFunction(model=>JSON.parse(document.getElementById('viewport').dataset.render).models.some(entry=>entry.model===model),currentBirdModel);
-      await page.waitForFunction(()=>JSON.parse(document.getElementById('viewport').dataset.render).firebirdTrackingHighlight===true);
+      await page.locator('#gameHud').waitFor({state:'visible'});
+      const exportedHtml=fs.readFileSync(exportedEmitter,'utf8');
+      assert.ok(exportedHtml.includes(JSON.stringify(currentEmitterModel)),'current emitter model remains baked into the export');
+      if(currentBirdModel)assert.ok(exportedHtml.includes(JSON.stringify(currentBirdModel)),'replacement bird model remains bundled');
+      assert.equal(await page.evaluate(()=>typeof window.foldField),'undefined','standalone does not expose reflection diagnostics');
+      assert.equal(await page.locator('#editMode').count(),0,'standalone has no editing controls');
       await capture('offline-current-emitter-model');
       results.push({name:'exported-game-resolves-current-prefab-model-without-server',status:'pass'});
       await closeContext('offline-emitter');
       await open({width:1280,height:800},pathToFileURL(path.resolve(cwd,'../outputs/game.html')).href,{offlineAssets:true});
-      await page.evaluate(()=>window.foldField.enableDiagnostics());
       await page.waitForFunction(()=>document.body.classList.contains('game-only'));
       assert.equal(await page.locator('#gameTitle').isVisible(),false,'standalone export must hide the level title');
       assert.equal(await page.locator('#gameDescription').isVisible(),false,'standalone export must hide the level description');
       assert.equal(await page.locator('#gameHint').isVisible(),true,'standalone export keeps gameplay instructions');
-      await page.waitForFunction(model=>{const data=JSON.parse(document.getElementById('viewport').dataset.render);return data.playerVisual?.model===model&&data.playerVisual.ready&&!data.playerVisual.fallback&&data.layers.player;},JSON.parse(fs.readFileSync(path.resolve(cwd,'../assets/prefab/entity/player_ai.json'),'utf8')).visual.model);
+      await page.locator('#gameHud').waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>typeof window.foldField),'undefined');
+      assert.equal(await page.locator('#viewport').getAttribute('data-state'),null);
       await capture('standalone-builtin-player');
       results.push({name:'player-fbx-renders-from-file-without-asset-server',status:'pass'});
       await closeContext('standalone-player');
+      results.push(...await verifyExportGuidance(browser,preview.url,directory));
     }
     if (scenario === 'all' || scenario === 'mobile') {
       await open({width: 390, height: 844}, '/');

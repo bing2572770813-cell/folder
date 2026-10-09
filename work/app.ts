@@ -12,7 +12,8 @@ import {copyTree,pasteTree} from './entities/tree-clipboard.mjs';
 import {validateMap as normalizeMap} from './core/map-model.mjs';
 import {moveNode,reparentNode,deleteNode,placeTreePrefab,replaceTreePrefab,placeCategorizedPrefab,configureNode,forkTreeDocument,renameTreeKeys,validateTreeDocument} from './entities/tree-commands.mjs';
 import {renderTreeCells,mapForSurface} from './render/tree-render.mjs';
-import {describeViewportCell} from './render/viewport-cell.mjs';
+import {describeViewportCell,describeViewportGuidance} from './render/viewport-cell.mjs';
+import {gameHtml} from './core/game-export.mjs';
 import {TreeDocument} from './entities/tree-document.mjs';
 import {previewPlacement,previewFootprint} from './entities/placement-preview.mjs';
 import {defaultComponents} from './entities/tree-runtime.mjs';
@@ -119,10 +120,12 @@ interface EditorElements {
 function $(id: keyof EditorElements): EditorElements[typeof id];
 function $(id: string): HTMLElement;
 function $(id: string): HTMLElement {
-  const element=document.getElementById(id);
+  const element=document.getElementById(id)??gameDetachedElements.get(id);
   if(!element)throw new Error(`缺少编辑器元素：${id}`);
   return element;
 }
+// Retain adapter targets after removing the authoring shell from a standalone game.
+const gameDetachedElements=new Map<string,HTMLElement>();
 const onEditorTab=event=>{if(event.detail==='inspect'){setTool('select');scheduleInspection();}};
 document.addEventListener('fold:editor-tab',onEditorTab);
 const editorTabs={dispose:()=>document.removeEventListener('fold:editor-tab',onEditorTab)};
@@ -143,15 +146,16 @@ const DEATH_IMAGE = window.__FOLD_FIELD_DEATH_IMAGE__ || '/assets/texture/death.
 const clone = data => JSON.parse(JSON.stringify(data));
 const previewCache=new Map();let previewRenderer,placementRenderCache=null,paperSurfaceCache=createPaperSurfaceCache();
 const blankTile = () => normalizeTile({...prefabs.find(p=>p.id==='paper_ai')?.tile,fold:null,folds:[]});
-let brushHeight=.09, prefabs=(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
-let tagCatalog=(window.__FOLD_FIELD_TAGS__||[]).map(normalizeTagPrefab);
+// Standalone snapshots contain export-time normalized literals; do not load or normalize prefabs again.
+let brushHeight=.09, prefabs=GAME_ONLY?(window.__FOLD_FIELD_PREFABS__||[]):(window.__FOLD_FIELD_PREFABS__||[]).map(normalizePrefab);
+let tagCatalog=GAME_ONLY?(window.__FOLD_FIELD_TAGS__||[]):(window.__FOLD_FIELD_TAGS__||[]).map(normalizeTagPrefab);
 let selectedPrefabId=prefabs.find(p=>p.id==='paper_ai')?.id??prefabs.find(isPlaceableEntity)?.id??null;
 const getPlayerPrefab=()=>prefabs.find(p=>p.id==='player_ai');
 const audio=createAudioSystem(window.__FOLD_FIELD_AUDIO_ASSETS__||{});
 function brushTile(){const selected=prefabs.find(p=>p.id===selectedPrefabId);if(selected&&!selected.tile)return {prefabId:selected.id};const value=Number($('blockHeight').value);if(!Number.isFinite(value)||value<.01||value>16)throw new Error('方块高度须为 0.01–16');brushHeight=value;const prefab=prefabs.find(p=>p.id===selectedPrefabId);if(!prefab)throw new Error('没有可用实体，请在后端提供 prefab JSON');return normalizeTile({...prefab.tile,...(prefab.tile.terrain==='key'?{keyName:$('keyName').value}:{}),...(hasColor(prefab.tile)?{color}:{}),height:brushHeight,...(prefab.tile.lift?{lift:{...prefab.tile.lift,initialHeight:brushHeight}}:{}),thickness:Number($('blockThickness').value),gradualRate:Number($('blockGradualRate').value),prefabId:prefab.id});}
 let documentModel=new TreeDocument(defaultMap());
 let map=documentModel.view(),tool='place',color='white',foldType='h';
-let hovered=null,showGrid=true,showTable=true,showCreaseDashes=true;
+let hovered=null,guideCell=null,showGrid=true,showTable=true,showCreaseDashes=true;
 let selectedTagTool=null;
 let editHistory=[],saveTimer=null,tooltipTimer=null;
 let selectionMode='single';
@@ -167,10 +171,10 @@ window.addEventListener('pagehide',event=>{if(!event.persisted){stopMapPersisten
 
 const foldableCells=new Set();
 let placementTagCells=[];
-const P=playerRuntime.createPlayerState(map.spawn,GAME_ONLY?'play':'edit');
-const controller=playerRuntime.createPlayerController({state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,playSound:audio.play,playMusic:audio.playMusic,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,refreshFragileSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;refreshFirebirdRangeLines();},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
+const P=playerRuntime.createPlayerState(map.spawn,'edit');
+const controller=playerRuntime.createPlayerController({gameOnly:GAME_ONLY,state:P,THREE,$,blocked,inside,walkable,canEnterTerrain,enterTerrain,finishAction,createTerrainState,validateTerrains,validateRegions,legalKeyNames,taggedCells,regionOf,foldsAt,inFoldRange,foldGroupAt,coord,FOLD_NAMES,clone,persist,toast,record,updateUI,buildPaper,renderPlayer,disposableClear,overlay,tileOutline,wx:c=>wx(c),wz:r=>wz(r),tileTop,playSound:audio.play,playMusic:audio.playMusic,resetDebugState:()=>{debugOverrides.clear();nodeDebug.clear();clearInspection();},foldView:{prepare:(...args)=>foldMotionView.prepare(...args),begin:(...args)=>foldMotionView.begin(...args),setAngle:angle=>foldMotionView.setAngle(angle),playerPosition:()=>foldMotionView.playerPosition(),footPosition:()=>foldMotionView.footPosition(),reset:()=>foldMotionView.reset()},getFoldHinge:group=>hingeFor(map,group,wx,wz,sceneryTop),getTabletopHeight:()=>sceneryTop,canFoldCell:(r,c)=>foldableCells.has(r+','+c),canDropEntity:node=>nodeCanDropOnFold(node),getEntityPrefab:id=>prefabs.find(prefab=>prefab.id===id),syncFoldState:()=>syncState(),onSelectionChanged:()=>refreshFoldSelection(),getLighting:()=>lighting,getPlayerPrefab,getMap:()=>map,getConfiguredMap:()=>documentModel.view(),getCellRegion:(r,c)=>documentModel.cellTags[r+','+c]?.regionTag??'默认区域',refreshLiftSurfaces,refreshMechanismSurfaces,refreshFragileSurfaces,resetMapView:()=>{map=documentModel.view();},getEntityWorld:()=>documentModel.world,onFirebirdThreat:threats=>{firebirdHalo.visible=threats.length>0;refreshFirebirdRangeLines();},componentRegistry:defaultComponents(),getFoldAxes:()=>foldAxes,getPlayerGroup:()=>playerGroup,getEffectLayer:()=>effectLayer,getSelectionRing:()=>selectionRing,isHidden:cellHidden,invalidateAxes:()=>{axisViewKey=null;}});
 const {canMoveTo,validateForPlay,exitIsValid,isAtExit,foldTargetFor,finishRun,checkRunEnd,clearSelection,selectPlayer,reflectPoint,foldTarget,selectFold,animatePlayer,transitionRegion,applyTerrainEntry,movePlayer,teleport,turn,resetRegions,setMode}=controller;
-try { const saved = EMBEDDED_MAP || localStorage.getItem(STORAGE_KEY); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
+try { const saved = EMBEDDED_MAP || (!GAME_ONLY&&localStorage.getItem(STORAGE_KEY)); if (saved) { restoreMap(typeof saved === 'string' ? JSON.parse(saved) : saved); controller.resetPosition(); } } catch { /* An invalid saved map falls back to the sample map. */ }
 
 function defaultMap() {
   return clone(demoMap);
@@ -193,7 +197,7 @@ function applyMap(next,saveHistory=false){const candidate=candidateForMap(next);
 function restoreMap(data){const next=new TreeDocument(data);documentModel=next;map=next.view();}
 function savedMap(){return documentModel.serialize({projectProperties,schemaFor:node=>nodeSchema(node),schemaForCell:(r,c)=>entityPropertySchema(map.tiles[r]?.[c]??{prefabId:'void_ai'},tagCatalog)});}
 function notifyMapChanged(){for(const error of editorBus.emit('map:changed',{map}))console.error('地图状态通知失败',error);}
-function persist() {documentModel.metadata=documentModel.cleanMetadata(map);editRefresh.request({save:true},!!gestureBefore);}
+function persist() {if(GAME_ONLY)return;documentModel.metadata=documentModel.cleanMetadata(map);editRefresh.request({save:true},!!gestureBefore);}
 function toast(text,error=false) { $('toast').textContent=text; $('toast').classList.toggle('error',error); $('toast').classList.add('show'); clearTimeout(toast.timer); toast.timer=setTimeout(()=>$('toast').classList.remove('show'),2400); }
 function currentHistory() { return P.mode==='edit'?editHistory:P.playHistory; }
 function editSnapshot(snapshot=documentModel.serialize()){return {...createEditSnapshot(snapshot,editRect,selectedCells),directSelectedCells:clone(directSelectedCells)};}
@@ -280,7 +284,7 @@ let foldAxes=[],axisViewKey=null;
 const terrainLayer=new THREE.Group(),staticTokenLayer=new THREE.Group(),tagLayer=new THREE.Group(),placementLayer=new THREE.Group();paper.add(terrainLayer,staticTokenLayer,tagLayer,placementLayer);
 const mechanismLayer=new THREE.Group(),rayLayer=new THREE.Group(),firebirdRangeLayer=new THREE.Group();paper.add(mechanismLayer,rayLayer,firebirdRangeLayer);
 const modelLayer=new THREE.Group();paper.add(modelLayer);
-const visualAssetSource=createVisualAssetSource({offline:Boolean(EMBEDDED_ASSETS),embedded:{...(window.__FOLD_FIELD_BUILTIN_ASSETS__??{}),...(EMBEDDED_ASSETS??{})}});
+const visualAssetSource=createVisualAssetSource({offline:GAME_ONLY||Boolean(EMBEDDED_ASSETS),embedded:{...(window.__FOLD_FIELD_BUILTIN_ASSETS__??{}),...(EMBEDDED_ASSETS??{})}});
 const modelLibrary=createModelLibrary({load:createFbxModelLoader(visualAssetSource)});
 let modelErrorKey='';
 const modelView=createModelView({layer:modelLayer,library:modelLibrary,onChange:()=>buildPaper(),onError:(descriptor,error)=>{const key=descriptor.id+':'+error.message;if(key!==modelErrorKey){modelErrorKey=key;console.warn('模型加载失败',descriptor.id,error);}}});
@@ -429,7 +433,7 @@ function rebuildPaper() {
   for(const entry of dynamicSurfaceEntries){entry.gridAttribute=grid.geometry.attributes.position;entry.styleAttribute=entry.style?entityEdgeLayer.children.find(line=>line.userData.edgeColor===entry.style)?.geometry.attributes.position:null;}
   rebuildFoldAxes();layoutScenery();buildCreaseGuides();buildFoldSelection();
   for(const layer of [tileLayer,staticTokenLayer,playerGroup])layer.traverse(object=>{if(object.isMesh){object.castShadow=true;object.receiveShadow=true;}});
-  renderRegionControls();renderEntityVisibility();refreshTreePanel();
+  if(!GAME_ONLY){renderRegionControls();renderEntityVisibility();refreshTreePanel();}
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();scheduleFoldPreparation();
 }
 // Update existing geometry only; gameplay selection and editor controls are untouched.
@@ -575,7 +579,7 @@ function updateCameraMode(){
   }
 }
 new ResizeObserver(()=>{fitCamera(false);}).observe(viewport);
-function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'],['topView','top']]){$(id).classList.toggle('active',view===value);$(id).setAttribute('aria-pressed',String(view===value));}document.querySelector('.viewport-corner span').textContent=view==='top'?'TOP VIEW':'ISOMETRIC';fitCamera();}
+function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'],['topView','top']]){$(id).classList.toggle('active',view===value);$(id).setAttribute('aria-pressed',String(view===value));}const label=document.querySelector('.viewport-corner span');if(label)label.textContent=view==='top'?'TOP VIEW':'ISOMETRIC';fitCamera();}
 $('fixedView').onclick=()=>changeView('fixed');$('topView').onclick=()=>changeView('top');$('fitView').onclick=()=>fitCamera();
 function syncAudioControls(){const muted=audio.isMuted(),button=$('audioMute'),icon=button.querySelector('svg');button.setAttribute('aria-pressed',String(muted));button.setAttribute('aria-label',muted?'打开声音':'静音');button.dataset.tip=muted?'打开声音':'静音';if(icon)icon.replaceWith(createElement(muted?VolumeX:Volume2));}
 $('audioMute').onclick=()=>{audio.setMuted(!audio.isMuted());syncAudioControls();};$('audioVolume').oninput=event=>{audio.setVolume(event.target.value);if(audio.isMuted())audio.setMuted(false);syncAudioControls();};syncAudioControls();
@@ -639,7 +643,7 @@ function editAt(r,c){
 }
 
 function clearInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=0;inspectedCell=null;for(const id of ['propertyInspector','generalPropertyInspector','cellSpecialInspector','cellPropertyInspector'])clearPropertyInspector($(id));$('inspectedCellProperties').textContent='尚未选择方格';$('inspectedEntity').textContent='使用地图工具的选区选择方格';$('inspectedProperties').textContent='尚未选择';$('propertyEditStatus').textContent='';renderMechanismText($('mechanismDescriptions'),['选择实体以查看机制说明']);}
-function scheduleInspection(){cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
+function scheduleInspection(){if(GAME_ONLY)return;cancelAnimationFrame(inspectionFrame);inspectionFrame=requestAnimationFrame(()=>{inspectionFrame=0;try{inspectSelection();}catch(error){clearInspection();$('propertyEditStatus').textContent=error.message;}});}
 function inspectionKey(r,c,tile){return r+','+c+':'+(tile?.instance?.id??'')+':'+(tile?.prefabId??'void_ai');}
 function inspectAtCell(r,c){setSelectedCells([{r,c}]);drawEditSelection();inspectSelection();}
 function inspectedPropertySchema(r,c,tile){
@@ -777,8 +781,23 @@ $('copyRegion').onclick=()=>{if(!editRect)return;try{clipboard=copyTree(document
 $('pasteRegion').onclick=()=>{if(!clipboard)return;setTool('paste');pendingRegion={r:0,c:0,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();};
 function pasteAt(r,c){try{if(clipboard.kind==='tree'){commitTree(pasteTree(documentModel,clipboard,r,c,{isHidden:cellHidden,nodeHidden}));pendingRegion=null;setTool('select');return;}if(clipboard.flat().some(t=>entityHidden(t,hiddenEntities)))throw new Error('不能粘贴隐藏的实体类型');for(let dr=0;dr<clipboard.length;dr++)for(let dc=0;dc<clipboard[0].length;dc++)if((!clipboard.mask||clipboard.mask[dr][dc])&&cellHidden(r+dr,c+dc))throw new Error('不能粘贴到隐藏区域');const result=pasteRegion(map,clipboard,r,c,cellHidden);assertHiddenContentUnchanged(map,result.map,visibility);applyMap(result.map,true);editRect=result.rect;setSelectedCells(unionCells([],editRect,(y,x)=>(!clipboard.mask||clipboard.mask[y-r][x-c])&&!cellHidden(y,x)));pendingRegion=null;tool='select';controller.resetPosition();buildPaper();persist();setTool('select');}catch(err){toast(err.message,true);}}
 
+function updateGuidance(){
+  const point=guideCell;
+  $('gameHint').textContent=point&&inside(point.r,point.c)
+    ?cellHidden(point.r,point.c)?coord(point.r,point.c)+': 尚未显示的区域。先找到通往这里的出口。':describeViewportGuidance(documentModel,point.r,point.c,{runtime:P.mode==='play',collectedKeys:P.terrainState.collectedKeys,nameFor:id=>prefabs.find(prefab=>prefab.id===id)?.name??id})
+    :'点击玩家查看可移动范围；点击折痕选择掉落目标，或在折痕上拖拽纸面并松开。悬停方块查看状态与规则。';
+}
 function updateUI(){
   updateCameraMode();
+  updateGuidance();
+  if(GAME_ONLY){
+    document.title=map.name+' · FOLD FIELD';applyVisibility();
+    $('gameHud').hidden=false;$('restartBtn').disabled=P.moving;
+    $('resultImage').src=P.terrainState.gameOver?DEATH_IMAGE:COMPLETION_IMAGE;
+    $('resultImage').alt=P.terrainState.gameOver?'死亡插画':'通关插画';
+    $('resultOverlay').hidden=!(P.mode==='play'&&!P.moving&&(P.levelWon||P.stepLimitHit));
+    refreshFoldSelection();return;
+  }
   renderTestModifiers($('testModifierControls'),{freeTeleport:P.freeTeleport,foldHints:P.foldHints},(kind,checked)=>{if(kind==='teleport')controller.setFreeTeleport(checked);else controller.setFoldHints(checked);});
   if(document.activeElement!==$('mapName'))$('mapName').value=map.name;
   $('sceneMapName').textContent=map.name;document.title=map.name+' · FOLD FIELD';
@@ -797,7 +816,7 @@ function updateUI(){
   const resultImage=$('resultImage');
   resultImage.src=P.terrainState.gameOver?DEATH_IMAGE:COMPLETION_IMAGE;
   resultImage.alt=P.terrainState.gameOver?'死亡插画':'通关插画';
-  $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'到达黄色出口即可通关。';$('gameHint').textContent=playing?'点击玩家查看八方向移动；点击折纸线高亮目标，再次点击目标方块掉落。':'编辑模式：设置起点和出口后开始游玩。';$('gameHud').hidden=!playing;
+  $('gameTitle').textContent=map.name;$('gameDescription').textContent=map.description||'';$('gameHud').hidden=!playing;
   $('resultOverlay').hidden=!(playing&&!P.moving&&(P.levelWon||P.stepLimitHit));
   let tiles=0,blocks=0,folds=0;for(const row of map.tiles)for(const t of row){if(!t)continue;tiles++;if(blocked(t))blocks++;folds+=foldsOf(t).length;}folds+=(map.foldCells??[]).length;$('tileCount').textContent=tiles+' TILES';$('mapStats').textContent=(tiles-blocks)+' 可通行 / '+blocks+' 阻挡 / '+folds+' 折纸线';
   $('undoBtn').disabled=!currentHistory().length||P.moving;$('restartBtn').disabled=!playing||P.moving;document.querySelectorAll('.rotate-left,.rotate-right').forEach(b=>b.disabled=P.moving);$('teleportBtn').disabled=P.moving||!P.chosenFold||!foldTarget(P.chosenFold).valid;
@@ -821,15 +840,13 @@ $('importMap').onclick=()=>$('mapFile').click();$('mapFile').onchange=async e=>{
 async function exportGameHtml(){
   const check=validateForPlay();
   if(!check.valid){toast(check.errors.join('；'),true);return;}
-  const visuals=[...collectModelDescriptors(documentModel,{getPrefab:id=>prefabs.find(prefab=>prefab.id===id)}).map(descriptor=>descriptor.visual),getPlayerPrefab()?.visual].filter(Boolean);
+  // Include future spawns/replacements as well as currently visible instances.
+  const visuals=prefabs.map(prefab=>prefab.visual).filter(Boolean);
   let embeddedAssets={};
   try{embeddedAssets=await visualAssetSource.bundle(visuals);}catch(error){toast('模型资源无法随导出打包：'+error.message,true);return;}
-  const documentCopy=document.documentElement.cloneNode(true);
-  const exportedViewport=documentCopy.querySelector('#viewport');exportedViewport.replaceChildren();for(const attribute of [...exportedViewport.attributes])if(attribute.name.startsWith('data-'))exportedViewport.removeAttribute(attribute.name);
-  documentCopy.querySelector('#resultOverlay').setAttribute('hidden','');
-  const current=documentCopy.outerHTML;
-  const boot='<script>window.__FOLD_FIELD_TAGS__='+JSON.stringify(tagCatalog).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_PREFABS__='+JSON.stringify(prefabs).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_MAP__='+JSON.stringify(savedMap()).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_EXPORT_ASSETS__='+JSON.stringify(embeddedAssets).replace(/</g,'\\u003c')+';window.__FOLD_FIELD_GAME_ONLY__=true;</script>';
-  const html='<!doctype html>\n'+current.replace(/<script>/i,boot+'<script>');
+  const shell=window.__FOLD_FIELD_STANDALONE_SHELL__,runtime=document.getElementById('fold-field-runtime')?.textContent;
+  if(!shell||!runtime){toast('缺少独立游戏模板，请重新构建编辑器',true);return;}
+  const html=gameHtml(shell,runtime,{map:savedMap(),prefabs,tags:tagCatalog,assets:embeddedAssets});
   const url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
   const a=document.createElement('a');a.href=url;a.download='game.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),500);toast('独立游戏已导出为 game.html');
 }
@@ -867,7 +884,7 @@ renderer.domElement.addEventListener('pointerdown',e=>{activePointers.add(e.poin
   if(P.foldMotion?.phase==='drag'){hoverOutline.visible=false;controller.updateFoldDrag(e.clientY,Math.min(300,viewport.clientHeight*.45));return;}
   if(P.mode==='play'&&P.chosenFold&&pointerDown?.button===0&&!multiTouch&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start&&controller.beginFoldDrag(start.r,start.c,pointerDown.y)){controller.updateFoldDrag(e.clientY,Math.min(300,viewport.clientHeight*.45));return;}}
   if(manualPan){hoverOutline.visible=false;disposableClear(placementLayer);return;}const hit=hitAt(e.clientX,e.clientY);hovered=hit;
-  if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));const groups=P.mode==='edit'&&visibility.folds?foldAxes.filter(g=>g.cells.some(p=>p.r===hit.r&&p.c===hit.c)):[];$('foldRadiusHint').hidden=!groups.length;$('foldRadiusHint').textContent=groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / ');const descriptionKey=[hit.r,hit.c,P.mode,visibility.folds,[...hiddenEntities].sort().join(',')].join('|');if(descriptionKey!==hoverDescriptionKey){hoverDescriptionKey=descriptionKey;$('hoverCoord').textContent=cellHidden(hit.r,hit.c)?coord(hit.r,hit.c)+' · 隐藏区域':describeViewportCell(documentModel,hit.r,hit.c,{nodeHidden,runtime:P.mode==='play',nameFor:id=>prefabs.find(prefab=>prefab.id===id)?.name??id});}}else{hoverDescriptionKey=null;hoverOutline.visible=false;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';}
+  guideCell=hit?{r:hit.r,c:hit.c}:null;updateGuidance();if(hit){hoverOutline.visible=true;hoverOutline.position.set(wx(hit.c),tileTop(hit.r,hit.c)+.035,wz(hit.r));const groups=P.mode==='edit'&&visibility.folds?foldAxes.filter(g=>g.cells.some(p=>p.r===hit.r&&p.c===hit.c)):[];$('foldRadiusHint').hidden=!groups.length;$('foldRadiusHint').textContent=groups.map(g=>FOLD_NAMES[g.type]+' · 作用半径 '+g.radius+'（切比雪夫距离）').join(' / ');const descriptionKey=[hit.r,hit.c,P.mode,visibility.folds,[...hiddenEntities].sort().join(',')].join('|');if(descriptionKey!==hoverDescriptionKey){hoverDescriptionKey=descriptionKey;$('hoverCoord').textContent=cellHidden(hit.r,hit.c)?coord(hit.r,hit.c)+' · 隐藏区域':describeViewportCell(documentModel,hit.r,hit.c,{nodeHidden,runtime:P.mode==='play',nameFor:id=>prefabs.find(prefab=>prefab.id===id)?.name??id});}}else{hoverDescriptionKey=null;hoverOutline.visible=false;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';}
   schedulePlacementPreview(hit);
   if(P.mode==='edit'&&tool==='paste'&&hit&&clipboard){pendingRegion={r:hit.r,c:hit.c,h:clipboard.height??clipboard.length,w:clipboard.width??clipboard[0].length};drawEditSelection();}
   if(P.mode==='edit'&&tool==='select'&&selectionMode==='multi'&&pointerDown?.button===0&&!multiTouch&&hit&&Math.hypot(e.clientX-pointerDown.x,e.clientY-pointerDown.y)>6){const start=hitAt(pointerDown.x,pointerDown.y);if(start){const rect=rectangle(start,hit);setSelectedCells(unionCells(selectionBase,rect,(r,c)=>!cellHidden(r,c)));dragEdited=true;drawEditSelection();}return;}
@@ -892,7 +909,7 @@ renderer.domElement.addEventListener('pointermove',e=>{
 renderer.domElement.addEventListener('pointerdown',()=>hoverTask.cancel());
 renderer.domElement.addEventListener('pointerleave',()=>hoverTask.cancel());
 renderer.domElement.addEventListener('pointercancel',()=>{latestPointerEvent=null;hoverTask.cancel();});
-	renderer.domElement.addEventListener('pointerleave',()=>{latestPointerEvent=null;pendingPlacementHit=null;hoverDescriptionKey=null;if(placementPreviewFrame){cancelAnimationFrame(placementPreviewFrame);placementPreviewFrame=0;}disposableClear(placementLayer);placementLayer.userData.preview=null;hoverOutline.visible=false;hovered=null;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';});
+	renderer.domElement.addEventListener('pointerleave',()=>{guideCell=null;updateGuidance();latestPointerEvent=null;pendingPlacementHit=null;hoverDescriptionKey=null;if(placementPreviewFrame){cancelAnimationFrame(placementPreviewFrame);placementPreviewFrame=0;}disposableClear(placementLayer);placementLayer.userData.preview=null;hoverOutline.visible=false;hovered=null;$('foldRadiusHint').hidden=true;$('hoverCoord').textContent='—';});
 renderer.domElement.addEventListener('pointercancel',e=>{controller.endFoldDrag(true);finishGesture();activePointers.delete(e.pointerId);if(!activePointers.size)multiTouch=false;pointerDown=null;lastEditKey=null;dragEdited=false;manualPan=false;});
 renderer.domElement.addEventListener('pointerup',e=>{finishGesture();activePointers.delete(e.pointerId);const down=pointerDown;pointerDown=null;const wasPan=manualPan,wasMultiTouch=multiTouch,wasDrag=dragEdited;manualPan=false;lastEditKey=null;dragEdited=false;syncState();if(!activePointers.size)multiTouch=false;if(P.foldMotion?.phase==='drag'){controller.endFoldDrag(wasMultiTouch||down?.button!==0||e.button!==0);return;}if(activePointers.size||wasMultiTouch||!down||down.button!==0||wasPan||wasDrag||Math.hypot(e.clientX-down.x,e.clientY-down.y)>6||P.moving)return;const hit=hitAt(e.clientX,e.clientY);if(!hit){selectedNodeId=null;lastClickTile=null;refreshTreePanel();setSelectedCells([]);editRect=null;clearSelection();drawEditSelection();syncState();return;}const {r,c}=hit;selectedNodeId=hit.nodeId??documentModel.primaryAt(r,c)?.id??null;lastClickTile={r,c};refreshTreePanel();if(P.mode==='edit'){if(!map.tiles[r][c]&&!documentModel.world.at(r,c).length&&tool!=='inspect'){setSelectedCells([]);editRect=null;drawEditSelection();syncState();if(tool==='select')return;}editAt(r,c);return;}controller.click(r,c);});
 window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLSelectElement||e.target instanceof HTMLTextAreaElement||e.target.isContentEditable||e.ctrlKey&&e.key.toLowerCase()!=='z')return;if(e.repeat&&e.key.toLowerCase()==='f')return;if(e.key.toLowerCase()==='f'){e.preventDefault();teleport();}if(e.key==='Escape'){pendingRegion=null;editRect=null;setSelectedCells([]);clearSelection();drawEditSelection();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();}});
@@ -900,7 +917,7 @@ window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e
 const tooltip=$('tooltip');document.querySelectorAll('[data-tip]').forEach(el=>{el.addEventListener('mouseenter',()=>{tooltipTimer=setTimeout(()=>{const r=el.getBoundingClientRect();tooltip.textContent=el.dataset.tip;tooltip.classList.add('show');tooltip.style.left=Math.max(5,Math.min(window.innerWidth-tooltip.offsetWidth-5,r.left+r.width/2-tooltip.offsetWidth/2))+'px';tooltip.style.top=(r.bottom+7+tooltip.offsetHeight>window.innerHeight?r.top-tooltip.offsetHeight-7:r.bottom+7)+'px';},250);});el.addEventListener('mouseleave',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});el.addEventListener('click',()=>{clearTimeout(tooltipTimer);tooltip.classList.remove('show');});});
 
 let renderedFrames=0,lastZoomLabel=null,diagnosticsEnabled=false;
-function syncState(){viewport.dataset.state=JSON.stringify({cameraFollowEnabled,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,showTable,showCreaseDashes,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState,turn:P.turn});}
+function syncState(){if(GAME_ONLY)return;viewport.dataset.state=JSON.stringify({cameraFollowEnabled,player:P.player,mode:P.mode,foldHints:P.foldHints,freeTeleport:P.freeTeleport,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,legalFoldMoves:P.legalFoldMoves,chosenFold:P.chosenFold,view,editRect,pendingRegion,brushHeight,selectedPrefabId,visibility,showGrid,showTable,showCreaseDashes,selectionMode,selectedCells,directSelectedCells,moveHeight:P.moveHeight,foldDrop:P.foldDrop,foldMotion:P.foldMotion,hiddenEntities:[...hiddenEntities],hiddenRegions:[...hiddenRegions],revealedRegions:[...P.revealedRegions],terrainState:P.terrainState,turn:P.turn});}
 function screenPoints(){
   viewport.dataset.frames=String(renderedFrames);viewport.dataset.render=JSON.stringify({firebirdThreat:controller.firebirdThreat(),firebirdTrackingHighlight:firebirdHalo.visible,spawnedEntityIds:documentModel.world.serialize().map(node=>node.id),flameMarkers:mechanismLayer.children.filter(marker=>marker.userData.flame).length,replacedFirebirds:mechanismLayer.children.filter(marker=>marker.userData.replaced).length,firebirdRangeLines:firebirdRangeLayer.children.filter(line=>line.userData.firebirdRange).length,foldStart:foldMotionView.stats(),foldAxes:foldAxes.length,foldGroups:foldAxes.map(({center,radius,type,cells})=>({center,radius,type,cells})),entityEdgeStyles:entityEdgeLayer.children.length,visibleTiles:tileLayer.children.reduce((n,o)=>n+(o.isInstancedMesh?o.count:(o.userData.surfaceCells?.length??0)),0),staticTokens:staticTokenLayer.children.length,gridSegments:gridLayer.children[0]?.geometry.attributes.position.count/2,creaseSegments:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?o.geometry.attributes.position.count/2:0),0),creaseDots:creaseGuideLayer.children.reduce((n,o)=>n+(o.isLineSegments?0:o.geometry.attributes.position.count/3),0),emitterHighlights:rayLayer.children.map(mesh=>({emitterId:mesh.userData.emitterId,...mesh.userData.cell})),models:modelLayer.children.map(host=>({nodeId:host.userData.cell?.nodeId,model:host.userData.model,rotation:host.rotation.y,position:host.position.toArray()})),playerVisual:playerVisual.status(),tokenShape:activeTokenHost.children[0]?.children[0]?.children[0]?.geometry.type,followPlayer:P.mode==='play'&&cameraFollowEnabled,defaultViewCells:9,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,camera:camera.position.toArray(),target:controls.target.toArray(),layers:{coords:boardLayer.visible,tiles:tileLayer.visible,folds:foldLayer.visible,player:playerGroup.visible,grid:gridLayer.visible,entityEdges:entityEdgeLayer.visible,axes:foldAxisLayer.visible}});
   if(map.width*map.height<=512){const b=renderer.domElement.getBoundingClientRect(),points={};for(let r=0;r<map.height;r++)for(let c=0;c<map.width;c++){const p=new THREE.Vector3(wx(c),tileTop(r,c)+.01,wz(r)).project(camera);points[r+','+c]={x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};}viewport.dataset.points=JSON.stringify(points);}else delete viewport.dataset.points;
@@ -913,9 +930,17 @@ function screenPoints(){
 	  const zoomLabel=Math.round(camera.zoom*100)+'%';if(zoomLabel!==lastZoomLabel){lastZoomLabel=zoomLabel;$('zoomLabel').textContent=zoomLabel;}
 	  renderer.render(scene,camera);renderedFrames++;if(diagnosticsEnabled&&!cameraBusy&&renderedFrames%10===0){screenPoints();}
 }
-resetRegions();setupPrefabs();setTool(tool);buildPaper();fitCamera();if(P.mode==='play')checkRunEnd();controller.refreshFirebirdThreat();requestAnimationFrame(tick);
+// Scene startup is separate from the per-frame loop.
+if(GAME_ONLY){setMode('play');if(P.mode!=='play')throw new Error('独立游戏地图无法进入游玩模式');fitCamera();}
+else{resetRegions();setupPrefabs();setTool(tool);buildPaper();fitCamera();controller.refreshFirebirdThreat();}
+requestAnimationFrame(tick);
+if(GAME_ONLY){
+  for(const element of document.querySelectorAll<HTMLElement>('[id]'))gameDetachedElements.set(element.id,element);
+  for(const selector of ['.topbar','.sidebar','.statusbar','#mapFile','#startBtn','#undoBtn','#redoBtn','#resultEdit','.canvas-top>.scene-info','.legend-inline','.map-badge','.scene-count','.viewport-corner'])document.querySelector(selector)?.remove();
+  for(const key of ['__FOLD_FIELD_PREFABS__','__FOLD_FIELD_TAGS__','__FOLD_FIELD_EXPORT_MAP__','__FOLD_FIELD_STANDALONE_SHELL__'])delete window[key];
+}
 // Read-only diagnostics support visual and interaction checks without bypassing the UI.
-window.foldField={enableDiagnostics:(enabled=true)=>{diagnosticsEnabled=!!enabled;if(diagnosticsEnabled)screenPoints();else for(const key of ['frames','render','points'])delete viewport.dataset[key];},getState:()=>clone({map,player:P.player,mode:P.mode,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,chosenFold:P.chosenFold,view,renderedFrames,placementPreview:placementLayer.userData.preview,terrainState:P.terrainState,turn:P.turn}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),tileTop(r,c)+paper.position.y+.01,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
+if(!GAME_ONLY)window.foldField={enableDiagnostics:(enabled=true)=>{diagnosticsEnabled=!!enabled;if(diagnosticsEnabled)screenPoints();else for(const key of ['frames','render','points'])delete viewport.dataset[key];},getState:()=>clone({map,player:P.player,mode:P.mode,tool,color,foldType,steps:P.steps,teleports:P.teleports,moving:P.moving,legalMoves:P.legalMoves,chosenFold:P.chosenFold,view,renderedFrames,placementPreview:placementLayer.userData.preview,terrainState:P.terrainState,turn:P.turn}),screenPoint:(r,c)=>{const p=new THREE.Vector3(wx(c),tileTop(r,c)+paper.position.y+.01,wz(r)).project(camera);const b=renderer.domElement.getBoundingClientRect();return {x:b.left+(p.x+1)*b.width/2,y:b.top+(1-p.y)*b.height/2};},reflect:reflectPoint};
 
 function setupPrefabs(){
   $('prefabSummary').parentElement.addEventListener('toggle',()=>{$('blockColorPanel').hidden=!$('prefabSummary').parentElement.open||!hasColor(prefabs.find(p=>p.id===selectedPrefabId)?.tile);});

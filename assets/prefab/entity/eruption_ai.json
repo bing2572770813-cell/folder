@@ -20,6 +20,13 @@
   "static": {
     "entityType": "terrain"
   },
+  "visual": {
+    "model": "model/box_close_shared.fbx",
+    "scale": [0.01, 0.01, 0.01],
+    "offset": [0, 0, 0],
+    "rotation": [0, 0, 0],
+    "textures": {}
+  },
   "BaseEntity": [
     "paper_ai"
   ]

@@ -230,6 +230,7 @@ controls.addEventListener('change',()=>{cameraInteraction.revision++;});
 controls.addEventListener('end',()=>{cameraInteraction.active=false;cameraInteraction.kind=null;if(latestPointerEvent)hoverTask.request(latestPointerEvent);});
 let view='fixed', baseSpan=9, cameraOffset=new THREE.Vector3(), manualPan=false;
 let cameraMode='edit',editorCameraSnapshot=null,cameraFollowEnabled=false;
+let renderedRegions=new Set<string>(),regionCameraPending=false;
 const cameraFollowTarget=new THREE.Vector3();
 const lastFollowPosition=new THREE.Vector3();let lastFollowSteps=0;
 // Follow the support plane, not the crumbling surface animation.
@@ -242,7 +243,7 @@ function getCameraFollowPosition(target){
  }
  return target;
 }
-function correctFollowCamera(){if(!cameraFollowEnabled)return;const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;getCameraFollowPosition(lastFollowPosition);lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
+function correctFollowCamera(){const damping=controls.enableDamping;controls.enableDamping=false;controls.update();controls.enableDamping=damping;lastFollowPosition.set(wx(P.player.c),tileTop(P.player.r,P.player.c)+paper.position.y+.018,wz(P.player.r));lastFollowSteps=P.steps;cameraFollowTarget.copy(boundedFollowTarget(lastFollowPosition,map.width,map.height,9/camera.zoom));followTarget(camera,controls,cameraFollowTarget,cameraOffset);}
 const paper=new THREE.Group(); scene.add(paper);
 const tableScenery=createTableScene(); scene.add(tableScenery.group);
 function paperUnderside(){return tabletopHeight(map,cellHidden); }
@@ -258,7 +259,7 @@ const fill=new THREE.DirectionalLight('#d1e8ee',1.1); fill.position.set(12,5,-8)
 let lighting={...lightingDefaults};
 function updateLighting(){lighting=applyLighting({sunlight,ambient,fill,renderer},lighting,map.width,map.height);}
 for(const [key] of lightingFields)$('lighting-'+key).oninput=()=>{try{const proposal={...lighting,[key]:Number($('lighting-'+key).value)};applyLighting({sunlight,ambient,fill,renderer},proposal,map.width,map.height);lighting=proposal;if(key==='creaseDepth')buildPaper();$('lightingStatus').textContent='光照预览已更新';}catch(e){$('lightingStatus').textContent=e.message;}};
-$('cameraFollowToggle').onchange=()=>{cameraFollowEnabled=$('cameraFollowToggle').checked;if(cameraFollowEnabled&&P.mode==='play'&&!manualPan)correctFollowCamera();syncState();};
+$('cameraFollowToggle').disabled=true;
 $('resetLighting').onclick=()=>{const previousDepth=lighting.creaseDepth;lighting={...lightingDefaults};for(const [key] of lightingFields)$('lighting-'+key).value=lighting[key];updateLighting();if(previousDepth!==lighting.creaseDepth)buildPaper();$('lightingStatus').textContent='已恢复默认光照';};
 const tileGeo=new THREE.BoxGeometry(1,1,1);
 const markerGeo=new THREE.PlaneGeometry(.94,.94);
@@ -454,6 +455,7 @@ function rebuildPaper(patchCells=null,foldsChanged=false) {
   for(const object of cellLayers.flatMap(layer=>layer.children).filter(object=>!existing.has(object)))object.traverse(child=>{if(child.isMesh){child.castShadow=true;child.receiveShadow=true;}});
   if(!GAME_ONLY){renderRegionControls();renderEntityVisibility();refreshTreePanel();}
   if(boardLayer.userData.size!==map.width+'x'+map.height){disposableClear(boardLayer);addAxisLabels(0);boardLayer.userData.size=map.width+'x'+map.height;}renderPlayer();applyVisibility();updateUI();scheduleFoldPreparation();
+  if(P.mode==='play'){if([...P.revealedRegions].some(name=>!renderedRegions.has(name)))regionCameraPending=true;renderedRegions=new Set(P.revealedRegions);}else{renderedRegions.clear();regionCameraPending=false;}
 }
 // Update existing geometry only; gameplay selection and editor controls are untouched.
 function refreshLiftSurfaces(){
@@ -604,7 +606,7 @@ function updateCameraMode(){
     if(editorCameraSnapshot){const saved=editorCameraSnapshot;changeView(saved.view);camera.position.copy(saved.position);controls.target.copy(saved.target);camera.zoom=saved.zoom;baseSpan=saved.span;resize();controls.update();editorCameraSnapshot=null;}else fitCamera();
   }
 }
-new ResizeObserver(()=>{fitCamera(false);}).observe(viewport);
+new ResizeObserver(()=>{if(P.mode==='play')resize();else fitCamera(false);}).observe(viewport);
 function changeView(next){view=next;for(const [id,value]of [['fixedView','fixed'],['topView','top']]){$(id).classList.toggle('active',view===value);$(id).setAttribute('aria-pressed',String(view===value));}const label=document.querySelector('.viewport-corner span');if(label)label.textContent=view==='top'?'TOP VIEW':'ISOMETRIC';fitCamera();}
 $('fixedView').onclick=()=>changeView('fixed');$('topView').onclick=()=>changeView('top');$('fitView').onclick=()=>fitCamera();
 function syncAudioControls(){const muted=audio.isMuted(),button=$('audioMute'),icon=button.querySelector('svg');button.setAttribute('aria-pressed',String(muted));button.setAttribute('aria-label',muted?'打开声音':'静音');button.dataset.tip=muted?'打开声音':'静音';if(icon)icon.replaceWith(createElement(muted?VolumeX:Volume2));}
@@ -952,9 +954,9 @@ function screenPoints(){
 	  const animating=P.moving||!!P.foldMotion;
 	  controller.tick(now);
 	  if(animating||P.moving||P.foldMotion)renderer.shadowMap.needsUpdate=true;
-  if(P.mode==='play'&&cameraFollowEnabled&&!manualPan&&!P.foldMotion){getCameraFollowPosition(cameraFollowTarget);if(P.moving||cameraFollowTarget.distanceToSquared(lastFollowPosition)>1e-12||P.steps!==lastFollowSteps)correctFollowCamera();}
+
 	  const zoomLabel=Math.round(camera.zoom*100)+'%';if(zoomLabel!==lastZoomLabel){lastZoomLabel=zoomLabel;$('zoomLabel').textContent=zoomLabel;}
-	  renderer.render(scene,camera);renderedFrames++;if(diagnosticsEnabled&&!cameraBusy&&renderedFrames%10===0){screenPoints();}
+	  renderer.render(scene,camera);renderedFrames++;if(regionCameraPending&&P.mode==='play'&&!P.foldMotion){regionCameraPending=false;correctFollowCamera();}if(diagnosticsEnabled&&!cameraBusy&&renderedFrames%10===0){screenPoints();}
 }
 // Scene startup is separate from the per-frame loop.
 if(GAME_ONLY){setMode('play');if(P.mode!=='play')throw new Error('独立游戏地图无法进入游玩模式');fitCamera();}

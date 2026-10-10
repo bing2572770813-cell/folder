@@ -8,6 +8,7 @@ const {chromium} = require('playwright-core');
 const {openPreview} = require('./preview-session.cjs');
 const {assertBrowserEvidence} = require('./browser-evidence.cjs');
 const {verifyExportGuidance}=require('./browser-export-guidance.cjs');
+const {verifyRegionCamera}=require('./browser-region-camera.cjs');
 
 function parseScenario(args = process.argv.slice(2)) {
   if (args.length === 0) return 'all';
@@ -75,6 +76,7 @@ async function main() {
       {channel: process.env.FOLD_BROWSER_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : 'chrome')};
     browser = await chromium.launch({...launch, headless: true});
     if (scenario === 'all' || scenario === 'desktop') {
+      results.push(...await verifyRegionCamera(browser,preview.url,directory));
       await open({width: 1280, height: 800}, '/');
       await page.waitForFunction(() => document.getElementById('editMode')?.getAttribute('aria-pressed') === 'true');
       await capture('desktop-editor');
